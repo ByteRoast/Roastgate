@@ -37,6 +37,8 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [InlineData("/whitelists")]
     [InlineData("/whitelists/edit")]
     [InlineData("/whitelists/raw")]
+    [InlineData("/reverse-proxies/wizard")]
+    [InlineData("/sites/wizard")]
     public async Task Config_pages_are_protected(string path)
     {
         HttpClient client = _factory.CreateBrowser();
@@ -76,6 +78,33 @@ public sealed class ConfigPagesTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("File name", await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("/reverse-proxies/wizard", "New reverse proxy", "Forward to")]
+    [InlineData("/sites/wizard", "New site", "Root directory")]
+    public async Task Signed_in_users_can_open_the_wizards(string path, string title, string field)
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        HttpResponseMessage response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await response.Content.ReadAsStringAsync();
+        Assert.Contains(title, html);
+        Assert.Contains("Domain names", html);
+        Assert.Contains(field, html);
+        Assert.Contains("Preview", html);
+    }
+
+    [Fact]
+    public async Task The_wizard_says_so_when_the_file_does_not_exist()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/reverse-proxies/wizard?name=ghost.conf");
+
+        Assert.Contains("does not exist", html);
     }
 
     [Fact]

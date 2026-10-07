@@ -1,0 +1,6 @@
+# Text files are checked out with LF on every platform (see .editorconfig), so multi-line literals in tests behave the same everywhere.
+* text=auto eol=lf
+
+*.ico binary
+*.png binary
+*.svg text eol=lf

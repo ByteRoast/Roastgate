@@ -16,7 +16,8 @@ public enum ConfigArea
     Whitelists,
 }
 
-public sealed record ConfigEntry(string Name, ConfigArea Area, bool Enabled, long SizeBytes, DateTimeOffset ModifiedAt);
+/// <param name="Wizard">The file carries the wizard's header, so the wizard can reopen it.</param>
+public sealed record ConfigEntry(string Name, ConfigArea Area, bool Enabled, long SizeBytes, DateTimeOffset ModifiedAt, bool Wizard = false);
 
 public sealed record ConfigFile(string Name, ConfigArea Area, string Content, bool Enabled, DateTimeOffset ModifiedAt);
 

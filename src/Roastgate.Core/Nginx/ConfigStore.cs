@@ -1,5 +1,6 @@
 using System.Text;
 using Roastgate.Core.Data;
+using Roastgate.Core.Nginx.Generation;
 using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Nginx;
@@ -73,7 +74,7 @@ public sealed class ConfigStore(
                 ConfigArea.Sites => IsLinkedTo(Path.Combine(locations.SitesEnabledDirectory, name), path),
                 _ => true,
             };
-            entries[name] = new ConfigEntry(name, area, enabled, info.Length, info.LastWriteTimeUtc);
+            entries[name] = new ConfigEntry(name, area, enabled, info.Length, info.LastWriteTimeUtc, IsWizardFile(path));
         }
 
         List<ConfigEntry> sorted = entries.Values.OrderBy((ConfigEntry entry) => entry.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -432,6 +433,21 @@ public sealed class ConfigStore(
     }
 
     // ---- File helpers -------------------------------------------------------------------
+
+    private static bool IsWizardFile(string path)
+    {
+        try
+        {
+            using StreamReader reader = new(path);
+            char[] buffer = new char[1024];
+            int read = reader.Read(buffer, 0, buffer.Length);
+            return SiteMetadataFormat.IsWizardFile(new string(buffer, 0, read));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
 
     private async Task<ConfigLocations> GetLocationsAsync(CancellationToken cancellationToken)
     {

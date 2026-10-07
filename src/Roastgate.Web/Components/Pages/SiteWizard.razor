@@ -1,0 +1,11 @@
+@page "/sites/wizard"
+@attribute [Authorize]
+
+<PageTitle>Wizard · Roastgate</PageTitle>
+
+<SiteWizardView Area="ConfigArea.Sites" Name="@Name" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "name")]
+    private string? Name { get; set; }
+}

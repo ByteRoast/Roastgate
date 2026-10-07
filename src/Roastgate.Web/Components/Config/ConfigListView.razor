@@ -12,7 +12,8 @@
     <div class="rg-page-actions">
         <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="_isBusy">Test nginx</MudButton>
         <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_isBusy">Reload nginx</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@Info.EditUrl(null)">New @Info.Singular</MudButton>
+        <MudButton Variant="Variant.Outlined" Href="@Info.EditUrl(null)">New from raw text</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@Info.WizardUrl(null)">New @Info.Singular</MudButton>
     </div>
 </div>
 
@@ -45,7 +46,13 @@
         <MudTh></MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Name"><a href="@Info.EditUrl(context.Name)">@context.Name</a></MudTd>
+        <MudTd DataLabel="Name">
+            <a href="@OpenUrl(context)">@context.Name</a>
+            @if (context.Wizard)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2" title="Created by the wizard: it can be reopened as a form">wizard</MudChip>
+            }
+        </MudTd>
         @if (Area != ConfigArea.Whitelists)
         {
             <MudTd DataLabel="Enabled">
@@ -55,7 +62,12 @@
         <MudTd DataLabel="Size">@FormatSize(context.SizeBytes)</MudTd>
         <MudTd DataLabel="Modified">@context.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
         <MudTd Style="text-align: right">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@Info.EditUrl(context.Name)" Size="Size.Small" aria-label="@("Edit " + context.Name)" />
+            @if (context.Wizard)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Code" Href="@Info.EditUrl(context.Name)" Size="Size.Small" aria-label="@("Edit " + context.Name + " as raw text")" title="Edit as raw text" />
+            }
+
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@OpenUrl(context)" Size="Size.Small" aria-label="@("Edit " + context.Name)" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(context))" Size="Size.Small" Disabled="_isBusy" aria-label="@("Delete " + context.Name)" />
         </MudTd>
     </RowTemplate>
@@ -73,6 +85,12 @@
     private bool _isBusy;
 
     private AreaInfo Info => AreaInfo.For(Area);
+
+    /// <summary>Files the wizard created open as a form; everything else opens as raw text.</summary>
+    private string OpenUrl(ConfigEntry entry)
+    {
+        return entry.Wizard ? Info.WizardUrl(entry.Name) : Info.EditUrl(entry.Name);
+    }
 
     protected override async Task OnParametersSetAsync()
     {

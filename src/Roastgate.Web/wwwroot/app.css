@@ -225,3 +225,28 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
         grid-template-columns: 1fr;
     }
 }
+
+/* Wizard. */
+.rg-switch-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.rg-switch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 0.25rem 1.5rem;
+}
+
+.rg-port-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.rg-preview {
+    max-height: 60vh;
+    overflow: auto;
+}

@@ -6,8 +6,8 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 3 of 6 done (setup, sign-in, safe editing of reverse proxies and sites, whitelist manager).
-> The creation wizard and certificates come next.
+> Status: phase 4 of 6 done (setup, sign-in, safe editing, whitelist manager, creation wizard).
+> Let's Encrypt certificates come next.
 
 ## What it manages
 
@@ -26,6 +26,21 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - Every overwrite and deletion keeps a backup in the database (the 30 most recent per file).
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
+
+### Creation wizard
+
+Describe a reverse proxy or a static site in a form (essentials, HTTPS, access, advanced) and Roastgate writes the nginx config:
+WebSockets, HTTPS with an optional redirect, HTTP/2, HSTS, upload limit, timeouts, security headers, whitelists, the Let's Encrypt
+challenge, and free directives for anything else. A preview tab shows exactly what will be written.
+
+- **Safe by construction.** Every value is validated against a strict pattern before it reaches the file (domains, URLs, paths, sizes),
+  and the free directive boxes must keep their braces balanced so they cannot leave their block.
+- **Aware of your nginx.** HTTP/2 is written as `http2 on;` from nginx 1.25.1 and as `listen ... ssl http2;` before (the first form
+  makes older versions fail). IPv6 listeners can be turned off for hosts without IPv6.
+- **Reopenable.** The settings are stored in a comment at the top of the generated file, with a hash of the body. Reopening the file
+  restores the form. If you edited the file by hand, the wizard tells you and asks before it would replace your changes; files
+  the wizard did not create are never replaced silently.
+- The proxy destination path must end with a slash (`http://backend/app/`): without it nginx glues the path to the request.
 
 ### Whitelists
 
