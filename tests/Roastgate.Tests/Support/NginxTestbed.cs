@@ -37,13 +37,19 @@ internal sealed class NginxTestbed : IAsyncDisposable
 
     public string Whitelists => Path.Combine(Root, "whitelists");
 
-    public static async Task<NginxTestbed> CreateAsync(bool createDirectories = true)
+    public string LetsEncrypt => Path.Combine(Root, "letsencrypt");
+
+    public static async Task<NginxTestbed> CreateAsync(
+        bool createDirectories = true,
+        Action<IServiceCollection>? configureServices = null,
+        Func<AppSettings, AppSettings>? configureSettings = null)
     {
         string root = Path.Combine(Path.GetTempPath(), "roastgate-nginx-" + Guid.NewGuid().ToString("N"));
         NginxTestbed? testbed = null;
         TestDatabase database = await TestDatabase.CreateAsync(configureServices: (IServiceCollection services) =>
         {
             services.AddSingleton<INginxController>(_ => testbed!.Controller);
+            configureServices?.Invoke(services);
         });
 
         testbed = new NginxTestbed(database, root);
@@ -55,11 +61,14 @@ internal sealed class NginxTestbed : IAsyncDisposable
             }
         }
 
-        await database.Get<AppSettingsService>().SaveAsync(new AppSettings
+        AppSettings settings = new()
         {
             NginxRoot = root,
             WhitelistsDirectory = testbed.Whitelists,
-        });
+            LetsEncryptDirectory = testbed.LetsEncrypt,
+            AcmeWebroot = Path.Combine(root, "acme"),
+        };
+        await database.Get<AppSettingsService>().SaveAsync(configureSettings is null ? settings : configureSettings(settings));
         return testbed;
     }
 

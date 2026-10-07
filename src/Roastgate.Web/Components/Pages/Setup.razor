@@ -60,6 +60,7 @@
         <MudTextField T="string" @bind-Value="_nginxRoot" Label="nginx directory" Variant="Variant.Outlined" Class="mb-3" />
         <MudTextField T="string" @bind-Value="_whitelistsDirectory" Label="Whitelists directory" Variant="Variant.Outlined" Class="mb-3" />
         <MudTextField T="string" @bind-Value="_acmeWebroot" Label="ACME webroot (Let's Encrypt challenges)" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_letsEncryptDirectory" Label="Let's Encrypt directory (certificates)" Variant="Variant.Outlined" Class="mb-3" />
         <MudSelect T="CertbotMode" @bind-Value="_certbotMode" Label="Certificate management" Variant="Variant.Outlined" Class="mb-3">
             <MudSelectItem Value="CertbotMode.Embedded">Embedded certbot (shipped with Roastgate)</MudSelectItem>
             <MudSelectItem Value="CertbotMode.Host">certbot installed on the host</MudSelectItem>
@@ -121,6 +122,7 @@
                 <tr><td>nginx directory</td><td><code>@_nginxRoot</code></td></tr>
                 <tr><td>Whitelists directory</td><td><code>@_whitelistsDirectory</code></td></tr>
                 <tr><td>ACME webroot</td><td><code>@_acmeWebroot</code></td></tr>
+                <tr><td>Let's Encrypt directory</td><td><code>@_letsEncryptDirectory</code></td></tr>
                 <tr><td>Certificates</td><td>@_certbotMode</td></tr>
                 <tr><td>Let's Encrypt e-mail</td><td>@(string.IsNullOrWhiteSpace(_acmeEmail) ? "(none)" : _acmeEmail)</td></tr>
             </tbody>
@@ -151,6 +153,7 @@
     private string _nginxRoot = "/etc/nginx";
     private string _whitelistsDirectory = "/etc/nginx/whitelists";
     private string _acmeWebroot = "/var/www/certbot";
+    private string _letsEncryptDirectory = "/etc/letsencrypt";
     private CertbotMode _certbotMode = CertbotMode.Embedded;
     private string? _acmeEmail;
 
@@ -163,6 +166,7 @@
             NginxRoot = _nginxRoot.Trim(),
             WhitelistsDirectory = _whitelistsDirectory.Trim(),
             AcmeWebroot = _acmeWebroot.Trim(),
+            LetsEncryptDirectory = _letsEncryptDirectory.Trim(),
             CertbotMode = _certbotMode,
             AcmeEmail = string.IsNullOrWhiteSpace(_acmeEmail) ? null : _acmeEmail.Trim(),
         };

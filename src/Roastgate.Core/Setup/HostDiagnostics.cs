@@ -52,6 +52,16 @@ public sealed class HostDiagnostics(IHostExec hostExec, NginxProbe nginxProbe, R
             ? new DiagnosticCheck("ACME webroot", DiagnosticStatus.Ok, $"{settings.AcmeWebroot} is visible to Roastgate.")
             : new DiagnosticCheck("ACME webroot", DiagnosticStatus.Warning, $"{settings.AcmeWebroot} does not exist. Certificates cannot be issued until it exists and nginx serves it under /.well-known/acme-challenge/."));
 
+        if (settings.CertbotMode != CertbotMode.Disabled)
+        {
+            checks.Add(Directory.Exists(settings.LetsEncryptDirectory)
+                ? new DiagnosticCheck("Let's Encrypt directory", DiagnosticStatus.Ok, $"{settings.LetsEncryptDirectory} is visible to Roastgate.")
+                : new DiagnosticCheck(
+                    "Let's Encrypt directory",
+                    DiagnosticStatus.Warning,
+                    $"{settings.LetsEncryptDirectory} does not exist yet. Mount the host's /etc/letsencrypt there so that nginx and Roastgate share the certificates."));
+        }
+
         checks.Add(await CheckCertbotAsync(settings, cancellationToken));
         return checks;
     }

@@ -17,9 +17,10 @@ RUN dotnet publish src/Roastgate.Web/Roastgate.Web.csproj -c Release -o /out \
     && test -f /out/wwwroot/_framework/blazor.web.js
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-# nsenter (util-linux) runs nginx and certbot in the host namespaces.
+# util-linux gives nsenter, which runs nginx (and the host's certbot) in the host namespaces.
+# certbot is the embedded one, used when the host has none (or when the settings choose it).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends util-linux \
+    && apt-get install -y --no-install-recommends util-linux certbot \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

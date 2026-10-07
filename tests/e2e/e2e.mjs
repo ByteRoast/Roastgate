@@ -361,11 +361,73 @@ check('plain HTTP is redirected to HTTPS on the chosen port', redirect.includes(
 const secure = sh(`bash -c 'printf "GET / HTTP/1.0\\r\\nHost: secure.example.com\\r\\n\\r\\n" | openssl s_client -quiet -connect 127.0.0.1:8443 -servername secure.example.com 2>/dev/null | head -1'`);
 check('HTTPS is really served with the certificate, behind the whitelist (127.0.0.1 is whitelisted)', secure.includes('200 OK'), secure);
 
+// ---- certificates (against a stand-in for certbot: it cannot reach Let's Encrypt) ----
+await page.goto(`${base}/certificates`);
+await waitText('No certificate yet');
+check('the page says certificates are handled by the embedded certbot', /embedded certbot/i.test(await body()));
+await page.getByLabel('Domain names').fill('lets.example.com');
+await button('Test first (dry run)').click();
+await waitText('The dry run succeeded');
+check('a dry run succeeds and issues nothing', !sh('ls /etc/letsencrypt/live 2>&1').includes('lets.example.com'));
+await button('Get the certificate').click();
+await waitText('was issued');
+check('issuing creates the certificate where nginx will read it', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
+const certificatesText = await body();
+check('the page lists it with its domain and its expiry read from the file', certificatesText.includes('lets.example.com') && /in (89|90) days/.test(certificatesText), certificatesText.slice(0, 300));
+await shot('09-certificates');
+
+// The wizard picks it from a list and fills in the paths.
+await page.goto(`${base}/reverse-proxies/wizard`);
+await waitField('Forward to');
+await page.getByLabel('Domain names').fill('lets.example.com');
+await page.getByLabel('Forward to').fill('http://127.0.0.1:8091');
+await tab('HTTPS').click();
+await page.getByLabel('Serve the site over HTTPS').check();
+await page.getByLabel("Use a Let's Encrypt certificate").click();
+await page.getByRole('option', { name: /lets\.example\.com/ }).click();
+await page.waitForTimeout(500);
+check('choosing a certificate fills in the certificate and key paths', (await page.getByLabel('Certificate (full chain)').inputValue()).endsWith('/live/lets.example.com/fullchain.pem') && (await page.getByLabel('Private key').inputValue()).endsWith('/live/lets.example.com/privkey.pem'));
+await tab('Advanced').click();
+await page.getByLabel('HTTP port').fill('8094');
+await page.getByLabel('HTTPS port').fill('8444');
+await button('Save').click();
+await expectSaved();
+const servedCertificate = () => sh(`bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -noout -subject -enddate'`);
+check('nginx serves the Let\'s Encrypt certificate that was chosen', servedCertificate().includes('lets.example.com'), servedCertificate());
+
+// A certificate that a config uses cannot be deleted.
+await page.goto(`${base}/certificates`);
+await waitText('lets.example.com.conf');
+check('the list shows which config uses the certificate', (await body()).includes('lets.example.com.conf'));
+await page.getByLabel('Delete lets.example.com').click();
+await button('Delete').click();
+await waitText('is still used by');
+check('deleting a certificate that is in use is refused', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
+
+// Let it age, then renew: Roastgate sees the new file and reloads nginx so the new certificate is served.
+sh(`openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout /etc/letsencrypt/live/lets.example.com/privkey.pem -out /etc/letsencrypt/live/lets.example.com/fullchain.pem -subj /CN=lets.example.com -addext subjectAltName=DNS:lets.example.com -days 5`);
+await page.goto(`${base}/certificates`);
+await waitText('in 4 days');
+check('a certificate close to expiry is shown with its few remaining days', /in [34] days/.test(await body()));
+await page.getByLabel('Renew lets.example.com now').click();
+await waitText('Renewed lets.example.com');
+check('renewing replaces the certificate and reloads nginx', (await body()).includes('nginx was reloaded'));
+check('nginx now serves a certificate valid for more than 60 days', sh(`bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -checkend 5184000 -noout'`).includes('will not expire'));
+
+// An unused certificate can be deleted.
+await page.getByLabel('Domain names').fill('unused.example.com');
+await button('Get the certificate').click();
+await waitText('was issued');
+await page.getByLabel('Delete unused.example.com').click();
+await button('Delete').click();
+await waitText('was deleted');
+check('an unused certificate is deleted through certbot', !sh('ls /etc/letsencrypt/live').includes('unused.example.com'));
+
 // ---- audit ----
 await page.goto(`${base}/audit-log`);
 await waitText('config.save');
 const audit = await body();
-check('the audit log records saves, refusals, enables and deletes', ['config.save', 'config.enable', 'config.disable', 'config.delete', 'nginx.reload', 'nginx.test'].every((a) => audit.includes(a)));
+check('the audit log records saves, refusals, enables and deletes', ['config.save', 'config.enable', 'config.disable', 'config.delete', 'nginx.reload', 'nginx.test', 'certbot.issue', 'certbot.renew', 'certbot.delete'].every((a) => audit.includes(a)));
 await shot('05-audit');
 
 await browser.close();

@@ -6,8 +6,8 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 4 of 6 done (setup, sign-in, safe editing, whitelist manager, creation wizard).
-> Let's Encrypt certificates come next.
+> Status: phase 5 of 6 done (setup, sign-in, safe editing, whitelist manager, creation wizard, Let's Encrypt certificates).
+> Backup restore, import of existing configs and two-factor authentication come next.
 
 ## What it manages
 
@@ -41,6 +41,25 @@ challenge, and free directives for anything else. A preview tab shows exactly wh
   restores the form. If you edited the file by hand, the wizard tells you and asks before it would replace your changes; files
   the wizard did not create are never replaced silently.
 - The proxy destination path must end with a slash (`http://backend/app/`): without it nginx glues the path to the request.
+
+### Certificates (Let's Encrypt)
+
+Get, list, renew and delete certificates from the **Certificates** page.
+
+- **Two ways to run certbot**, chosen at setup: the **embedded** one (shipped in the image, it works on the `/etc/letsencrypt` you mount,
+  and Roastgate renews twice a day by itself), or the one **installed on the host** (driven through `nsenter`, renewed by the host's
+  own timer). Never both renewing at once: the setup diagnostics warn you if certbot also exists on the host.
+- **Certificates are read from the files** certbot maintains, not from its text output: names, domains, issuer, expiry, staging or not,
+  and which of your configs use each one.
+- **Renewal reloads nginx** only when a certificate really changed (the file is compared before and after), so nginx never keeps
+  serving an old one. A failed reload is reported, not hidden.
+- **Dry run first**: validates your domains against Let's Encrypt's staging server and issues nothing.
+- A certificate that a config still uses **cannot be deleted**. Every value passed to certbot is validated, and it never goes through a shell.
+- The wizard lists your certificates and fills in the paths, and warns when the chosen certificate does not cover the domains.
+
+For a validation to work, nginx must answer on port 80 for the domain and serve the ACME webroot under `/.well-known/acme-challenge/`:
+tick "Let the Let's Encrypt validation through" in the wizard (it keeps working behind a whitelist). Wildcard certificates need a DNS
+challenge and are not supported.
 
 ### Whitelists
 

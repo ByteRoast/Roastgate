@@ -25,6 +25,8 @@ RoastgateOptions options = RoastgateOptions.FromEnvironment();
 builder.Services.AddRoastgateCore(options);
 builder.Services.AddSingleton<SignInTicketService>();
 builder.Services.AddScoped<CurrentUser>();
+builder.Services.AddSingleton(RenewalSchedule.Default);
+builder.Services.AddHostedService<CertificateRenewalService>();
 
 // Session cookies and antiforgery tokens are encrypted with these keys. They live in the data volume so that
 // recreating the container (an upgrade, for instance) does not sign everybody out.

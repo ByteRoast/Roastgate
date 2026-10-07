@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Roastgate.Core.Certificates;
 using Roastgate.Core.Data;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
@@ -37,13 +38,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISetupService, SetupService>();
 
         services.AddSingleton<IHostExec, HostExec>();
+        services.AddSingleton<ILocalExec, LocalExec>();
         services.AddSingleton<NginxProbe>();
         services.AddSingleton<INginxController, NginxController>();
         services.AddSingleton<IConfigBackupStore, ConfigBackupStore>();
         services.AddSingleton<IConfigStore, ConfigStore>();
+        services.AddSingleton<IManagedConfigReader, ManagedConfigReader>();
         services.AddSingleton<IWhitelistUsageScanner, WhitelistUsageScanner>();
         services.AddSingleton<IWhitelistService, WhitelistService>();
         services.AddSingleton<ISiteWizardService, SiteWizardService>();
+        services.AddSingleton<ICertificateCatalog, CertificateCatalog>();
+        services.AddSingleton<ICertificateService, CertificateService>();
+        services.AddSingleton<ICertificateRenewalJob, CertificateRenewalJob>();
         services.AddSingleton<HostDiagnostics>();
         return services;
     }

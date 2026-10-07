@@ -14,7 +14,7 @@ public interface IWhitelistUsageScanner
 /// It understands quoted and relative paths and wildcard includes. It does not read nginx.conf or files that
 /// those configs include in turn, so "not used" means "not used by anything Roastgate manages".
 /// </summary>
-public sealed partial class WhitelistUsageScanner(AppSettingsService settingsService) : IWhitelistUsageScanner
+public sealed partial class WhitelistUsageScanner(IManagedConfigReader configs, AppSettingsService settingsService) : IWhitelistUsageScanner
 {
     [GeneratedRegex(@"^\s*include\s+(?<path>""[^""]*""|'[^']*'|[^\s;]+)\s*;")]
     private static partial Regex IncludeStatement();
@@ -31,48 +31,24 @@ public sealed partial class WhitelistUsageScanner(AppSettingsService settingsSer
             (string name) => NormalizePath(locations.WhitelistIncludePath(name), settings.NginxRoot),
             StringComparer.Ordinal);
 
-        foreach (ConfigArea area in new[] { ConfigArea.ReverseProxies, ConfigArea.Sites })
+        foreach (ManagedConfig config in await configs.ReadAllAsync(cancellationToken))
         {
-            string directory = locations.Directory(area);
-            if (!Directory.Exists(directory))
+            for (int index = 0; index < config.Lines.Length; index++)
             {
-                continue;
-            }
-
-            foreach (string path in Directory.EnumerateFiles(directory))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string fileName = Path.GetFileName(path);
-                bool disabledProxy = area == ConfigArea.ReverseProxies && fileName.EndsWith(ConfigNames.DisabledSuffix, StringComparison.Ordinal);
-                string name = disabledProxy ? fileName[..^ConfigNames.DisabledSuffix.Length] : fileName;
-                bool isManagedName = ConfigNames.IsValid(name) && (area == ConfigArea.Sites || name.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal));
-                if (!isManagedName)
+                Match match = IncludeStatement().Match(config.Lines[index]);
+                if (!match.Success)
                 {
                     continue;
                 }
 
-                bool enabled = area == ConfigArea.ReverseProxies
-                    ? !disabledProxy
-                    : ConfigStore.IsLinkedTo(Path.Combine(locations.SitesEnabledDirectory, name), path);
-
-                string[] lines = await ReadLinesAsync(path, cancellationToken);
-                for (int index = 0; index < lines.Length; index++)
+                string target = NormalizePath(NginxPaths.Unquote(match.Groups["path"].Value), settings.NginxRoot);
+                bool isPattern = target.Contains('*', StringComparison.Ordinal) || target.Contains('?', StringComparison.Ordinal);
+                foreach (KeyValuePair<string, string> whitelist in whitelistPaths)
                 {
-                    Match match = IncludeStatement().Match(lines[index]);
-                    if (!match.Success)
+                    bool matches = isPattern ? GlobMatches(target, whitelist.Value) : string.Equals(target, whitelist.Value, StringComparison.Ordinal);
+                    if (matches)
                     {
-                        continue;
-                    }
-
-                    string target = NormalizePath(Unquote(match.Groups["path"].Value), settings.NginxRoot);
-                    bool isPattern = target.Contains('*', StringComparison.Ordinal) || target.Contains('?', StringComparison.Ordinal);
-                    foreach (KeyValuePair<string, string> whitelist in whitelistPaths)
-                    {
-                        bool matches = isPattern ? GlobMatches(target, whitelist.Value) : string.Equals(target, whitelist.Value, StringComparison.Ordinal);
-                        if (matches)
-                        {
-                            usage[whitelist.Key].Add(new WhitelistUsage(area, name, enabled, index + 1, isPattern));
-                        }
+                        usage[whitelist.Key].Add(new WhitelistUsage(config.Area, config.FileName, config.Enabled, index + 1, isPattern));
                     }
                 }
             }
@@ -88,56 +64,9 @@ public sealed partial class WhitelistUsageScanner(AppSettingsService settingsSer
             StringComparer.Ordinal);
     }
 
-    private static async Task<string[]> ReadLinesAsync(string path, CancellationToken cancellationToken)
-    {
-        FileInfo info = new(path);
-        if (info.Length > ConfigNames.MaximumContentBytes)
-        {
-            return [];
-        }
-
-        return (await File.ReadAllTextAsync(path, cancellationToken)).Replace("\r\n", "\n").Split('\n');
-    }
-
-    private static string Unquote(string text)
-    {
-        return text.Length >= 2 && (text[0] == '"' || text[0] == '\'') ? text[1..^1] : text;
-    }
-
-    /// <summary>
-    /// A comparable form of an nginx path: forward slashes, no "." or ".." segments, absolute (relative paths are
-    /// resolved against the nginx directory, as nginx does).
-    /// </summary>
     internal static string NormalizePath(string path, string nginxRoot)
     {
-        string unified = path.Replace('\\', '/');
-        string absolute = unified.StartsWith('/') || (unified.Length > 1 && unified[1] == ':')
-            ? unified
-            : nginxRoot.Replace('\\', '/').TrimEnd('/') + "/" + unified;
-
-        List<string> segments = [];
-        foreach (string segment in absolute.Split('/'))
-        {
-            if (segment.Length == 0 || segment == ".")
-            {
-                continue;
-            }
-
-            if (segment == "..")
-            {
-                if (segments.Count > 0)
-                {
-                    segments.RemoveAt(segments.Count - 1);
-                }
-
-                continue;
-            }
-
-            segments.Add(segment);
-        }
-
-        string joined = string.Join('/', segments);
-        return absolute.StartsWith('/') ? "/" + joined : joined;
+        return NginxPaths.Normalize(path, nginxRoot);
     }
 
     private static bool GlobMatches(string pattern, string path)

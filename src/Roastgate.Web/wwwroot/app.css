@@ -240,6 +240,13 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     gap: 0.25rem 1.5rem;
 }
 
+.rg-field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
 .rg-port-row {
     display: flex;
     flex-wrap: wrap;

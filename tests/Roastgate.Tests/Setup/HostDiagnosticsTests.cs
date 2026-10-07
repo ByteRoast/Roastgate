@@ -28,6 +28,7 @@ public sealed class HostDiagnosticsTests : IDisposable
             }
 
             Directory.CreateDirectory(Path.Combine(_root, "acme"));
+            Directory.CreateDirectory(Path.Combine(_root, "letsencrypt"));
         }
 
         return new AppSettings
@@ -35,6 +36,7 @@ public sealed class HostDiagnosticsTests : IDisposable
             NginxRoot = _root,
             WhitelistsDirectory = Path.Combine(_root, "whitelists"),
             AcmeWebroot = Path.Combine(_root, "acme"),
+            LetsEncryptDirectory = Path.Combine(_root, "letsencrypt"),
             CertbotMode = mode,
         };
     }
@@ -70,6 +72,20 @@ public sealed class HostDiagnosticsTests : IDisposable
 
         Assert.DoesNotContain(checks, (DiagnosticCheck check) => check.Status != DiagnosticStatus.Ok);
         Assert.Contains("1.27.3", Find(checks, "nginx").Message);
+    }
+
+    [Fact]
+    public async Task A_missing_lets_encrypt_directory_is_a_warning_unless_certificates_are_disabled()
+    {
+        HostDiagnostics diagnostics = CreateDiagnostics(HostExecMode.Nsenter, HealthyHost);
+        AppSettings layout = CreateLayout();
+        Directory.Delete(layout.LetsEncryptDirectory);
+
+        IReadOnlyList<DiagnosticCheck> enabled = await diagnostics.RunAsync(layout);
+        IReadOnlyList<DiagnosticCheck> disabled = await diagnostics.RunAsync(layout with { CertbotMode = CertbotMode.Disabled });
+
+        Assert.Equal(DiagnosticStatus.Warning, Find(enabled, "Let's Encrypt directory").Status);
+        Assert.DoesNotContain(disabled, (DiagnosticCheck check) => check.Name == "Let's Encrypt directory");
     }
 
     [Fact]

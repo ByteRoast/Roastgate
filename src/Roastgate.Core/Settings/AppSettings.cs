@@ -25,6 +25,9 @@ public sealed partial record AppSettings
 
     public string AcmeWebroot { get; init; } = "/var/www/certbot";
 
+    /// <summary>Where Let's Encrypt keeps certificates (<c>live/&lt;name&gt;/fullchain.pem</c>). Shared with the host when it is mounted.</summary>
+    public string LetsEncryptDirectory { get; init; } = "/etc/letsencrypt";
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public CertbotMode CertbotMode { get; init; } = CertbotMode.Embedded;
 
@@ -42,6 +45,7 @@ public sealed partial record AppSettings
         ValidatePath(problems, "nginx root", NginxRoot);
         ValidatePath(problems, "whitelists directory", WhitelistsDirectory);
         ValidatePath(problems, "ACME webroot", AcmeWebroot);
+        ValidatePath(problems, "Let's Encrypt directory", LetsEncryptDirectory);
 
         if (!string.IsNullOrWhiteSpace(AcmeEmail) && !EmailPattern().IsMatch(AcmeEmail))
         {

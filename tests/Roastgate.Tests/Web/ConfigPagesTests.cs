@@ -39,6 +39,7 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [InlineData("/whitelists/raw")]
     [InlineData("/reverse-proxies/wizard")]
     [InlineData("/sites/wizard")]
+    [InlineData("/certificates")]
     public async Task Config_pages_are_protected(string path)
     {
         HttpClient client = _factory.CreateBrowser();
@@ -95,6 +96,19 @@ public sealed class ConfigPagesTests : IAsyncLifetime
         Assert.Contains("Domain names", html);
         Assert.Contains(field, html);
         Assert.Contains("Preview", html);
+    }
+
+    [Fact]
+    public async Task The_certificates_page_explains_how_certificates_are_managed_and_where_they_are_read()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/certificates");
+
+        Assert.Contains("Certificates", html);
+        Assert.Contains("embedded certbot", html);
+        Assert.Contains("Get a certificate", html);
+        Assert.Contains("Test first (dry run)", html);
     }
 
     [Fact]

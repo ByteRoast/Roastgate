@@ -1,5 +1,6 @@
 @inject ISiteWizardService Wizard
 @inject IConfigStore Store
+@inject ICertificateCatalog Catalog
 @inject CurrentUser User
 @inject NavigationManager Navigation
 @using Roastgate.Core.Nginx.Generation
@@ -108,6 +109,24 @@
         <MudSwitch T="bool" @bind-Value="_form.EnableTls" Color="Color.Primary" Label="Serve the site over HTTPS" />
         @if (_form.EnableTls)
         {
+            @if (_certificates.Count > 0)
+            {
+                <MudSelect T="string" Label="Use a Let's Encrypt certificate" Variant="Variant.Outlined" Class="mt-4" Clearable="true"
+                           Value="SelectedCertificate?.Name" ValueChanged="SelectCertificate"
+                           HelperText="Fills in the two paths below. You can also type any other certificate.">
+                    @foreach (CertificateInfo certificate in _certificates)
+                    {
+                        <MudSelectItem T="string" Value="@certificate.Name">@certificate.Name (@string.Join(", ", certificate.Domains))</MudSelectItem>
+                    }
+                </MudSelect>
+                @if (SelectedCertificate is { } selected && UncoveredNames(selected).Count > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        This certificate does not cover @string.Join(", ", UncoveredNames(selected)): browsers will show a name mismatch for them.
+                    </MudAlert>
+                }
+            }
+
             <MudTextField T="string" @bind-Value="_form.CertificatePath" Label="Certificate (full chain)" Variant="Variant.Outlined" Class="mt-4" Immediate="true"
                           Placeholder="/etc/letsencrypt/live/app.example.com/fullchain.pem"
                           Error="@(ErrorFor(nameof(SiteSpec.CertificatePath), _form.CertificatePath) is not null)" ErrorText="@ErrorFor(nameof(SiteSpec.CertificatePath), _form.CertificatePath)" />
@@ -267,6 +286,7 @@
     private readonly HashSet<string> _selectedWhitelists = new(StringComparer.Ordinal);
     private WizardForm _form = new();
     private IReadOnlyList<string> _availableWhitelists = [];
+    private IReadOnlyList<CertificateInfo> _certificates = [];
     private SiteKind _kind;
     private MetadataStatus _status = MetadataStatus.None;
     private WizardPreview? _preview;
@@ -288,6 +308,20 @@
 
     private string? FirstDomain => ParseNames(_form.ServerNames).FirstOrDefault();
 
+    private CertificateInfo? SelectedCertificate => _certificates.FirstOrDefault((CertificateInfo certificate) => certificate.FullChainPath == _form.CertificatePath);
+
+    private List<string> UncoveredNames(CertificateInfo certificate)
+    {
+        return ParseNames(_form.ServerNames).Where((string name) => name != "_" && !certificate.Covers(name)).ToList();
+    }
+
+    private void SelectCertificate(string? name)
+    {
+        CertificateInfo? certificate = _certificates.FirstOrDefault((CertificateInfo item) => item.Name == name);
+        _form.CertificatePath = certificate?.FullChainPath ?? string.Empty;
+        _form.CertificateKeyPath = certificate?.PrivateKeyPath ?? string.Empty;
+    }
+
     private string EffectiveName => string.IsNullOrWhiteSpace(_form.Name) ? FirstDomain ?? string.Empty : _form.Name.Trim();
 
     private string PreviewFileName => ConfigNames.Normalize(Area, EffectiveName) ?? "(no name yet)";
@@ -306,6 +340,7 @@
 
         ConfigListing whitelists = await Store.ListAsync(ConfigArea.Whitelists);
         _availableWhitelists = whitelists.Entries.Select((ConfigEntry entry) => entry.Name).ToList();
+        _certificates = (await Catalog.ListAsync()).Certificates.Select((CertificateEntry entry) => entry.Certificate).ToList();
 
         SiteSpec spec = await Wizard.NewSpecAsync(Area);
         if (!_isNew)
