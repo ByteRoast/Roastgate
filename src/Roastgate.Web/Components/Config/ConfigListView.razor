@@ -1,0 +1,135 @@
+@inject IConfigStore Store
+@inject CurrentUser User
+@inject IDialogService Dialogs
+@using Roastgate.Core.Nginx
+@using Roastgate.Web.Services
+
+<div class="rg-page-header">
+    <div>
+        <MudText Typo="Typo.h4">@Info.Title</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@Info.Description</MudText>
+    </div>
+    <div class="rg-page-actions">
+        <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="_isBusy">Test nginx</MudButton>
+        <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_isBusy">Reload nginx</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@Info.EditUrl(null)">New @Info.Singular</MudButton>
+    </div>
+</div>
+
+<ResultAlert Result="_result" Class="mb-4" />
+
+@if (_listing is not null && !_listing.DirectoryExists)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        The directory <code>@_listing.Directory</code> does not exist or is not visible to Roastgate.
+        @if (Area == ConfigArea.Whitelists)
+        {
+            <span>It is created when you save the first whitelist.</span>
+        }
+        else
+        {
+            <span>Mount your nginx directory into the container, or fix the path in the settings.</span>
+        }
+    </MudAlert>
+}
+
+<MudTable T="ConfigEntry" Items="_listing?.Entries" Loading="_listing is null" Hover="true" Dense="true" Outlined="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        @if (Area != ConfigArea.Whitelists)
+        {
+            <MudTh>Enabled</MudTh>
+        }
+        <MudTh>Size</MudTh>
+        <MudTh>Modified</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Name"><a href="@Info.EditUrl(context.Name)">@context.Name</a></MudTd>
+        @if (Area != ConfigArea.Whitelists)
+        {
+            <MudTd DataLabel="Enabled">
+                <MudSwitch T="bool" Value="context.Enabled" ValueChanged="@((bool value) => SetEnabledAsync(context, value))" Color="Color.Primary" Disabled="_isBusy" aria-label="@("Enable " + context.Name)" />
+            </MudTd>
+        }
+        <MudTd DataLabel="Size">@FormatSize(context.SizeBytes)</MudTd>
+        <MudTd DataLabel="Modified">@context.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+        <MudTd Style="text-align: right">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@Info.EditUrl(context.Name)" Size="Size.Small" aria-label="@("Edit " + context.Name)" />
+            <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(context))" Size="Size.Small" Disabled="_isBusy" aria-label="@("Delete " + context.Name)" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText>No @Info.Singular yet.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    [Parameter, EditorRequired]
+    public ConfigArea Area { get; set; }
+
+    private ConfigListing? _listing;
+    private ConfigResult? _result;
+    private bool _isBusy;
+
+    private AreaInfo Info => AreaInfo.For(Area);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _listing = await Store.ListAsync(Area);
+    }
+
+    private async Task TestAsync()
+    {
+        await RunAsync(async () => _result = await Store.TestNginxAsync(await User.GetNameAsync()));
+    }
+
+    private async Task ReloadAsync()
+    {
+        await RunAsync(async () => _result = await Store.ReloadNginxAsync(await User.GetNameAsync()));
+    }
+
+    private async Task SetEnabledAsync(ConfigEntry entry, bool enabled)
+    {
+        await RunAsync(async () => _result = await Store.SetEnabledAsync(Area, entry.Name, enabled, reload: true, await User.GetNameAsync()));
+    }
+
+    private async Task DeleteAsync(ConfigEntry entry)
+    {
+        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
+            "Delete " + entry.Name + "?",
+            "The file is removed and nginx is reloaded. A backup of its content is kept.",
+            yesText: "Delete",
+            cancelText: "Cancel");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await RunAsync(async () => _result = await Store.DeleteAsync(Area, entry.Name, reload: true, await User.GetNameAsync()));
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _isBusy = true;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        return bytes < 1024 ? bytes + " B" : (bytes / 1024.0).ToString("0.#") + " KiB";
+    }
+}

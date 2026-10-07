@@ -25,6 +25,9 @@
     <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Responsive" ClipMode="DrawerClipMode.Always">
         <MudNavMenu>
             <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="/reverse-proxies" Icon="@Icons.Material.Filled.AltRoute">Reverse proxies</MudNavLink>
+            <MudNavLink Href="/sites" Icon="@Icons.Material.Filled.Language">Sites</MudNavLink>
+            <MudNavLink Href="/whitelists" Icon="@Icons.Material.Filled.Shield">Whitelists</MudNavLink>
             <MudNavLink Href="/audit-log" Icon="@Icons.Material.Filled.History">Audit log</MudNavLink>
         </MudNavMenu>
     </MudDrawer>

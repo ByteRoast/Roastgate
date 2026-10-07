@@ -48,11 +48,15 @@ public sealed class AdminAccount
 
 public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> options) : DbContext(options)
 {
+    private const int ConfigNameMaximumLength = 100;
+
     public DbSet<Setting> Settings => Set<Setting>();
 
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
 
     public DbSet<AdminAccount> AdminAccounts => Set<AdminAccount>();
+
+    public DbSet<ConfigBackup> ConfigBackups => Set<ConfigBackup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -76,6 +80,19 @@ public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> opti
             entity.Property(entry => entry.Target).HasColumnName("target").HasMaxLength(500);
             entity.Property(entry => entry.Success).HasColumnName("success");
             entity.Property(entry => entry.Details).HasColumnName("details");
+        });
+
+        modelBuilder.Entity<ConfigBackup>(entity =>
+        {
+            entity.ToTable("config_backups");
+            entity.HasKey(backup => backup.Id);
+            entity.Property(backup => backup.Id).HasColumnName("id").ValueGeneratedOnAdd();
+            entity.Property(backup => backup.CreatedAt).HasColumnName("created_at");
+            entity.Property(backup => backup.Area).HasColumnName("area").HasMaxLength(50);
+            entity.Property(backup => backup.Name).HasColumnName("name").HasMaxLength(ConfigNameMaximumLength);
+            entity.Property(backup => backup.Reason).HasColumnName("reason").HasMaxLength(50);
+            entity.Property(backup => backup.Content).HasColumnName("content");
+            entity.HasIndex(backup => new { backup.Area, backup.Name });
         });
 
         modelBuilder.Entity<AdminAccount>(entity =>

@@ -21,7 +21,9 @@ internal sealed class TestDatabase : IAsyncDisposable
 
     public ServiceProvider Services { get; }
 
-    public static async Task<TestDatabase> CreateAsync(Action<RoastgateOptions>? configureOptions = null)
+    public static async Task<TestDatabase> CreateAsync(
+        Action<RoastgateOptions>? configureOptions = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         string directory = Path.Combine(Path.GetTempPath(), "roastgate-tests-" + Guid.NewGuid().ToString("N"));
         RoastgateOptions options = new()
@@ -36,6 +38,7 @@ internal sealed class TestDatabase : IAsyncDisposable
         ServiceCollection services = new();
         services.AddRoastgateCore(options);
         services.AddSingleton(new PasswordHasher(1000));
+        configureServices?.Invoke(services);
 
         ServiceProvider provider = services.BuildServiceProvider();
         await provider.MigrateRoastgateDatabaseAsync();

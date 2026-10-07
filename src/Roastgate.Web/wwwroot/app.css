@@ -165,3 +165,41 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .rg-inline-form {
     display: inline;
 }
+
+/* Config list and editor pages. */
+.rg-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.rg-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.rg-editor {
+    height: 60vh;
+    min-height: 24rem;
+    border: 1px solid #dadde1;
+    border-radius: 0.4rem;
+    overflow: hidden;
+}
+
+/* BlazorMonaco gives its container no height of its own: without this it collapses to a few pixels and the code is invisible. */
+.rg-editor .monaco-editor-container {
+    width: 100%;
+    height: 100%;
+}
+
+.rg-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}

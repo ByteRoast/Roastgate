@@ -11,6 +11,7 @@ using Roastgate.Web.Authentication;
 using Roastgate.Web.Cli;
 using Roastgate.Web.Components;
 using Roastgate.Web.Middleware;
+using Roastgate.Web.Services;
 
 if (args.Length > 0 && args[0] == "reset-password")
 {
@@ -22,6 +23,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 RoastgateOptions options = RoastgateOptions.FromEnvironment();
 builder.Services.AddRoastgateCore(options);
 builder.Services.AddSingleton<SignInTicketService>();
+builder.Services.AddScoped<CurrentUser>();
 
 // Session cookies and antiforgery tokens are encrypted with these keys. They live in the data volume so that
 // recreating the container (an upgrade, for instance) does not sign everybody out.

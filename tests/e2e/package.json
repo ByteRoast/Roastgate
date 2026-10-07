@@ -1,0 +1,12 @@
+{
+  "name": "roastgate-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Browser tests that drive the real application against a real nginx in Docker",
+  "scripts": {
+    "test": "node e2e.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}

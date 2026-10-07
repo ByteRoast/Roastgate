@@ -1,0 +1,26 @@
+@if (Result is not null)
+{
+    <MudAlert Severity="Severity" Class="@Class" Variant="Variant.Outlined">
+        <div>@Result.Message</div>
+        @if (!string.IsNullOrWhiteSpace(Result.NginxOutput))
+        {
+            <pre class="rg-output">@Result.NginxOutput</pre>
+        }
+    </MudAlert>
+}
+
+@code {
+    [Parameter]
+    public ConfigResult? Result { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    private Severity Severity => Result switch
+    {
+        null => Severity.Info,
+        { Succeeded: false } => Severity.Error,
+        { Warning: true } => Severity.Warning,
+        _ => Severity.Success,
+    };
+}

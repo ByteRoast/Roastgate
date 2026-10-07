@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Roastgate.Core.Data;
 using Roastgate.Core.Hosting;
+using Roastgate.Core.Nginx;
 using Roastgate.Core.Security;
 using Roastgate.Core.Settings;
 using Roastgate.Core.Setup;
@@ -35,6 +36,9 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IHostExec, HostExec>();
         services.AddSingleton<NginxProbe>();
+        services.AddSingleton<INginxController, NginxController>();
+        services.AddSingleton<IConfigBackupStore, ConfigBackupStore>();
+        services.AddSingleton<IConfigStore, ConfigStore>();
         services.AddSingleton<HostDiagnostics>();
         return services;
     }

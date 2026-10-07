@@ -1,0 +1,12 @@
+@page "/whitelists/edit"
+@attribute [Authorize]
+@using Roastgate.Core.Nginx
+
+<PageTitle>Whitelist · Roastgate</PageTitle>
+
+<ConfigEditView Area="ConfigArea.Whitelists" Name="@Name" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "name")]
+    private string? Name { get; set; }
+}

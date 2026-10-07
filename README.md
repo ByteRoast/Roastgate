@@ -6,8 +6,8 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 1 of 6 done (setup, sign-in, host access, Docker image). Config editing, whitelists, the creation wizard and certificates
-> come next.
+> Status: phase 2 of 6 done (setup, sign-in, safe editing of reverse proxies, sites and whitelists with a Monaco editor).
+> The whitelist editor, the creation wizard and certificates come next.
 
 ## What it manages
 
@@ -18,6 +18,14 @@ Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 | `whitelists/<name>.conf` | `allow <ip>;` lines | included from your configs |
 
 Every change follows the same cycle: backup, write, `nginx -t`, automatic rollback if invalid, reload if valid.
+
+- Edit any file in a Monaco editor with nginx syntax highlighting; the file name is part of the URL as a query string
+  (`/reverse-proxies/edit?name=app.conf`), so every route stays lowercase and hyphenated.
+- Enable or disable a proxy or a site with one switch. Roastgate only touches symlinks that point at the site itself, and
+  understands both relative and absolute links (the Debian default site uses an absolute one).
+- Every overwrite and deletion keeps a backup in the database (the 30 most recent per file).
+- If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
+- Writes are atomic (temporary file, then rename) and keep the original file permissions.
 
 ## Quick start
 
@@ -77,6 +85,9 @@ dotnet run --project src/Roastgate.Web          # http://localhost:5009, host co
 ```
 
 On Windows or macOS there is no nginx to drive, so the dashboard reports it as unreachable; everything else works.
+
+The tests that fake nginx live in `tests/Roastgate.Tests`. A second suite drives the real UI against a real nginx in Docker, see
+[tests/e2e](tests/e2e/README.md).
 
 The database schema is managed with EF Core migrations:
 

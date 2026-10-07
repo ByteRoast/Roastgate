@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @inject NginxProbe Probe
 @inject RoastgateOptions Options
+@inject IConfigStore Store
+@inject CurrentUser User
 
 <PageTitle>Dashboard · Roastgate</PageTitle>
 
@@ -37,8 +39,11 @@
             </MudCardContent>
             <MudCardActions>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RefreshAsync" Disabled="_isChecking">Check again</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="_isChecking">Test configuration</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_isChecking">Reload nginx</MudButton>
             </MudCardActions>
         </MudCard>
+        <ResultAlert Result="_result" Class="mt-4" />
     </MudItem>
 
     <MudItem xs="12" md="6">
@@ -63,10 +68,21 @@
 @code {
     private NginxProbeResult? _probe;
     private bool _isChecking;
+    private ConfigResult? _result;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshAsync();
+    }
+
+    private async Task TestAsync()
+    {
+        _result = await Store.TestNginxAsync(await User.GetNameAsync());
+    }
+
+    private async Task ReloadAsync()
+    {
+        _result = await Store.ReloadNginxAsync(await User.GetNameAsync());
     }
 
     private async Task RefreshAsync()
