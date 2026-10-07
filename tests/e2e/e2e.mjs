@@ -3,6 +3,25 @@
 import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
+
+// RFC 6238 (HMAC-SHA1, 30 s steps, 6 digits), written here independently of the server, as an authenticator app would compute it.
+const base32Decode = (text) => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const character of text.replace(/[\s=-]/g, '').toUpperCase()) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
+  const bytes = [];
+  for (let index = 0; index + 8 <= bits.length; index += 8) bytes.push(parseInt(bits.slice(index, index + 8), 2));
+  return Buffer.from(bytes);
+};
+const totp = (secret, stepOffset = 0) => {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000) + stepOffset));
+  const hash = crypto.createHmac('sha1', base32Decode(secret)).update(counter).digest();
+  const offset = hash[hash.length - 1] & 0x0f;
+  const binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
+  return String(binary % 1000000).padStart(6, '0');
+};
 
 const out = process.env.E2E_OUT ?? './out';
 const shots = `${out}/screenshots`;
@@ -510,6 +529,131 @@ await page.getByLabel('Password').fill('A-brand-new-Passw0rd');
 await page.getByRole('button', { name: 'Sign in' }).click();
 await page.waitForURL(`${base}/`, { timeout: 10000 });
 check('the new password works', true);
+
+// ---- two-factor authentication ----
+const NEW_PASSWORD = 'A-brand-new-Passw0rd';
+const typePasswordStep = async (p, password) => {
+  await p.getByLabel('Username').fill('admin');
+  await p.getByLabel('Password', { exact: true }).fill(password);
+  await p.getByRole('button', { name: 'Sign in' }).click();
+};
+const newBrowserAtLogin = async () => {
+  const context = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+  const fresh = await context.newPage();
+  await fresh.goto(`${base}/login`);
+  await fresh.getByLabel('Username').waitFor();
+  await fresh.waitForTimeout(700);
+  return { context, fresh };
+};
+const enableTwoFactor = async () => {
+  await page.goto(`${base}/settings`);
+  await waitText('Two-factor authentication');
+  await button('Set up two-factor authentication').click();
+  await page.locator('.rg-qr svg').waitFor();
+  const secret = (await page.locator('.rg-secret').innerText()).replace(/\s+/g, '');
+  await page.getByLabel('Code from the app').fill(totp(secret));
+  await button('Turn on two-factor authentication').click();
+  await waitText('Save these recovery codes now');
+  const recovery = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
+  return { secret, recovery };
+};
+
+await page.goto(`${base}/settings`);
+await waitText('Two-factor authentication');
+await button('Set up two-factor authentication').click();
+await page.locator('.rg-qr svg').waitFor();
+check('a QR code is shown to scan', (await page.locator('.rg-qr svg').count()) === 1);
+await shot('12-two-factor-setup');
+const secret = (await page.locator('.rg-secret').innerText()).replace(/\s+/g, '');
+check('the secret is shown too, for apps that cannot scan', /^[A-Z2-7]{32}$/.test(secret), secret);
+await page.getByLabel('Code from the app').fill('000000');
+await button('Turn on two-factor authentication').click();
+await waitText('That code is not valid');
+check('a wrong code does not turn it on', (await body()).includes('Set up two-factor') === false);
+await page.getByLabel('Code from the app').fill(totp(secret));
+await button('Turn on two-factor authentication').click();
+await waitText('Save these recovery codes now');
+const recovery = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
+check('ten recovery codes are shown, once', recovery.length === 10 && recovery.every((code) => /^[a-z2-7]{4}(-[a-z2-7]{4}){3}$/.test(code)), recovery.join(' '));
+await button('I have saved them, sign in again').click();
+await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
+check('turning it on ends the session and says why', (await body()).includes('Two-factor authentication was changed'));
+
+// The two steps, with a code computed by this script (so the server's TOTP is checked against an independent implementation).
+await typePasswordStep(page, NEW_PASSWORD);
+await waitText('Two-step verification');
+check('the password alone leads to the second step, not into the application', page.url().includes('/login'));
+await shot('13-two-step');
+await page.getByLabel('Authentication code').fill('000000');
+await button('Verify').click();
+await waitText('That code is not valid');
+check('a wrong code is refused', page.url().includes('/login'));
+await page.getByLabel('Authentication code').fill(totp(secret, 1));
+await button('Verify').click();
+await page.waitForURL(`${base}/`, { timeout: 15000 });
+check('the code computed independently signs in', true);
+
+// A recovery code works once.
+const first = await newBrowserAtLogin();
+await typePasswordStep(first.fresh, NEW_PASSWORD);
+await first.fresh.getByLabel('Authentication code').fill(recovery[0].toUpperCase());
+await first.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
+await first.fresh.waitForURL(`${base}/`, { timeout: 15000 });
+check('a recovery code signs in (case does not matter)', true);
+await first.context.close();
+const second = await newBrowserAtLogin();
+await typePasswordStep(second.fresh, NEW_PASSWORD);
+await second.fresh.getByLabel('Authentication code').fill(recovery[0]);
+await second.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
+await second.fresh.getByText('That code is not valid').first().waitFor({ timeout: 10000 });
+check('the same recovery code does not work twice', second.fresh.url().includes('/login'));
+await second.context.close();
+
+// New recovery codes replace the old ones.
+await page.goto(`${base}/settings`);
+await waitText('Two-factor authentication is');
+await page.getByLabel('Code from the app', { exact: true }).fill(recovery[1]);
+await button('Get new recovery codes').click();
+await waitText('Save these recovery codes now');
+const regenerated = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
+check('regenerating gives ten new codes, confirmed with a code', regenerated.length === 10 && !regenerated.includes(recovery[2]));
+await button('I have saved them').click();
+await waitText('10 recovery code(s) left');
+check('regenerating does not sign the user out', !page.url().includes('/login'));
+const third = await newBrowserAtLogin();
+await typePasswordStep(third.fresh, NEW_PASSWORD);
+await third.fresh.getByLabel('Authentication code').fill(recovery[2]);
+await third.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
+await third.fresh.getByText('That code is not valid').first().waitFor({ timeout: 10000 });
+check('an old recovery code no longer works', true);
+await third.context.close();
+
+// Turning it off needs the password and a code.
+await page.getByLabel('Password', { exact: true }).fill('wrong-password-123');
+await page.getByLabel('Code from the app (or a recovery code)').fill(regenerated[0]);
+await button('Turn off two-factor authentication').click();
+await waitText('The password is not correct');
+check('turning it off with a wrong password is refused', true);
+await page.getByLabel('Password', { exact: true }).fill(NEW_PASSWORD);
+await button('Turn off two-factor authentication').click();
+await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
+await typePasswordStep(page, NEW_PASSWORD);
+await page.waitForURL(`${base}/`, { timeout: 15000 });
+check('with two-factor off the password alone signs in again', true);
+
+// The way out when the phone is lost: the console command.
+const enabledAgain = await enableTwoFactor();
+check('it can be turned on again with a new secret', enabledAgain.secret !== secret);
+await button('I have saved them, sign in again').click();
+await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
+await typePasswordStep(page, NEW_PASSWORD);
+await waitText('Two-step verification');
+const consoleOutput = sh('roastgate disable-2fa 2>&1');
+check('the console command turns it off', consoleOutput.includes('is off'), consoleOutput);
+await page.goto(`${base}/login`);
+await typePasswordStep(page, NEW_PASSWORD);
+await page.waitForURL(`${base}/`, { timeout: 20000 });
+check('afterwards the password alone is enough', true);
 
 // ---- audit ----
 await page.goto(`${base}/audit-log`);

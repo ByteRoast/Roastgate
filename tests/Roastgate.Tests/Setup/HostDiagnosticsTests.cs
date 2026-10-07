@@ -12,10 +12,7 @@ public sealed class HostDiagnosticsTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_root))
-        {
-            Directory.Delete(_root, recursive: true);
-        }
+        TemporaryDirectory.Delete(_root);
     }
 
     private AppSettings CreateLayout(bool withDirectories = true, CertbotMode mode = CertbotMode.Embedded)

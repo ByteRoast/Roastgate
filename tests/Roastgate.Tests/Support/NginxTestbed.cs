@@ -98,10 +98,7 @@ internal sealed class NginxTestbed : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _database.DisposeAsync();
-        if (Directory.Exists(Root))
-        {
-            Directory.Delete(Root, recursive: true);
-        }
+        TemporaryDirectory.Delete(Root);
     }
 
     public sealed class FakeNginxController(NginxTestbed testbed) : INginxController

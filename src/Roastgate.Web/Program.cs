@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
 using Roastgate.Core;
@@ -21,6 +23,11 @@ if (args.Length > 0 && args[0] == "reset-password")
     return await ResetPasswordCommand.RunAsync();
 }
 
+if (args.Length > 0 && args[0] == "disable-2fa")
+{
+    return await DisableTwoFactorCommand.RunAsync();
+}
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 RoastgateOptions options = RoastgateOptions.FromEnvironment();
@@ -32,9 +39,10 @@ builder.Services.AddHostedService<CertificateRenewalService>();
 
 // Session cookies and antiforgery tokens are encrypted with these keys. They live in the data volume so that
 // recreating the container (an upgrade, for instance) does not sign everybody out.
-builder.Services.AddDataProtection()
-    .SetApplicationName("Roastgate")
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(options.DataDirectory, "keys")));
+builder.Services.AddDataProtection().SetApplicationName("Roastgate");
+builder.Services.AddOptions<KeyManagementOptions>().Configure<RoastgateOptions, ILoggerFactory>(
+    (KeyManagementOptions keys, RoastgateOptions current, ILoggerFactory loggerFactory) =>
+        keys.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(current.DataDirectory, "keys")), loggerFactory));
 builder.Services.AddMudServices();
 
 builder.Services

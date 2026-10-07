@@ -37,6 +37,18 @@ internal static partial class HtmlForm
         return fields;
     }
 
+    /// <summary>Posts a form the way a browser does: the hidden fields found in <paramref name="page"/> plus the given values.</summary>
+    public static Task<HttpResponseMessage> PostAsync(HttpClient client, string path, string page, IReadOnlyDictionary<string, string> values)
+    {
+        Dictionary<string, string> fields = HiddenFields(page);
+        foreach (KeyValuePair<string, string> value in values)
+        {
+            fields[value.Key] = value.Value;
+        }
+
+        return client.PostAsync(path, new FormUrlEncodedContent(fields));
+    }
+
     public static async Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string username, string password, string path = "/login")
     {
         string page = await client.GetStringAsync(path);

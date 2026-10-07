@@ -57,9 +57,6 @@ internal sealed class TestDatabase : IAsyncDisposable
 
         // SQLite pools connections per file; release them so the temporary directory can be deleted on Windows.
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
+        TemporaryDirectory.Delete(_directory);
     }
 }

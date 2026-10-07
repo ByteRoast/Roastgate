@@ -27,6 +27,15 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
 
+### Two-factor authentication
+
+In **Settings**, scan the QR code with any authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden...) and confirm with a code. You get ten
+**recovery codes**, shown once (each signs you in once; they are stored hashed). Sign-in then has two steps, and the second step only appears after a correct password.
+
+- Codes follow RFC 6238 (SHA-1, 30 s, 6 digits). One step of clock drift is tolerated; a code that was used cannot be used again (the check is atomic in the database).
+- Five wrong codes end the attempt, and a client address is locked out after five failures, whatever the password.
+- Lost the phone and the codes? From the host: `docker exec roastgate roastgate disable-2fa`.
+
 ### Settings
 
 The **Settings** page edits the paths and options chosen at setup (validated the same way), checks the host with the values you typed
@@ -134,7 +143,8 @@ in practice, root on the host. Treat it accordingly:
   and open browser tabs are rechecked every 30 seconds). `roastgate reset-password` does the same, so it is also the answer to a stolen session.
 - Every sign-in, failure and (soon) config change is written to the audit log.
 - The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored unencrypted, so keep `/data` readable by root only.
-- Two-factor authentication is planned.
+- **Two-factor authentication** (TOTP, any authenticator app) is available in the settings: a code is asked after the password, a code can be used only once, and
+  wrong codes are throttled separately from passwords. Turning it on or off ends every other session.
 
 ## Development
 

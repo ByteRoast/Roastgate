@@ -17,10 +17,7 @@ public sealed class ResetPasswordCommandTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
+        TemporaryDirectory.Delete(_directory);
     }
 
     private static Func<string, string> Typing(params string[] answers)

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Roastgate.Core;
 using Roastgate.Core.Security;
 using Roastgate.Core.Setup;
@@ -14,6 +15,9 @@ public sealed class RoastgateFactory : WebApplicationFactory<Program>, IAsyncLif
 {
     public const string SetupToken = "integration-test-token-0123456789";
     public const string AdminPassword = "Correct-Horse-9";
+
+    /// <summary>The clock the application runs on: tests move it to get new one-time codes instead of waiting.</summary>
+    public FakeTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
 
     private readonly string _dataDirectory = Path.Combine(Path.GetTempPath(), "roastgate-web-tests-" + Guid.NewGuid().ToString("N"));
 
@@ -29,6 +33,7 @@ public sealed class RoastgateFactory : WebApplicationFactory<Program>, IAsyncLif
                 SetupToken = SetupToken,
             });
             services.AddSingleton(new PasswordHasher(1000));
+            services.AddSingleton<TimeProvider>(Time);
         });
     }
 
@@ -55,9 +60,6 @@ public sealed class RoastgateFactory : WebApplicationFactory<Program>, IAsyncLif
     {
         await base.DisposeAsync();
         SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_dataDirectory))
-        {
-            Directory.Delete(_dataDirectory, recursive: true);
-        }
+        Support.TemporaryDirectory.Delete(_dataDirectory);
     }
 }

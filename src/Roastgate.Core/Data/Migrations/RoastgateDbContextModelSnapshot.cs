@@ -32,6 +32,10 @@ namespace Roastgate.Core.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("RecoveryCodeHashes")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("recovery_codes");
+
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -39,6 +43,10 @@ namespace Roastgate.Core.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("")
                         .HasColumnName("security_stamp");
+
+                    b.Property<long?>("TotpLastStep")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("totp_last_step");
 
                     b.Property<string>("TotpSecret")
                         .HasColumnType("TEXT")

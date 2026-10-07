@@ -35,6 +35,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PasswordHasher>(_ => new PasswordHasher());
         services.AddSingleton<ISessionStamp, SessionStamp>();
         services.AddSingleton<AccountService>();
+        services.AddSingleton<ITwoFactorService, TwoFactorService>();
+        services.AddSingleton<TwoFactorChallenges>();
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<ISetupService, SetupService>();
 

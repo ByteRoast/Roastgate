@@ -121,6 +121,12 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     border-color: #ee8a26;
 }
 
+.rg-auth-help {
+    margin: 0 0 1rem;
+    color: #525860;
+    font-size: 0.9rem;
+}
+
 .rg-auth-notice {
     margin: 0 0 1rem;
     padding: 0.6rem 0.8rem;
@@ -279,6 +285,33 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 
 .rg-diff-removed-text {
     color: #af272b;
+}
+
+/* Two-factor authentication. */
+.rg-qr {
+    width: 13rem;
+    max-width: 100%;
+    padding: 0.5rem;
+    background: #ffffff;
+    border: 1px solid #dadde1;
+    border-radius: 0.4rem;
+}
+
+.rg-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.rg-secret {
+    letter-spacing: 0.05em;
+    word-break: break-all;
+}
+
+.rg-recovery-codes {
+    font-size: 1rem;
+    line-height: 1.7;
+    user-select: all;
 }
 
 /* Wizard. */

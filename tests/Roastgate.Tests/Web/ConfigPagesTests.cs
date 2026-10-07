@@ -150,6 +150,8 @@ public sealed class ConfigPagesTests : IAsyncLifetime
         Assert.Contains("Check the host with these values", html);
         Assert.Contains("About this instance", html);
         Assert.Contains("Signed in as", html);
+        Assert.Contains("Two-factor authentication", html);
+        Assert.Contains("Set up two-factor authentication", html);
     }
 
     [Fact]
