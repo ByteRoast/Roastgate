@@ -1,5 +1,6 @@
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
+using Roastgate.Core.Nginx.Parsing;
 using Roastgate.Core.Nginx.Whitelists;
 using Roastgate.Tests.Support;
 
@@ -174,6 +175,34 @@ public sealed class SiteWizardServiceTests
         WizardFile? loaded = await Wizard(nginx).LoadAsync(ConfigArea.ReverseProxies, "legacy");
 
         Assert.Equal(MetadataStatus.None, loaded!.Metadata.Status);
+    }
+
+    [Fact]
+    public async Task A_hand_written_file_can_be_imported_and_saved_through_the_wizard_with_a_backup()
+    {
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        const string handWritten = "server {\n    listen 80;\n    server_name legacy.example.com;\n    location / {\n        proxy_pass http://127.0.0.1:9000;\n        proxy_buffering off;\n    }\n}\n";
+        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "legacy", handWritten, reload: false, "admin");
+
+        SiteImportResult? import = await Wizard(nginx).ImportAsync(ConfigArea.ReverseProxies, "legacy.conf");
+
+        Assert.NotNull(import?.Spec);
+        Assert.Equal("proxy_buffering off;", import.Spec.ExtraLocationDirectives);
+        ConfigResult saved = await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "legacy", import.Spec, reload: false, "admin");
+        Assert.True(saved.Succeeded, saved.Message);
+        ConfigFile? after = await nginx.Store.ReadAsync(ConfigArea.ReverseProxies, "legacy");
+        Assert.Contains("proxy_buffering off;", after!.Content);
+        Assert.Contains("proxy_pass http://127.0.0.1:9000;", after.Content);
+        Assert.Equal(MetadataStatus.Intact, SiteMetadataFormat.Read(after.Content).Status);
+    }
+
+    [Fact]
+    public async Task Importing_a_missing_file_or_a_whitelist_returns_null()
+    {
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+
+        Assert.Null(await Wizard(nginx).ImportAsync(ConfigArea.ReverseProxies, "ghost"));
+        Assert.Null(await Wizard(nginx).ImportAsync(ConfigArea.Whitelists, "ghost"));
     }
 
     [Fact]

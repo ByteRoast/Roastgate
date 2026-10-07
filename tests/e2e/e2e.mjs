@@ -274,7 +274,9 @@ await page.waitForTimeout(1500);
 check('an unused whitelist is deleted', !sh('ls /etc/nginx/whitelists').includes('mixed.conf'));
 
 // ---- the wizard, against a real nginx ----
-const httpGet = (port, host) => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`);
+const httpGet = (port, host, path = '/') => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`);
+// Writes a file in the container with its real newlines (printf through two shells would keep the backslashes).
+const writeHostFile = (path, content) => sh(`bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`);
 const tab = (name) => page.getByRole('tab', { name, exact: true });
 // Waits for the "Saved." message, and when the save failed shows why instead of just timing out.
 const expectSaved = async () => {
@@ -351,10 +353,53 @@ await page.goto(`${base}/reverse-proxies`);
 await waitText('proxied.example.com.conf');
 check('the list still opens an edited wizard file in the wizard', (await page.getByLabel('Edit proxied.example.com.conf', { exact: true }).getAttribute('href')).includes('/wizard'));
 
-// A file the wizard did not create gets an explicit warning instead of being silently replaced.
+// A file the wizard did not create is read into the form, and the user is told that saving regenerates it.
 await page.goto(`${base}/reverse-proxies/wizard?name=app.example.com.conf`);
 await waitText('not created by the wizard');
-check('a hand-made file is not silently replaced by the wizard', (await body()).includes('replaces the whole file'));
+check('a hand-made file is imported and the user is told saving regenerates it', (await body()).includes('read from the existing config') && (await body()).includes('regenerates the whole file'));
+check('the imported form shows what the file said', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:3000');
+
+// A richer hand-made file: what the form has no field for must survive a save through the wizard, checked by the real nginx.
+writeHostFile('/etc/nginx/conf.d/legacy.example.com.conf', `server {
+    listen 8095;
+    server_name legacy.example.com;
+    gzip on;
+    location /health {
+        return 200 "ok";
+    }
+    location / {
+        proxy_pass http://127.0.0.1:9000;
+        proxy_buffering off;
+    }
+}
+`);
+await openEditor('/reverse-proxies/edit?name=legacy.example.com.conf');
+await page.getByTestId('import-link').click();
+await waitText('read from the existing config');
+check('the import fills the fields of a richer file', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:9000');
+await button('Save').click();
+await expectSaved();
+const legacyFile = sh('cat /etc/nginx/conf.d/legacy.example.com.conf');
+check('free directives survive a save through the wizard and the real nginx accepts the result',
+    legacyFile.includes('proxy_buffering off;') && legacyFile.includes('return 200 "ok";') && legacyFile.includes('gzip on;') && legacyFile.includes('# roastgate-spec:'), legacyFile.slice(0, 300));
+const legacyAnswer = httpGet(8095, 'legacy.example.com', '/health');
+check('the imported site still answers on its own port', legacyAnswer.includes('200') && legacyAnswer.endsWith('ok'), legacyAnswer.slice(0, 200));
+
+// A file the wizard could not reproduce faithfully is refused with the reason, and nothing is rewritten unless the user insists.
+writeHostFile('/etc/nginx/conf.d/blocked.example.com.conf', `upstream backend {
+    server 127.0.0.1:9100;
+}
+server {
+    listen 8096;
+    server_name blocked.example.com;
+    location / {
+        proxy_pass http://backend;
+    }
+}
+`);
+await page.goto(`${base}/reverse-proxies/wizard?name=blocked.example.com.conf`);
+await waitText('cannot be imported without changing what it does');
+check('a file with an upstream block is refused with the reason', (await body()).includes('outside a server block would be lost') && (await body()).includes('replaces the whole file'));
 
 // HTTPS with a real certificate, a redirect and a whitelist.
 sh('openssl req -x509 -nodes -newkey rsa:2048 -keyout /etc/ssl/private/rg-e2e.key -out /etc/ssl/certs/rg-e2e.crt -subj /CN=secure.example.com -days 2');

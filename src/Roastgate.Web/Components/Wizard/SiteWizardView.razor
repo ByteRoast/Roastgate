@@ -34,17 +34,48 @@
         </MudAlert>
         break;
     case MetadataStatus.None when !_isNew:
-        <MudAlert Severity="Severity.Warning" Class="mb-4">
-            This file was not created by the wizard, so its settings are unknown. You can still describe the site below: saving
-            <strong>replaces the whole file</strong> with the generated config (a backup of the current content is kept).
-            To change it without losing anything, <a href="@Info.EditUrl(_fileName)">edit it as raw text</a>.
-        </MudAlert>
-        break;
     case MetadataStatus.Unreadable:
-        <MudAlert Severity="Severity.Warning" Class="mb-4">
-            The wizard header of this file cannot be read, so its settings are unknown. Saving replaces the whole file
-            (a backup is kept), or <a href="@Info.EditUrl(_fileName)">edit it as raw text</a>.
-        </MudAlert>
+        @if (_importBlockers.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="import-info">
+                <div>
+                    @(_status == MetadataStatus.Unreadable ? "The wizard header of this file cannot be read:" : "This file was not created by the wizard:")
+                    its settings were <strong>read from the existing config</strong> and filled in below. Anything the form has no field for is kept
+                    in the "Extra directives" boxes of the Advanced tab.
+                </div>
+                <div>
+                    Saving <strong>regenerates the whole file</strong> from the form (a backup of the current content is kept), so check the Preview tab first.
+                    To change the file without regenerating it, <a href="@Info.EditUrl(_fileName)">edit it as raw text</a>.
+                </div>
+                @if (_importNotes.Count > 0)
+                {
+                    <ul>
+                        @foreach (string note in _importNotes)
+                        {
+                            <li>@note</li>
+                        }
+                    </ul>
+                }
+            </MudAlert>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Warning" Class="mb-4" data-testid="import-blocked">
+                <div>
+                    This file was not created by the wizard and <strong>cannot be imported without changing what it does</strong>:
+                </div>
+                <ul>
+                    @foreach (string blocker in _importBlockers)
+                    {
+                        <li>@blocker</li>
+                    }
+                </ul>
+                <div>
+                    You can still describe the site below, but saving <strong>replaces the whole file</strong> (a backup is kept).
+                    To change it without losing anything, <a href="@Info.EditUrl(_fileName)">edit it as raw text</a>.
+                </div>
+            </MudAlert>
+        }
         break;
 }
 
@@ -287,6 +318,8 @@
     private WizardForm _form = new();
     private IReadOnlyList<string> _availableWhitelists = [];
     private IReadOnlyList<CertificateInfo> _certificates = [];
+    private IReadOnlyList<string> _importNotes = [];
+    private IReadOnlyList<string> _importBlockers = [];
     private SiteKind _kind;
     private MetadataStatus _status = MetadataStatus.None;
     private WizardPreview? _preview;
@@ -336,6 +369,8 @@
         _loaded = true;
         _loadedName = Name;
         _isNew = string.IsNullOrWhiteSpace(Name);
+        _importNotes = [];
+        _importBlockers = [];
         _selectedWhitelists.Clear();
 
         ConfigListing whitelists = await Store.ListAsync(ConfigArea.Whitelists);
@@ -357,6 +392,15 @@
             if (existing.Metadata.Spec is { } stored)
             {
                 spec = stored;
+            }
+            else if (await Wizard.ImportAsync(Area, Name!) is { } import)
+            {
+                _importNotes = import.Notes;
+                _importBlockers = import.Blockers;
+                if (import.Spec is { } imported)
+                {
+                    spec = imported;
+                }
             }
         }
 

@@ -1,4 +1,5 @@
 using Roastgate.Core.Hosting;
+using Roastgate.Core.Nginx.Parsing;
 using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Nginx.Generation;
@@ -22,6 +23,9 @@ public interface ISiteWizardService
     Task<ConfigResult> SaveAsync(ConfigArea area, string name, SiteSpec spec, bool reload, string actor, CancellationToken cancellationToken = default);
 
     Task<WizardFile?> LoadAsync(ConfigArea area, string name, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads an existing hand-written file into wizard settings. Null when the file does not exist.</summary>
+    Task<SiteImportResult?> ImportAsync(ConfigArea area, string name, CancellationToken cancellationToken = default);
 }
 
 public sealed class SiteWizardService(IConfigStore store, AppSettingsService settingsService, NginxProbe nginxProbe) : ISiteWizardService
@@ -102,5 +106,17 @@ public sealed class SiteWizardService(IConfigStore store, AppSettingsService set
     {
         ConfigFile? file = await store.ReadAsync(area, name, cancellationToken);
         return file is null ? null : new WizardFile(file, SiteMetadataFormat.Read(file.Content));
+    }
+
+    public async Task<SiteImportResult?> ImportAsync(ConfigArea area, string name, CancellationToken cancellationToken = default)
+    {
+        ConfigFile? file = area == ConfigArea.Whitelists ? null : await store.ReadAsync(area, name, cancellationToken);
+        if (file is null)
+        {
+            return null;
+        }
+
+        AppSettings settings = await settingsService.GetAsync(cancellationToken);
+        return SiteImporter.Import(file.Content, new ConfigLocations(settings), settings.AcmeWebroot);
     }
 }

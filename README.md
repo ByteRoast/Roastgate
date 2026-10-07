@@ -6,8 +6,8 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 5 of 6 done (setup, sign-in, safe editing, whitelist manager, creation wizard, Let's Encrypt certificates).
-> Backup restore, import of existing configs and two-factor authentication come next.
+> Status: all six phases are done (setup, sign-in, safe editing, whitelist manager, creation wizard, Let's Encrypt certificates,
+> backup restore, settings, two-factor authentication, import of existing configs).
 
 ## What it manages
 
@@ -26,6 +26,18 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - Every overwrite and deletion keeps a backup in the database (the 30 most recent per file).
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
+
+### Importing a hand-written config
+
+Open a file that the wizard did not create in the wizard (the "import into the wizard" link of the raw editor, or `/reverse-proxies/wizard?name=app.conf`) and its
+settings are **read from the file**: names, ports, upstream, certificate, whitelists, upload limit, WebSocket headers, timeouts, redirect.
+Everything the form has no field for (other locations, `gzip`, `proxy_buffering`...) is kept as free directives in the Advanced tab, so
+nothing is lost. Saving regenerates the file (a backup is kept), so check the Preview tab first.
+
+A file is **refused, with the reason**, when the wizard could not reproduce it faithfully: a top-level `upstream` or `map`, a `listen` bound to an
+address, `default_server`, a regex `server_name`, a different `proxy_set_header Host`, an HTTP server that does more than redirect, more than two server
+blocks. Those stay editable as raw text. Comments between directives are not kept, and the wizard lists the defaults it adds (for example the
+`X-Forwarded-*` headers) when your file did not have them.
 
 ### Two-factor authentication
 

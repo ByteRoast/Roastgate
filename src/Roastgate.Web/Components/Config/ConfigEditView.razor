@@ -21,6 +21,10 @@
             {
                 <span> &middot; <a href="@Info.WizardUrl(_name)">open in the wizard</a> (hand edits will be replaced)</span>
             }
+            else if (!_isNew && _file is not null && Area != ConfigArea.Whitelists)
+            {
+                <span> &middot; <a href="@Info.WizardUrl(_name)" data-testid="import-link">import into the wizard</a> (the file is regenerated, a backup is kept)</span>
+            }
             @if (Area == ConfigArea.Whitelists && !_isNew)
             {
                 <span> &middot; <a href="@("/whitelists/edit?name=" + Uri.EscapeDataString(_name))">edit as a list</a></span>
