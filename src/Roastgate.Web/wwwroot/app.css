@@ -121,6 +121,15 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     border-color: #ee8a26;
 }
 
+.rg-auth-notice {
+    margin: 0 0 1rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 0.4rem;
+    background: #eef9fd;
+    color: #193c47;
+    font-size: 0.9rem;
+}
+
 .rg-auth-error {
     margin: 0.25rem 0 0;
     color: #af272b;

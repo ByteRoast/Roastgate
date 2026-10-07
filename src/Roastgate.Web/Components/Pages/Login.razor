@@ -12,6 +12,11 @@
 
 <h1 class="rg-auth-title">Sign in</h1>
 
+@if (NoticeText is not null)
+{
+    <p class="rg-auth-notice" role="status">@NoticeText</p>
+}
+
 <EditForm Model="Input" FormName="login" OnValidSubmit="SignInAsync" Enhance="false" class="rg-auth-form">
     <DataAnnotationsValidator />
 
@@ -40,6 +45,16 @@
 
     [SupplyParameterFromQuery(Name = "returnUrl")]
     private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery(Name = "notice")]
+    private string? Notice { get; set; }
+
+    private string? NoticeText => Notice switch
+    {
+        "password-changed" => "Your password was changed. Sign in again with the new one.",
+        "two-factor-changed" => "Two-factor authentication was changed. Sign in again.",
+        _ => null,
+    };
 
     private string? _error;
 

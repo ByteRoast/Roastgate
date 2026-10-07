@@ -41,6 +41,12 @@ public sealed class AdminAccount
 
     public string? TotpSecret { get; set; }
 
+    /// <summary>
+    /// Random value stored in every session cookie. It is renewed whenever the credentials really change (new password, two-factor
+    /// enabled or disabled), which ends all open sessions. It is not renewed when a hash is merely upgraded.
+    /// </summary>
+    public string SecurityStamp { get; set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
@@ -103,6 +109,7 @@ public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> opti
             entity.Property(account => account.Username).HasColumnName("username").HasMaxLength(32);
             entity.Property(account => account.PasswordHash).HasColumnName("password_hash");
             entity.Property(account => account.TotpSecret).HasColumnName("totp_secret");
+            entity.Property(account => account.SecurityStamp).HasColumnName("security_stamp").HasMaxLength(64).HasDefaultValue(string.Empty);
             entity.Property(account => account.CreatedAt).HasColumnName("created_at");
             entity.Property(account => account.UpdatedAt).HasColumnName("updated_at");
         });

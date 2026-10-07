@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AppSettingsService>();
 
         services.AddSingleton<PasswordHasher>(_ => new PasswordHasher());
+        services.AddSingleton<ISessionStamp, SessionStamp>();
         services.AddSingleton<AccountService>();
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<ISetupService, SetupService>();

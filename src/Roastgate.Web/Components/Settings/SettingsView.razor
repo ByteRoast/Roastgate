@@ -1,0 +1,259 @@
+@inject AppSettingsService SettingsService
+@inject HostDiagnostics Diagnostics
+@inject AccountService Accounts
+@inject IAdminAccountStore AccountStore
+@inject LoginThrottle Throttle
+@inject IAuditLog Audit
+@inject RoastgateOptions Options
+@inject CurrentUser User
+@inject NavigationManager Navigation
+@using System.Reflection
+@using Roastgate.Core.Setup
+
+<div class="rg-page-header">
+    <div>
+        <MudText Typo="Typo.h4">Settings</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Where Roastgate finds nginx and Let's Encrypt, your password, and a check of the host.</MudText>
+    </div>
+</div>
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-1">Paths and options</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        These paths are the ones <em>Roastgate</em> sees: they must be mounted into its container, at the same location as on the host,
+        because nginx reads the files you write through the same paths.
+    </MudText>
+
+    @if (_saveErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3">
+            @foreach (string error in _saveErrors)
+            {
+                <div>@error</div>
+            }
+        </MudAlert>
+    }
+
+    @if (_saved)
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-3">Settings saved.</MudAlert>
+    }
+
+    <div class="rg-field-row">
+        <MudTextField T="string" @bind-Value="_nginxRoot" Label="nginx directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_whitelistsDirectory" Label="Whitelists directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_acmeWebroot" Label="ACME webroot" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_letsEncryptDirectory" Label="Let's Encrypt directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+    <div class="rg-field-row mt-3">
+        <MudSelect T="CertbotMode" @bind-Value="_certbotMode" Label="Certificate management" Variant="Variant.Outlined" Margin="Margin.Dense">
+            <MudSelectItem Value="CertbotMode.Embedded">Embedded certbot (renewed by Roastgate)</MudSelectItem>
+            <MudSelectItem Value="CertbotMode.Host">certbot installed on the host</MudSelectItem>
+            <MudSelectItem Value="CertbotMode.Disabled">Do not manage certificates</MudSelectItem>
+        </MudSelect>
+        <MudTextField T="string" @bind-Value="_acmeEmail" Label="Let's Encrypt e-mail" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+    <div class="rg-editor-actions">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync">Save settings</MudButton>
+        <MudButton Variant="Variant.Outlined" OnClick="RunDiagnosticsAsync" Disabled="_isChecking">Check the host with these values</MudButton>
+    </div>
+
+    @if (_isChecking)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-3" />
+    }
+    else if (_checks.Count > 0)
+    {
+        <div class="mt-3"><DiagnosticsTable Checks="_checks" /></div>
+    }
+</MudPaper>
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-1">Change the password</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        Every open session, on every device, is ended: you sign in again with the new password.
+    </MudText>
+
+    @if (_passwordErrors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3">
+            @foreach (string error in _passwordErrors)
+            {
+                <div>@error</div>
+            }
+        </MudAlert>
+    }
+
+    <div class="rg-field-row">
+        <MudTextField T="string" @bind-Value="_currentPassword" Label="Current password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_newPassword" Label="New password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+        <MudTextField T="string" @bind-Value="_confirmation" Label="Repeat the new password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </div>
+    @if (_newPassword.Length > 0)
+    {
+        @foreach (string problem in CredentialPolicy.ValidatePassword(_newPassword, _username))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-1">@problem</MudText>
+        }
+    }
+
+    <div class="rg-editor-actions">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ChangePasswordAsync" Disabled="_isChangingPassword">Change the password</MudButton>
+    </div>
+</MudPaper>
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-2">About this instance</MudText>
+    <MudSimpleTable Dense="true" Elevation="0">
+        <tbody>
+            <tr><td>Signed in as</td><td>@_username</td></tr>
+            <tr><td>Version</td><td>@_version</td></tr>
+            <tr><td>Host commands</td><td>@(Options.HostExecMode == HostExecMode.Nsenter ? "run in the host namespaces (nsenter)" : "run inside this process (direct, development)")</td></tr>
+            <tr><td>Data directory</td><td><code>@Options.DataDirectory</code></td></tr>
+            <tr><td>Forwarded headers</td><td>@(Options.TrustForwardedHeaders ? "trusted (X-Forwarded-For, X-Forwarded-Proto)" : "ignored")</td></tr>
+            <tr><td>Secure cookies</td><td>@(Options.SecureCookies ? "yes" : "no (set ROASTGATE_SECURE_COOKIES=true behind HTTPS)")</td></tr>
+        </tbody>
+    </MudSimpleTable>
+</MudPaper>
+
+@code {
+    private readonly List<string> _saveErrors = [];
+    private readonly List<string> _passwordErrors = [];
+    private IReadOnlyList<DiagnosticCheck> _checks = [];
+    private AppSettings _original = new();
+    private string _nginxRoot = string.Empty;
+    private string _whitelistsDirectory = string.Empty;
+    private string _acmeWebroot = string.Empty;
+    private string _letsEncryptDirectory = string.Empty;
+    private string? _acmeEmail;
+    private CertbotMode _certbotMode;
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _confirmation = string.Empty;
+    private string _username = string.Empty;
+    private string _version = string.Empty;
+    private bool _saved;
+    private bool _isChecking;
+    private bool _isChangingPassword;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _original = await SettingsService.GetAsync();
+        _nginxRoot = _original.NginxRoot;
+        _whitelistsDirectory = _original.WhitelistsDirectory;
+        _acmeWebroot = _original.AcmeWebroot;
+        _letsEncryptDirectory = _original.LetsEncryptDirectory;
+        _acmeEmail = _original.AcmeEmail;
+        _certbotMode = _original.CertbotMode;
+        _username = await User.GetNameAsync();
+        _version = typeof(SettingsView).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
+    }
+
+    private AppSettings Current()
+    {
+        return new AppSettings
+        {
+            NginxRoot = _nginxRoot.Trim(),
+            WhitelistsDirectory = _whitelistsDirectory.Trim(),
+            AcmeWebroot = _acmeWebroot.Trim(),
+            LetsEncryptDirectory = _letsEncryptDirectory.Trim(),
+            CertbotMode = _certbotMode,
+            AcmeEmail = string.IsNullOrWhiteSpace(_acmeEmail) ? null : _acmeEmail.Trim(),
+        };
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        _saved = false;
+        _saveErrors.Clear();
+        AppSettings updated = Current();
+        _saveErrors.AddRange(updated.Validate());
+        if (_saveErrors.Count > 0)
+        {
+            return;
+        }
+
+        List<string> changed = ChangedSettings(_original, updated);
+        await SettingsService.SaveAsync(updated);
+        await Audit.WriteAsync(await User.GetNameAsync(), "settings.update", null, true, changed.Count == 0 ? "no change" : string.Join(", ", changed));
+        _original = updated;
+        _saved = true;
+    }
+
+    private static List<string> ChangedSettings(AppSettings before, AppSettings after)
+    {
+        List<string> changed = [];
+        if (before.NginxRoot != after.NginxRoot) { changed.Add("nginx directory"); }
+        if (before.WhitelistsDirectory != after.WhitelistsDirectory) { changed.Add("whitelists directory"); }
+        if (before.AcmeWebroot != after.AcmeWebroot) { changed.Add("ACME webroot"); }
+        if (before.LetsEncryptDirectory != after.LetsEncryptDirectory) { changed.Add("Let's Encrypt directory"); }
+        if (before.CertbotMode != after.CertbotMode) { changed.Add("certificate management"); }
+        if (before.AcmeEmail != after.AcmeEmail) { changed.Add("Let's Encrypt e-mail"); }
+        return changed;
+    }
+
+    private async Task RunDiagnosticsAsync()
+    {
+        _saveErrors.Clear();
+        AppSettings values = Current();
+        _saveErrors.AddRange(values.Validate());
+        if (_saveErrors.Count > 0)
+        {
+            return;
+        }
+
+        _isChecking = true;
+        try
+        {
+            _checks = await Diagnostics.RunAsync(values);
+        }
+        finally
+        {
+            _isChecking = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        _passwordErrors.Clear();
+        string throttleKey = "password-change:" + _username;
+        if (Throttle.IsBlocked(throttleKey, out TimeSpan retryAfter))
+        {
+            _passwordErrors.Add($"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalMinutes)} minute(s).");
+            return;
+        }
+
+        if (_newPassword != _confirmation)
+        {
+            _passwordErrors.Add("The two new passwords do not match.");
+            return;
+        }
+
+        _isChangingPassword = true;
+        try
+        {
+            IReadOnlyList<string> problems = await Accounts.ChangePasswordAsync(_currentPassword, _newPassword);
+            if (problems.Count > 0)
+            {
+                if (problems.Any((string problem) => problem.Contains("current password", StringComparison.Ordinal)))
+                {
+                    Throttle.RecordFailure(throttleKey);
+                    await Audit.WriteAsync(_username, "auth.password-change", null, false, "wrong current password");
+                }
+
+                _passwordErrors.AddRange(problems);
+                return;
+            }
+
+            Throttle.Reset(throttleKey);
+            await Audit.WriteAsync(_username, "auth.password-change", null, true);
+
+            // The security stamp changed, so this session is over as well: the sign-in page explains why.
+            Navigation.NavigateTo("/login?notice=password-changed", forceLoad: true);
+        }
+        finally
+        {
+            _isChangingPassword = false;
+        }
+    }
+}

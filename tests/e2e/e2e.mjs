@@ -456,6 +456,61 @@ await button('Restore').click();
 await waitText('Restored.');
 check('the deleted site is back in sites-available', sh('ls /etc/nginx/sites-available').includes('example.com'));
 
+// ---- settings ----
+await page.goto(`${base}/settings`);
+await waitField('nginx directory');
+await page.getByLabel('nginx directory').fill('relative/path');
+await button('Save settings').click();
+await waitText('must be an absolute path');
+check('an unsafe path is refused with an explanation', true);
+await page.getByLabel('nginx directory').fill('/etc/nginx');
+await page.getByLabel("Let's Encrypt e-mail").fill('ops@example.com');
+await button('Save settings').click();
+await waitText('Settings saved.');
+await page.goto(`${base}/certificates`);
+await waitField('Domain names');
+check('saved settings are used elsewhere (the e-mail is pre-filled when getting a certificate)', (await page.getByLabel('E-mail for expiry notices').inputValue()) === 'ops@example.com');
+await page.goto(`${base}/settings`);
+await waitField('nginx directory');
+await button('Check the host with these values').click();
+await waitText('host access');
+check('the host can be checked from the settings page', /nginx/.test(await body()) && /Let's Encrypt directory/.test(await body()));
+await shot('11-settings');
+
+// Another browser, signed in with the current password.
+const context2 = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+const page2 = await context2.newPage();
+await page2.goto(`${base}/login`);
+await page2.getByLabel('Username').fill('admin');
+await page2.getByLabel('Password').fill('Correct-Horse-9');
+await page2.getByRole('button', { name: 'Sign in' }).click();
+await page2.waitForURL(`${base}/`);
+
+await page.getByLabel('Current password').fill('definitely-not-it-1!');
+await page.getByLabel('New password', { exact: true }).fill('A-brand-new-Passw0rd');
+await page.getByLabel('Repeat the new password').fill('A-brand-new-Passw0rd');
+await button('Change the password').click();
+await waitText('current password is not correct');
+check('a wrong current password is refused', true);
+
+await page.getByLabel('Current password').fill('Correct-Horse-9');
+await button('Change the password').click();
+await page.waitForURL(/\/login\?notice=password-changed/, { timeout: 15000 });
+check('changing the password sends the user to the sign-in page with an explanation', (await body()).includes('Your password was changed'));
+await page2.goto(`${base}/`);
+check('the other browser, still open, is signed out as well', page2.url().includes('/login'), page2.url());
+await context2.close();
+
+await page.getByLabel('Username').fill('admin');
+await page.getByLabel('Password').fill('Correct-Horse-9');
+await page.getByRole('button', { name: 'Sign in' }).click();
+await waitText('Invalid username or password.');
+check('the old password no longer works', true);
+await page.getByLabel('Password').fill('A-brand-new-Passw0rd');
+await page.getByRole('button', { name: 'Sign in' }).click();
+await page.waitForURL(`${base}/`, { timeout: 10000 });
+check('the new password works', true);
+
 // ---- audit ----
 await page.goto(`${base}/audit-log`);
 await waitText('config.save');

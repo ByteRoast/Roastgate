@@ -1,0 +1,32 @@
+@using Roastgate.Core.Setup
+
+<MudSimpleTable Dense="true" Elevation="0" Outlined="true">
+    <tbody>
+        @foreach (DiagnosticCheck check in Checks)
+        {
+            <tr>
+                <td class="rg-check-icon">
+                    @switch (check.Status)
+                    {
+                        case DiagnosticStatus.Ok:
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Title="OK" />
+                            break;
+                        case DiagnosticStatus.Warning:
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Title="Warning" />
+                            break;
+                        default:
+                            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Title="Error" />
+                            break;
+                    }
+                </td>
+                <td><strong>@check.Name</strong></td>
+                <td>@check.Message</td>
+            </tr>
+        }
+    </tbody>
+</MudSimpleTable>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DiagnosticCheck> Checks { get; set; } = [];
+}

@@ -244,6 +244,68 @@ public sealed class AccessFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/")).StatusCode);
     }
 
+    // ---- Sessions end when the credentials change --------------------------------------
+
+    [Fact]
+    public async Task Changing_the_password_ends_every_session_that_was_already_open()
+    {
+        HttpClient laptop = _factory.CreateBrowser();
+        HttpClient stolen = _factory.CreateBrowser();
+        await _factory.CompleteSetupAsync();
+        await HtmlForm.PostLoginAsync(laptop, "admin", RoastgateFactory.AdminPassword);
+        await HtmlForm.PostLoginAsync(stolen, "admin", RoastgateFactory.AdminPassword);
+        Assert.Equal(HttpStatusCode.OK, (await laptop.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await stolen.GetAsync("/")).StatusCode);
+
+        IReadOnlyList<string> problems = await _factory.Services.GetRequiredService<AccountService>()
+            .ChangePasswordAsync(RoastgateFactory.AdminPassword, "A-brand-new-Passw0rd");
+
+        Assert.Empty(problems);
+        Assert.Equal(HttpStatusCode.Redirect, (await laptop.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await stolen.GetAsync("/audit-log")).StatusCode);
+        HttpResponseMessage signedInAgain = await HtmlForm.PostLoginAsync(laptop, "admin", "A-brand-new-Passw0rd");
+        Assert.Equal(HttpStatusCode.Redirect, signedInAgain.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await laptop.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_session_opened_after_the_change_is_not_affected_by_it()
+    {
+        HttpClient client = _factory.CreateBrowser();
+        await _factory.CompleteSetupAsync();
+        await _factory.Services.GetRequiredService<AccountService>().ChangePasswordAsync(RoastgateFactory.AdminPassword, "A-brand-new-Passw0rd");
+
+        await HtmlForm.PostLoginAsync(client, "admin", "A-brand-new-Passw0rd");
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/audit-log")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("password-changed", "Your password was changed")]
+    [InlineData("two-factor-changed", "Two-factor authentication was changed")]
+    public async Task The_sign_in_page_explains_why_the_session_ended(string notice, string text)
+    {
+        HttpClient client = _factory.CreateBrowser();
+        await _factory.CompleteSetupAsync();
+
+        string html = await client.GetStringAsync($"/login?notice={notice}");
+
+        Assert.Contains(text, html);
+    }
+
+    [Fact]
+    public async Task An_unknown_notice_shows_nothing()
+    {
+        HttpClient client = _factory.CreateBrowser();
+        await _factory.CompleteSetupAsync();
+
+        string html = await client.GetStringAsync("/login?notice=%3Cscript%3Ealert(1)%3C/script%3E");
+
+        Assert.DoesNotContain("<script>alert(1)", html);
+        Assert.DoesNotContain("rg-auth-notice", html);
+    }
+
     // ---- URL normalisation ------------------------------------------------------------
 
     [Theory]

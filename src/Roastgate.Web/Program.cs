@@ -2,11 +2,13 @@ using System.Net;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
 using Roastgate.Core;
 using Roastgate.Core.Data;
+using Roastgate.Core.Security;
 using Roastgate.Core.Setup;
 using Roastgate.Web.Authentication;
 using Roastgate.Web.Cli;
@@ -48,9 +50,20 @@ builder.Services
         cookie.AccessDeniedPath = "/login";
         cookie.ExpireTimeSpan = TimeSpan.FromHours(12);
         cookie.SlidingExpiration = true;
+        cookie.Events.OnValidatePrincipal = async context =>
+        {
+            // A cookie issued before the last password change carries an old security stamp: it is no longer valid.
+            ISessionStamp sessionStamp = context.HttpContext.RequestServices.GetRequiredService<ISessionStamp>();
+            if (!await AuthenticationHelper.IsCurrentAsync(context.Principal, sessionStamp, context.HttpContext.RequestAborted))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
     });
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, StampRevalidatingAuthenticationStateProvider>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

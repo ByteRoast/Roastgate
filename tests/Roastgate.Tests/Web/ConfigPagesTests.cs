@@ -41,6 +41,7 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [InlineData("/sites/wizard")]
     [InlineData("/certificates")]
     [InlineData("/backups")]
+    [InlineData("/settings")]
     public async Task Config_pages_are_protected(string path)
     {
         HttpClient client = _factory.CreateBrowser();
@@ -135,6 +136,20 @@ public sealed class ConfigPagesTests : IAsyncLifetime
         HttpResponseMessage response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_settings_page_offers_the_paths_the_password_and_a_host_check()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/settings");
+
+        Assert.Contains("Paths and options", html);
+        Assert.Contains("Change the password", html);
+        Assert.Contains("Check the host with these values", html);
+        Assert.Contains("About this instance", html);
+        Assert.Contains("Signed in as", html);
     }
 
     [Fact]

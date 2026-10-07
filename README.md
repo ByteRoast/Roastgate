@@ -27,6 +27,11 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
 
+### Settings
+
+The **Settings** page edits the paths and options chosen at setup (validated the same way), checks the host with the values you typed
+before you rely on them, and changes the password (current password required, with a throttle against guessing).
+
 ### Backups and restore
 
 Every overwrite and every deletion keeps the previous content (the 30 most recent per file). The **Backups** page (also reachable
@@ -125,6 +130,8 @@ in practice, root on the host. Treat it accordingly:
 - Keep the port on `127.0.0.1` and reach it through an SSH tunnel, a VPN, or an nginx server block protected by a whitelist and HTTPS.
 - Use a long, unique administrator password. Sign-in is rate limited (5 failures per 15 minutes per client address).
 - The session cookie is `HttpOnly` and `SameSite=Strict`; set `ROASTGATE_SECURE_COOKIES=true` when served over HTTPS.
+- **Changing the password ends every open session**, on every device (sessions carry a security stamp that is renewed with the password,
+  and open browser tabs are rechecked every 30 seconds). `roastgate reset-password` does the same, so it is also the answer to a stolen session.
 - Every sign-in, failure and (soon) config change is written to the audit log.
 - The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored unencrypted, so keep `/data` readable by root only.
 - Two-factor authentication is planned.
