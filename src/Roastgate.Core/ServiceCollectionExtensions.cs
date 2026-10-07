@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Roastgate.Core.Data;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
+using Roastgate.Core.Nginx.Whitelists;
 using Roastgate.Core.Security;
 using Roastgate.Core.Settings;
 using Roastgate.Core.Setup;
@@ -39,6 +40,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INginxController, NginxController>();
         services.AddSingleton<IConfigBackupStore, ConfigBackupStore>();
         services.AddSingleton<IConfigStore, ConfigStore>();
+        services.AddSingleton<IWhitelistUsageScanner, WhitelistUsageScanner>();
+        services.AddSingleton<IWhitelistService, WhitelistService>();
         services.AddSingleton<HostDiagnostics>();
         return services;
     }

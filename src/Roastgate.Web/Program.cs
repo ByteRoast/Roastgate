@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -109,6 +110,14 @@ app.MapGet("/sign-in/{ticket}", async (string ticket, SignInTicketService ticket
     await audit.WriteAsync(username, "auth.login", null, true, "after setup");
     return Results.Redirect("/");
 }).AllowAnonymous();
+
+// The address the signed-in browser connects from, as Roastgate sees it (shown next to "add my address" in the whitelist editor).
+app.MapGet("/client-address", (HttpContext context) =>
+{
+    IPAddress? address = context.Connection.RemoteIpAddress;
+    string text = address is null ? string.Empty : (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
+    return Results.Text(text, "text/plain");
+}).RequireAuthorization();
 
 app.MapPost("/logout", async (HttpContext context, IAntiforgery antiforgery, IAuditLog audit) =>
 {

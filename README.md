@@ -6,8 +6,8 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 2 of 6 done (setup, sign-in, safe editing of reverse proxies, sites and whitelists with a Monaco editor).
-> The whitelist editor, the creation wizard and certificates come next.
+> Status: phase 3 of 6 done (setup, sign-in, safe editing of reverse proxies and sites, whitelist manager).
+> The creation wizard and certificates come next.
 
 ## What it manages
 
@@ -26,6 +26,20 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - Every overwrite and deletion keeps a backup in the database (the 30 most recent per file).
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
+
+### Whitelists
+
+- A list editor (address and comment per line) with live validation of IPv4, IPv6 and CIDR ranges. Validation is strict:
+  `1.2`, `0x7f.0.0.1` or `10.0.0.5/24` (host bits set, which nginx silently ignores) are flagged instead of being passed on.
+- Paste many addresses at once, or add the address you are connecting from with one click.
+- Each whitelist shows **where it is used** (the `include` lines of your proxies and sites, relative or absolute paths,
+  quoted or not, wildcard includes), and gives you the `include` and `deny all;` lines to copy.
+- A whitelist that is still included **cannot be deleted**. `nginx -t` remains the last safety net for includes in files
+  Roastgate does not read (such as `nginx.conf`).
+- A file that holds anything other than `allow` lines (a `deny`, a comment in the middle...) is never rewritten by the list
+  editor: Roastgate opens it as raw text instead, so nothing you wrote is lost.
+
+Remember that nginx evaluates `return` before `allow` and `deny`: a `location` that only does `return 200;` ignores the whitelist.
 
 ## Quick start
 

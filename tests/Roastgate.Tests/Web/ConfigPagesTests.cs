@@ -36,6 +36,7 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [InlineData("/sites/edit")]
     [InlineData("/whitelists")]
     [InlineData("/whitelists/edit")]
+    [InlineData("/whitelists/raw")]
     public async Task Config_pages_are_protected(string path)
     {
         HttpClient client = _factory.CreateBrowser();
@@ -66,7 +67,7 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [Theory]
     [InlineData("/reverse-proxies/edit")]
     [InlineData("/sites/edit")]
-    [InlineData("/whitelists/edit")]
+    [InlineData("/whitelists/raw")]
     public async Task Signed_in_users_can_open_the_new_file_pages(string path)
     {
         HttpClient client = await SignedInBrowserAsync();
@@ -75,6 +76,64 @@ public sealed class ConfigPagesTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("File name", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Signed_in_users_can_open_the_new_whitelist_page_with_its_list_editor()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        HttpResponseMessage response = await client.GetAsync("/whitelists/edit");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("New whitelist", html);
+        Assert.Contains("Allowed addresses", html);
+        Assert.Contains("Add address", html);
+    }
+
+    [Fact]
+    public async Task The_whitelist_list_page_explains_that_a_whitelist_needs_an_include()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/whitelists");
+
+        Assert.Contains("until a reverse proxy or a site includes it", html);
+        Assert.Contains("New whitelist", html);
+    }
+
+    [Fact]
+    public async Task The_client_address_endpoint_answers_signed_in_users_with_plain_text()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        HttpResponseMessage response = await client.GetAsync("/client-address");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.StartsWith("text/plain", response.Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task The_client_address_endpoint_is_not_available_to_anonymous_visitors()
+    {
+        HttpClient client = _factory.CreateBrowser();
+        await _factory.CompleteSetupAsync();
+
+        HttpResponseMessage response = await client.GetAsync("/client-address");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.StartsWith("/login", response.Headers.Location!.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Opening_a_whitelist_that_does_not_exist_says_so()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/whitelists/edit?name=ghost.conf");
+
+        Assert.Contains("does not exist", html);
     }
 
     [Fact]

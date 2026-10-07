@@ -13,6 +13,10 @@
         <MudText Typo="Typo.h4">@(_isNew ? "New " + Info.Singular : _name)</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">
             <a href="@Info.ListRoute">@Info.Title</a>
+            @if (Area == ConfigArea.Whitelists && !_isNew)
+            {
+                <span> &middot; <a href="@("/whitelists/edit?name=" + Uri.EscapeDataString(_name))">edit as a list</a></span>
+            }
             @if (!_isNew && _file is not null && Area != ConfigArea.Whitelists)
             {
                 <span> &middot; @(_file.Enabled ? "enabled" : "disabled")</span>

@@ -203,3 +203,25 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     gap: 0.75rem;
     margin-top: 1rem;
 }
+
+/* Whitelist editor. */
+.rg-entry-row {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
+    gap: 0.75rem;
+    align-items: start;
+    margin-bottom: 0.5rem;
+}
+
+.rg-entry-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .rg-entry-row {
+        grid-template-columns: 1fr;
+    }
+}
