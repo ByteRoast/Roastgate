@@ -1,35 +1,42 @@
-using Roastgate.Core;
+using Microsoft.EntityFrameworkCore;
 using Roastgate.Core.Data;
+using Roastgate.Tests.Support;
 
 namespace Roastgate.Tests.Core;
 
-public sealed class DatabaseTests : IDisposable
+public sealed class DatabaseTests
 {
-    private readonly string _directory = Path.Combine(Path.GetTempPath(), "roastgate-tests-" + Guid.NewGuid().ToString("N"));
-
-    private async Task<RoastgateDatabase> CreateMigratedDatabaseAsync()
-    {
-        RoastgateDatabase database = new(new RoastgateOptions { DataDirectory = _directory });
-        await database.MigrateAsync();
-        return database;
-    }
-
     [Fact]
     public async Task Migrating_twice_is_harmless()
     {
-        RoastgateDatabase database = await CreateMigratedDatabaseAsync();
+        await using TestDatabase database = await TestDatabase.CreateAsync();
 
-        await database.MigrateAsync();
+        await database.Services.MigrateRoastgateDatabaseAsync();
 
-        SettingsStore settings = new(database);
+        ISettingsStore settings = database.Get<ISettingsStore>();
         await settings.SetAsync("key", "value");
         Assert.Equal("value", await settings.GetAsync("key"));
     }
 
     [Fact]
+    public async Task The_model_has_no_pending_changes_compared_to_the_migrations()
+    {
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        IDbContextFactory<RoastgateDbContext> factory = database.Get<IDbContextFactory<RoastgateDbContext>>();
+
+        await using RoastgateDbContext context = await factory.CreateDbContextAsync();
+
+        Assert.Empty(await context.Database.GetPendingMigrationsAsync());
+        Assert.False(
+            context.Database.HasPendingModelChanges(),
+            "The EF model changed without a migration. Run: dotnet dotnet-ef migrations add <Name> --project src/Roastgate.Core --startup-project src/Roastgate.Web --output-dir Data/Migrations");
+    }
+
+    [Fact]
     public async Task Settings_can_be_created_updated_and_deleted()
     {
-        SettingsStore settings = new(await CreateMigratedDatabaseAsync());
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        ISettingsStore settings = database.Get<ISettingsStore>();
 
         Assert.Null(await settings.GetAsync("missing"));
 
@@ -45,7 +52,8 @@ public sealed class DatabaseTests : IDisposable
     [Fact]
     public async Task Audit_entries_are_listed_newest_first_and_keep_their_fields()
     {
-        AuditLog audit = new(await CreateMigratedDatabaseAsync());
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        IAuditLog audit = database.Get<IAuditLog>();
 
         await audit.WriteAsync("admin", "config.save", "conf.d/app.conf", true);
         await audit.WriteAsync("admin", "nginx.reload", null, false, "nginx: [emerg] unexpected end of file");
@@ -64,7 +72,8 @@ public sealed class DatabaseTests : IDisposable
     [Fact]
     public async Task Audit_listing_honours_the_requested_count()
     {
-        AuditLog audit = new(await CreateMigratedDatabaseAsync());
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        IAuditLog audit = database.Get<IAuditLog>();
         for (int index = 0; index < 5; index++)
         {
             await audit.WriteAsync("admin", "action-" + index, null, true);
@@ -76,13 +85,32 @@ public sealed class DatabaseTests : IDisposable
         Assert.Equal("action-4", entries[0].Action);
     }
 
-    public void Dispose()
+    [Fact]
+    public async Task Only_one_administrator_can_ever_be_created()
     {
-        // SQLite pools connections per file; release them so the temp directory can be deleted on Windows.
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        IAdminAccountStore accounts = database.Get<IAdminAccountStore>();
+
+        Assert.Null(await accounts.GetAsync());
+        Assert.True(await accounts.CreateAsync("admin", "hash-1"));
+        Assert.False(await accounts.CreateAsync("someone-else", "hash-2"));
+
+        AdminAccount? account = await accounts.GetAsync();
+        Assert.NotNull(account);
+        Assert.Equal("admin", account.Username);
+        Assert.Equal("hash-1", account.PasswordHash);
+        Assert.Null(account.TotpSecret);
+    }
+
+    [Fact]
+    public async Task The_password_hash_can_be_replaced()
+    {
+        await using TestDatabase database = await TestDatabase.CreateAsync();
+        IAdminAccountStore accounts = database.Get<IAdminAccountStore>();
+        await accounts.CreateAsync("admin", "old-hash");
+
+        await accounts.UpdatePasswordHashAsync("new-hash");
+
+        Assert.Equal("new-hash", (await accounts.GetAsync())!.PasswordHash);
     }
 }

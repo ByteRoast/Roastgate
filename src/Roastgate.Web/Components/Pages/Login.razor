@@ -1,0 +1,89 @@
+@page "/login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+@using System.ComponentModel.DataAnnotations
+@inject AccountService Accounts
+@inject LoginThrottle Throttle
+@inject IAuditLog Audit
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · Roastgate</PageTitle>
+
+<h1 class="rg-auth-title">Sign in</h1>
+
+<EditForm Model="Input" FormName="login" OnValidSubmit="SignInAsync" Enhance="false" class="rg-auth-form">
+    <DataAnnotationsValidator />
+
+    <label for="username">Username</label>
+    <InputText id="username" @bind-Value="Input!.Username" autocomplete="username" autofocus />
+
+    <label for="password">Password</label>
+    <InputText id="password" type="password" @bind-Value="Input!.Password" autocomplete="current-password" />
+
+    @if (_error is not null)
+    {
+        <p class="rg-auth-error" role="alert">@_error</p>
+    }
+
+    <button type="submit" class="rg-auth-button">Sign in</button>
+</EditForm>
+
+@code {
+    private const int MaximumLoggedUsernameLength = 64;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private LoginInput? Input { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    private string? ReturnUrl { get; set; }
+
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        Input ??= new LoginInput();
+
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo(LocalUrl.OrDefault(ReturnUrl, "/"));
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        string clientKey = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (Throttle.IsBlocked(clientKey, out TimeSpan retryAfter))
+        {
+            _error = $"Too many failed attempts. Try again in {Math.Ceiling(retryAfter.TotalMinutes)} minute(s).";
+            return;
+        }
+
+        AdminAccount? account = await Accounts.VerifyCredentialsAsync(Input!.Username, Input.Password);
+        if (account is null)
+        {
+            Throttle.RecordFailure(clientKey);
+            string attempted = Input!.Username.Length > MaximumLoggedUsernameLength ? Input.Username[..MaximumLoggedUsernameLength] : Input.Username;
+            await Audit.WriteAsync("anonymous", "auth.login", attempted, false, $"from {clientKey}");
+            _error = "Invalid username or password.";
+            return;
+        }
+
+        Throttle.Reset(clientKey);
+        await AuthenticationHelper.SignInAsync(HttpContext, account.Username);
+        await Audit.WriteAsync(account.Username, "auth.login", null, true, $"from {clientKey}");
+        Navigation.NavigateTo(LocalUrl.OrDefault(ReturnUrl, "/"));
+    }
+
+    public sealed class LoginInput
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

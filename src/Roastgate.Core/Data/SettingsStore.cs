@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace Roastgate.Core.Data;
 
@@ -11,37 +11,36 @@ public interface ISettingsStore
     Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default);
 }
 
-public sealed class SettingsStore(RoastgateDatabase database) : ISettingsStore
+public sealed class SettingsStore(IDbContextFactory<RoastgateDbContext> factory) : ISettingsStore
 {
     public async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await database.OpenAsync(cancellationToken);
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT value FROM settings WHERE key = $key;";
-        command.Parameters.AddWithValue("$key", key);
-        return (string?)await command.ExecuteScalarAsync(cancellationToken);
+        await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        Setting? setting = await database.Settings.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key, cancellationToken);
+        return setting?.Value;
     }
 
     public async Task SetAsync(string key, string value, CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await database.OpenAsync(cancellationToken);
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO settings (key, value, updated_at) VALUES ($key, $value, $updatedAt)
-            ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-            """;
-        command.Parameters.AddWithValue("$key", key);
-        command.Parameters.AddWithValue("$value", value);
-        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.UtcNow.ToString("O"));
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        Setting? setting = await database.Settings.SingleOrDefaultAsync(item => item.Key == key, cancellationToken);
+        if (setting is null)
+        {
+            database.Settings.Add(new Setting { Key = key, Value = value, UpdatedAt = DateTimeOffset.UtcNow });
+        }
+        else
+        {
+            setting.Value = value;
+            setting.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await database.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await database.OpenAsync(cancellationToken);
-        await using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM settings WHERE key = $key;";
-        command.Parameters.AddWithValue("$key", key);
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        int deleted = await database.Settings.Where(item => item.Key == key).ExecuteDeleteAsync(cancellationToken);
+        return deleted > 0;
     }
 }

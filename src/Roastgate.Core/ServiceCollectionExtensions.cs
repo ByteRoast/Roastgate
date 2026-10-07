@@ -1,6 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Roastgate.Core.Data;
 using Roastgate.Core.Hosting;
+using Roastgate.Core.Security;
+using Roastgate.Core.Settings;
+using Roastgate.Core.Setup;
 
 namespace Roastgate.Core;
 
@@ -8,12 +13,29 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddRoastgateCore(this IServiceCollection services, RoastgateOptions options)
     {
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(options);
-        services.AddSingleton<RoastgateDatabase>();
+
+        // The path is read from the registered options at resolution time, so tests can swap the options for a temporary directory.
+        services.AddDbContextFactory<RoastgateDbContext>((IServiceProvider provider, DbContextOptionsBuilder builder) =>
+        {
+            RoastgateOptions current = provider.GetRequiredService<RoastgateOptions>();
+            Directory.CreateDirectory(current.DataDirectory);
+            builder.UseSqlite($"Data Source={current.DatabasePath};Foreign Keys=True");
+        });
         services.AddSingleton<ISettingsStore, SettingsStore>();
         services.AddSingleton<IAuditLog, AuditLog>();
+        services.AddSingleton<IAdminAccountStore, AdminAccountStore>();
+        services.AddSingleton<AppSettingsService>();
+
+        services.AddSingleton<PasswordHasher>(_ => new PasswordHasher());
+        services.AddSingleton<AccountService>();
+        services.AddSingleton<LoginThrottle>();
+        services.AddSingleton<ISetupService, SetupService>();
+
         services.AddSingleton<IHostExec, HostExec>();
         services.AddSingleton<NginxProbe>();
+        services.AddSingleton<HostDiagnostics>();
         return services;
     }
 }

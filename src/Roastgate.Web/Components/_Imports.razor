@@ -1,5 +1,7 @@
 @using System.Net.Http
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
@@ -10,7 +12,11 @@
 @using Roastgate.Core
 @using Roastgate.Core.Data
 @using Roastgate.Core.Hosting
+@using Roastgate.Core.Security
+@using Roastgate.Core.Settings
+@using Roastgate.Core.Setup
 @using Roastgate.Web
+@using Roastgate.Web.Authentication
 @using Roastgate.Web.Components
 @using Roastgate.Web.Components.Layout
 @using Roastgate.Web.Theming

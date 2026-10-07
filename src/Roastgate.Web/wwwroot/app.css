@@ -1,5 +1,14 @@
 /* Roastgate: MudBlazor does the heavy lifting; this file only holds what the theme cannot express. */
 
+/* Pages rendered without MudBlazor (sign-in, errors) need the brand font stack too. */
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+}
+
+code {
+    word-break: break-all;
+}
+
 .rg-logo {
     height: 2rem;
     width: 2rem;
@@ -46,4 +55,113 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     position: absolute;
     right: 0.75rem;
     top: 0.5rem;
+}
+
+/* Sign-in, error and not-found pages (static, no MudBlazor). */
+.rg-auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: #f5f6f7;
+}
+
+.rg-auth-card {
+    width: 100%;
+    max-width: 24rem;
+    padding: 2rem;
+    background: #ffffff;
+    border: 1px solid #dadde1;
+    border-radius: 0.8rem;
+    box-shadow: 0 1px 2px 0 #0000001a;
+    color: #1c1e21;
+}
+
+.rg-auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.rg-auth-brand img {
+    width: 2.25rem;
+    height: 2.25rem;
+}
+
+.rg-auth-title {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+}
+
+.rg-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.rg-auth-form label {
+    font-size: 0.85rem;
+    color: #525860;
+}
+
+.rg-auth-form input {
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #dadde1;
+    border-radius: 0.4rem;
+    font: inherit;
+}
+
+.rg-auth-form input:focus {
+    outline: 2px solid #ee8a26;
+    outline-offset: 0;
+    border-color: #ee8a26;
+}
+
+.rg-auth-error {
+    margin: 0.25rem 0 0;
+    color: #af272b;
+    font-size: 0.9rem;
+}
+
+.rg-auth-button {
+    margin-top: 0.75rem;
+    padding: 0.6rem 1rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: #ee8a26;
+    color: #1c1e21;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.rg-auth-button:hover {
+    background: #dd7b19;
+}
+
+/* Setup wizard and layout helpers. */
+.rg-setup-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.rg-step-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.rg-check-icon {
+    width: 2.5rem;
+}
+
+.rg-inline-form {
+    display: inline;
 }

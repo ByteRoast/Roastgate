@@ -1,14 +1,19 @@
 @page "/error"
+@layout AuthLayout
+@attribute [AllowAnonymous]
 @using System.Diagnostics
 
 <PageTitle>Error · Roastgate</PageTitle>
 
-<MudAlert Severity="Severity.Error">An error occurred while processing your request.</MudAlert>
+<h1 class="rg-auth-title">Something went wrong</h1>
+<p>An error occurred while processing your request.</p>
 
 @if (RequestId is not null)
 {
-    <MudText Class="mt-3">Request ID: <code>@RequestId</code></MudText>
+    <p>Request ID: <code>@RequestId</code></p>
 }
+
+<p><a href="/">Back to the dashboard</a></p>
 
 @code {
     [CascadingParameter]
