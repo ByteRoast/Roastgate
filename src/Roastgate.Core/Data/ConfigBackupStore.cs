@@ -28,6 +28,9 @@ public interface IConfigBackupStore
     Task<IReadOnlyList<ConfigBackup>> ListAsync(string? area, string? name, int count, CancellationToken cancellationToken = default);
 
     Task<ConfigBackup?> GetAsync(long id, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes a backup, used when the change it was taken for was refused and undone (it would only duplicate the current file).</summary>
+    Task DeleteAsync(long id, CancellationToken cancellationToken = default);
 }
 
 public sealed class ConfigBackupStore(IDbContextFactory<RoastgateDbContext> factory) : IConfigBackupStore
@@ -78,6 +81,12 @@ public sealed class ConfigBackupStore(IDbContextFactory<RoastgateDbContext> fact
         }
 
         return await query.OrderByDescending(item => item.Id).Take(count).ToListAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        await database.ConfigBackups.Where(item => item.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
     public async Task<ConfigBackup?> GetAsync(long id, CancellationToken cancellationToken = default)

@@ -44,6 +44,12 @@ public sealed record AreaInfo(ConfigArea Area, string Title, string Singular, st
         return name is null ? route : route + "?name=" + Uri.EscapeDataString(name);
     }
 
+    public string BackupsUrl(string? name)
+    {
+        string url = "/backups?area=" + Area;
+        return name is null ? url : url + "&name=" + Uri.EscapeDataString(name);
+    }
+
     public string EditUrl(string? name)
     {
         return name is null ? EditRoute : EditRoute + "?name=" + Uri.EscapeDataString(name);

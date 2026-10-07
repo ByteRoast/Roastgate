@@ -423,6 +423,39 @@ await button('Delete').click();
 await waitText('was deleted');
 check('an unused certificate is deleted through certbot', !sh('ls /etc/letsencrypt/live').includes('unused.example.com'));
 
+// ---- backups: compare and restore ----
+// The refused change earlier left no backup behind; a successful second edit creates the first one.
+check('a refused change left no backup', sh('ls /etc/nginx/conf.d').includes('app.example.com.conf'));
+await openEditor('/reverse-proxies/edit?name=app.example.com.conf');
+await setEditor((await getEditor()) + '\n# second version');
+await button('Save').click();
+await expectSaved();
+await page.goto(`${base}/backups?area=ReverseProxies&name=app.example.com.conf`);
+await waitText('Taken before');
+check('the backups of a file are listed', /a change/i.test(await body()));
+await button('Compare').first().click();
+await waitText('Restoring');
+const comparison = await body();
+check('comparing shows what restoring would add and remove', /adds \d+ line/.test(comparison) && /removes \d+ line/.test(comparison), comparison.slice(0, 300));
+check('the differences are drawn line by line', (await page.locator('.rg-diff-added, .rg-diff-removed').count()) > 0);
+await shot('10-backups');
+const beforeRestore = sh('cat /etc/nginx/conf.d/app.example.com.conf');
+await button('Restore this version').click();
+await button('Restore').click();
+await waitText('Restored.');
+check('restoring puts the old version back and reloads nginx', (await body()).includes('nginx reloaded.') && sh('cat /etc/nginx/conf.d/app.example.com.conf') !== beforeRestore);
+
+// A deleted site comes back (it was deleted earlier in the scenario).
+await page.goto(`${base}/backups?area=Sites&name=example.com`);
+await waitText('a deletion');
+await button('Compare').first().click();
+await waitText('does not exist any more');
+check('a deleted file says restoring creates it again', (await body()).includes('restoring creates it again'));
+await button('Restore this version').click();
+await button('Restore').click();
+await waitText('Restored.');
+check('the deleted site is back in sites-available', sh('ls /etc/nginx/sites-available').includes('example.com'));
+
 // ---- audit ----
 await page.goto(`${base}/audit-log`);
 await waitText('config.save');

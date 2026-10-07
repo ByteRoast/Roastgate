@@ -11,7 +11,7 @@
             <a href="/whitelists">Whitelists</a>
             @if (!_isNew)
             {
-                <span> &middot; <a href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))">edit as raw text</a></span>
+                <span> &middot; <a href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))">edit as raw text</a> &middot; <a href="@("/backups?area=Whitelists&name=" + Uri.EscapeDataString(_name))">history</a></span>
             }
         </MudText>
     </div>

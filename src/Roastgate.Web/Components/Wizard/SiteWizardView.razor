@@ -12,7 +12,7 @@
             <a href="@Info.ListRoute">@Info.Title</a>
             @if (!_isNew)
             {
-                <span> &middot; <a href="@Info.EditUrl(_fileName)">edit as raw text</a></span>
+                <span> &middot; <a href="@Info.EditUrl(_fileName)">edit as raw text</a> &middot; <a href="@Info.BackupsUrl(_fileName)">history</a></span>
             }
         </MudText>
     </div>

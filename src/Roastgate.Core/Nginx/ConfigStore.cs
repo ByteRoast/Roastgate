@@ -16,6 +16,9 @@ public interface IConfigStore
 
     Task<ConfigResult> DeleteAsync(ConfigArea area, string name, bool reload, string actor, CancellationToken cancellationToken = default);
 
+    /// <summary>Puts the content of a backup back, through the same cycle as a save. What is replaced is backed up in turn.</summary>
+    Task<ConfigResult> RestoreAsync(long backupId, bool reload, string actor, CancellationToken cancellationToken = default);
+
     Task<ConfigResult> SetEnabledAsync(ConfigArea area, string name, bool enabled, bool reload, string actor, CancellationToken cancellationToken = default);
 
     Task<ConfigResult> TestNginxAsync(string actor, CancellationToken cancellationToken = default);
@@ -114,13 +117,37 @@ public sealed class ConfigStore(
 
     // ---- Changing -----------------------------------------------------------------------
 
-    public async Task<ConfigResult> SaveAsync(
+    public Task<ConfigResult> SaveAsync(
         ConfigArea area,
         string name,
         string content,
         bool reload,
         string actor,
         CancellationToken cancellationToken = default)
+    {
+        return SaveCoreAsync(area, name, content, reload, actor, "save", "config.save", cancellationToken);
+    }
+
+    public async Task<ConfigResult> RestoreAsync(long backupId, bool reload, string actor, CancellationToken cancellationToken = default)
+    {
+        ConfigBackup? backup = await backups.GetAsync(backupId, cancellationToken);
+        if (backup is null || !Enum.TryParse(backup.Area, out ConfigArea area) || !Enum.IsDefined(area))
+        {
+            return new ConfigResult(false, "That backup does not exist.");
+        }
+
+        return await SaveCoreAsync(area, backup.Name, backup.Content, reload, actor, "restore", "config.restore", cancellationToken);
+    }
+
+    private async Task<ConfigResult> SaveCoreAsync(
+        ConfigArea area,
+        string name,
+        string content,
+        bool reload,
+        string actor,
+        string backupReason,
+        string auditAction,
+        CancellationToken cancellationToken)
     {
         string? normalized = ConfigNames.Normalize(area, name);
         if (normalized is null)
@@ -139,17 +166,18 @@ public sealed class ConfigStore(
         string? existing = Locate(locations, area, normalized, out _);
         string path = existing ?? Path.Combine(directory, normalized);
         string? previous = existing is null ? null : await File.ReadAllTextAsync(existing, cancellationToken);
+        long? createdBackup = null;
 
         return await MutateAsync(
             actor,
-            "config.save",
+            auditAction,
             Describe(area, normalized),
             reload,
             async () =>
             {
                 if (previous is not null)
                 {
-                    await backups.AddAsync(area.ToString(), normalized, "save", previous, cancellationToken);
+                    createdBackup = await backups.AddAsync(area.ToString(), normalized, backupReason, previous, cancellationToken);
                 }
 
                 Directory.CreateDirectory(directory);
@@ -157,6 +185,7 @@ public sealed class ConfigStore(
             },
             async () =>
             {
+                await DiscardBackupAsync(createdBackup);
                 if (previous is null)
                 {
                     File.Delete(path);
@@ -166,7 +195,7 @@ public sealed class ConfigStore(
                     await WriteAtomicAsync(path, previous, CancellationToken.None);
                 }
             },
-            "Saved.",
+            backupReason == "restore" ? "Restored." : "Saved.",
             cancellationToken);
     }
 
@@ -183,6 +212,7 @@ public sealed class ConfigStore(
         string previous = await File.ReadAllTextAsync(path, cancellationToken);
         string linkPath = Path.Combine(locations.SitesEnabledDirectory, normalized);
         bool wasLinked = area == ConfigArea.Sites && IsLinkedTo(linkPath, path);
+        long? deletionBackup = null;
 
         return await MutateAsync(
             actor,
@@ -191,7 +221,7 @@ public sealed class ConfigStore(
             reload,
             async () =>
             {
-                await backups.AddAsync(area.ToString(), normalized, "delete", previous, cancellationToken);
+                deletionBackup = await backups.AddAsync(area.ToString(), normalized, "delete", previous, cancellationToken);
                 if (wasLinked)
                 {
                     File.Delete(linkPath);
@@ -201,6 +231,7 @@ public sealed class ConfigStore(
             },
             async () =>
             {
+                await DiscardBackupAsync(deletionBackup);
                 await WriteAtomicAsync(path, previous, CancellationToken.None);
                 if (wasLinked)
                 {
@@ -433,6 +464,15 @@ public sealed class ConfigStore(
     }
 
     // ---- File helpers -------------------------------------------------------------------
+
+    /// <summary>A change that was undone leaves nothing to restore: its backup would only repeat the current file.</summary>
+    private async Task DiscardBackupAsync(long? backupId)
+    {
+        if (backupId is { } id)
+        {
+            await backups.DeleteAsync(id, CancellationToken.None);
+        }
+    }
 
     private static bool IsWizardFile(string path)
     {

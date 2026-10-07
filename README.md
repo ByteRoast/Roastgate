@@ -27,6 +27,13 @@ Every change follows the same cycle: backup, write, `nginx -t`, automatic rollba
 - If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
 - Writes are atomic (temporary file, then rename) and keep the original file permissions.
 
+### Backups and restore
+
+Every overwrite and every deletion keeps the previous content (the 30 most recent per file). The **Backups** page (also reachable
+from the "history" link of each file) lists them, compares any version with the current file line by line (what restoring would add
+and remove), and restores it. A restore goes through the same backup, `nginx -t`, rollback and reload cycle as a save. A change that
+nginx refused leaves no backup behind, since it would only repeat the current file.
+
 ### Creation wizard
 
 Describe a reverse proxy or a static site in a form (essentials, HTTPS, access, advanced) and Roastgate writes the nginx config:

@@ -40,6 +40,7 @@ public sealed class ConfigPagesTests : IAsyncLifetime
     [InlineData("/reverse-proxies/wizard")]
     [InlineData("/sites/wizard")]
     [InlineData("/certificates")]
+    [InlineData("/backups")]
     public async Task Config_pages_are_protected(string path)
     {
         HttpClient client = _factory.CreateBrowser();
@@ -109,6 +110,31 @@ public sealed class ConfigPagesTests : IAsyncLifetime
         Assert.Contains("embedded certbot", html);
         Assert.Contains("Get a certificate", html);
         Assert.Contains("Test first (dry run)", html);
+    }
+
+    [Fact]
+    public async Task The_backups_page_explains_what_is_kept_and_starts_empty()
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        string html = await client.GetStringAsync("/backups");
+
+        Assert.Contains("Backups", html);
+        Assert.Contains("No backup yet", html);
+        Assert.Contains("30 most recent", html);
+    }
+
+    [Theory]
+    [InlineData("/backups?area=ReverseProxies&name=app.conf")]
+    [InlineData("/backups?area=Nonsense&name=x")]
+    [InlineData("/backups?area=Whitelists")]
+    public async Task The_backups_page_copes_with_any_filter_including_garbage(string url)
+    {
+        HttpClient client = await SignedInBrowserAsync();
+
+        HttpResponseMessage response = await client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

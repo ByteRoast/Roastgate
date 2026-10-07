@@ -111,6 +111,44 @@ public sealed class ConfigStoreTests
     }
 
     [Fact]
+    public async Task A_change_nginx_refuses_leaves_no_backup_because_it_would_only_repeat_the_current_file()
+    {
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", GoodProxy, reload: false, "admin");
+
+        ConfigResult result = await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", BrokenProxy, reload: true, "admin");
+
+        Assert.True(result.RolledBack);
+        Assert.Empty(await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 10));
+    }
+
+    [Fact]
+    public async Task A_deletion_nginx_refuses_leaves_no_backup_either()
+    {
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        await nginx.Store.SaveAsync(ConfigArea.Whitelists, "office", "allow 203.0.113.0/24;", reload: false, "admin");
+        nginx.Controller.FailureRule = () => File.Exists(Path.Combine(nginx.Whitelists, "office.conf")) ? null : "nginx: [emerg] open() failed";
+
+        ConfigResult result = await nginx.Store.DeleteAsync(ConfigArea.Whitelists, "office", reload: true, "admin");
+
+        Assert.True(result.RolledBack);
+        Assert.Empty(await nginx.Database.Get<IConfigBackupStore>().ListAsync("Whitelists", "office.conf", 10));
+    }
+
+    [Fact]
+    public async Task A_change_that_succeeds_keeps_its_backup_even_when_an_earlier_one_was_refused()
+    {
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "one;", reload: false, "admin");
+        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", BrokenProxy, reload: false, "admin");
+        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "two;", reload: false, "admin");
+
+        ConfigBackup backup = Assert.Single(await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 10));
+
+        Assert.Equal("one;\n", backup.Content);
+    }
+
+    [Fact]
     public async Task Only_the_most_recent_backups_of_a_file_are_kept()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();

@@ -226,6 +226,52 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     }
 }
 
+/* Backups: line by line comparison. */
+.rg-diff {
+    margin-top: 0.5rem;
+    border: 1px solid #dadde1;
+    border-radius: 0.4rem;
+    overflow-x: auto;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85rem;
+}
+
+.rg-diff-line {
+    display: flex;
+    white-space: pre;
+}
+
+.rg-diff-mark {
+    flex: none;
+    width: 1.75rem;
+    text-align: center;
+    user-select: none;
+    color: #525860;
+}
+
+.rg-diff-added {
+    background: #e6f6e6;
+}
+
+.rg-diff-removed {
+    background: #ffebec;
+}
+
+.rg-diff-skip {
+    padding: 0.2rem 0.75rem;
+    color: #525860;
+    background: #f5f6f7;
+    font-style: italic;
+}
+
+.rg-diff-added-text {
+    color: #007300;
+}
+
+.rg-diff-removed-text {
+    color: #af272b;
+}
+
 /* Wizard. */
 .rg-switch-row {
     display: flex;
