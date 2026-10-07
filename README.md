@@ -6,7 +6,7 @@ your `/etc/nginx` stays the source of truth.
 
 Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
 
-> Status: phase 1 of 6 (setup, sign-in, host access). Config editing, whitelists, the creation wizard and certificates
+> Status: phase 1 of 6 done (setup, sign-in, host access, Docker image). Config editing, whitelists, the creation wizard and certificates
 > come next.
 
 ## What it manages
@@ -63,6 +63,7 @@ in practice, root on the host. Treat it accordingly:
 - Use a long, unique administrator password. Sign-in is rate limited (5 failures per 15 minutes per client address).
 - The session cookie is `HttpOnly` and `SameSite=Strict`; set `ROASTGATE_SECURE_COOKIES=true` when served over HTTPS.
 - Every sign-in, failure and (soon) config change is written to the audit log.
+- The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored unencrypted, so keep `/data` readable by root only.
 - Two-factor authentication is planned.
 
 ## Development

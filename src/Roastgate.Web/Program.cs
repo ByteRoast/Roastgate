@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
 using Roastgate.Core;
@@ -21,6 +22,12 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 RoastgateOptions options = RoastgateOptions.FromEnvironment();
 builder.Services.AddRoastgateCore(options);
 builder.Services.AddSingleton<SignInTicketService>();
+
+// Session cookies and antiforgery tokens are encrypted with these keys. They live in the data volume so that
+// recreating the container (an upgrade, for instance) does not sign everybody out.
+builder.Services.AddDataProtection()
+    .SetApplicationName("Roastgate")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(options.DataDirectory, "keys")));
 builder.Services.AddMudServices();
 
 builder.Services

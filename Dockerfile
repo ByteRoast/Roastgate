@@ -10,7 +10,11 @@ COPY src/Roastgate.Web/Roastgate.Web.csproj src/Roastgate.Web/
 RUN dotnet restore src/Roastgate.Web/Roastgate.Web.csproj
 
 COPY src/ src/
-RUN dotnet publish src/Roastgate.Web/Roastgate.Web.csproj -c Release --no-restore -o /out
+
+# No --no-restore on purpose: the layer above restored without wwwroot present, and publishing on top of that
+# silently drops the Blazor framework scripts (_framework/blazor.web.js), which leaves a page that never becomes interactive.
+RUN dotnet publish src/Roastgate.Web/Roastgate.Web.csproj -c Release -o /out \
+    && test -f /out/wwwroot/_framework/blazor.web.js
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # nsenter (util-linux) runs nginx and certbot in the host namespaces.
