@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Roastgate.Core/Roastgate.Core.csproj" />
+    <Project Path="src/Roastgate.Web/Roastgate.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Roastgate.Tests/Roastgate.Tests.csproj" />
+  </Folder>
+</Solution>

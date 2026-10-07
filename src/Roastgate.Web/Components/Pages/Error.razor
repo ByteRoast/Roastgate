@@ -1,0 +1,23 @@
+@page "/error"
+@using System.Diagnostics
+
+<PageTitle>Error · Roastgate</PageTitle>
+
+<MudAlert Severity="Severity.Error">An error occurred while processing your request.</MudAlert>
+
+@if (RequestId is not null)
+{
+    <MudText Class="mt-3">Request ID: <code>@RequestId</code></MudText>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}

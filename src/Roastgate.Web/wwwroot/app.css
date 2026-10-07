@@ -1,0 +1,49 @@
+/* Roastgate: MudBlazor does the heavy lifting; this file only holds what the theme cannot express. */
+
+.rg-logo {
+    height: 2rem;
+    width: 2rem;
+}
+
+.rg-brand {
+    font-weight: 700;
+}
+
+/* #ee8a26 on white is too faint for text links; use the darkest shade of the brand orange (~6:1). */
+a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
+    color: #9f560d;
+}
+
+.rg-output {
+    margin: 0.75rem 0 0;
+    padding: 0.75rem;
+    background: #f6f7f8;
+    border: 1px solid #dadde1;
+    border-radius: 0.4rem;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85rem;
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #ffebec;
+    color: #4b1113;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
