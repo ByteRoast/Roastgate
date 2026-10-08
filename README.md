@@ -4,10 +4,75 @@ A web UI that drives the nginx installed on your server. It runs in a Docker con
 reverse proxies, hosted sites, IP whitelists and Let's Encrypt certificates, without ever leaving nginx's own files:
 your `/etc/nginx` stays the source of truth.
 
-Built with C# / .NET 10, Blazor Server, MudBlazor and SQLite (EF Core).
+Built with [.NET 10](https://github.com/dotnet/core) and [MudBlazor](https://github.com/MudBlazor/MudBlazor), with the
+[Monaco editor](https://github.com/microsoft/monaco-editor) (through [BlazorMonaco](https://github.com/serdarciplak/BlazorMonaco)) for raw editing.
 
-> Status: all six phases are done (setup, sign-in, safe editing, whitelist manager, creation wizard, Let's Encrypt certificates,
-> backup restore, settings, two-factor authentication, import of existing configs).
+## Installation
+
+### Requirements
+
+- A Linux server with **nginx installed on the host** (Roastgate drives it, it does not ship one). Debian and Ubuntu layouts
+  (`conf.d/`, `sites-available/`, `sites-enabled/`) are supported.
+- **Docker** with the Compose plugin, and `root` (or the `docker` group) on that server.
+- Optional: `certbot` on the host. Without it, Roastgate uses the one embedded in its image.
+
+### Install
+
+```bash
+git clone https://github.com/ByteRoast/Roastgate.git
+cd Roastgate
+docker compose up -d --build
+docker logs roastgate        # prints the setup token
+```
+
+The provided `docker-compose.yml` runs the container as `privileged` with `pid: host` (so it can run `nginx` and `certbot` in the host
+namespaces) and mounts what it needs:
+
+| Host path | Purpose |
+|---|---|
+| `/etc/nginx` | the nginx configuration Roastgate reads and writes |
+| `/etc/letsencrypt` | certificates (read, and written by the embedded certbot) |
+| `/var/www/certbot` | ACME webroot used by the Let's Encrypt challenge |
+| `roastgate-data` (named volume, `/data`) | the SQLite database and the keys that encrypt session cookies |
+
+If your nginx or webroot live elsewhere, change the left side of these mounts and enter the same paths during the setup.
+To pick the setup token yourself, uncomment `ROASTGATE_SETUP_TOKEN` in the compose file (16+ characters).
+
+### First start
+
+Open <http://127.0.0.1:8181> (from your own machine, `ssh -L 8181:127.0.0.1:8181 user@server` gives you that address). The first
+visit goes to `/setup`:
+
+1. Enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`).
+2. Create the **administrator** account (the only account).
+3. Choose the **paths and options** (nginx directory, whitelists directory, ACME webroot, certbot mode).
+4. Review the **host diagnostics** (host access, nginx, `nginx -t`, directories, certbot).
+5. Finish: you are signed in automatically, and `/setup` no longer exists.
+
+### Update
+
+```bash
+cd Roastgate
+git pull
+docker compose up -d --build
+```
+
+The database lives in the `roastgate-data` volume, so your account and backups survive the rebuild.
+
+### Forgot the password?
+
+```bash
+docker exec -it roastgate roastgate reset-password
+```
+
+### Uninstall
+
+```bash
+docker compose down            # keeps the data volume
+docker compose down --volumes  # also deletes the account, settings and backup history
+```
+
+Your nginx files stay where they are: Roastgate never moves them.
 
 ## What it manages
 
@@ -41,7 +106,7 @@ blocks. Those stay editable as raw text. Comments between directives are not kep
 
 ### Two-factor authentication
 
-In **Settings**, scan the QR code with any authenticator app (Google Authenticator, Aegis, 1Password, Bitwarden...) and confirm with a code. You get ten
+In **Settings**, scan the QR code with any authenticator app ([Google Authenticator](https://support.google.com/accounts/answer/1066447), [Aegis](https://github.com/beemdevelopment/Aegis), [1Password](https://1password.com), [Bitwarden](https://bitwarden.com)...) and confirm with a code. You get ten
 **recovery codes**, shown once (each signs you in once; they are stored hashed). Sign-in then has two steps, and the second step only appears after a correct password.
 
 - Codes follow RFC 6238 (SHA-1, 30 s, 6 digits). One step of clock drift is tolerated; a code that was used cannot be used again (the check is atomic in the database).
@@ -108,29 +173,6 @@ challenge and are not supported.
 
 Remember that nginx evaluates `return` before `allow` and `deny`: a `location` that only does `return 200;` ignores the whitelist.
 
-## Quick start
-
-```bash
-git clone https://github.com/ByteRoast/Roastgate.git
-cd Roastgate
-docker compose up -d --build
-docker logs roastgate        # prints the setup token
-```
-
-Open <http://127.0.0.1:8181>. The first visit goes to `/setup`:
-
-1. Enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`).
-2. Create the **administrator** account (the only account).
-3. Choose the **paths and options** (nginx directory, whitelists directory, ACME webroot, certbot mode).
-4. Review the **host diagnostics** (host access, nginx, `nginx -t`, directories, certbot).
-5. Finish: you are signed in automatically, and `/setup` no longer exists.
-
-Forgot the password?
-
-```bash
-docker exec -it roastgate roastgate reset-password
-```
-
 ## Configuration
 
 Environment variables, all optional:
@@ -177,19 +219,4 @@ The database schema is managed with EF Core migrations:
 
 ```bash
 dotnet dotnet-ef migrations add <Name> --project src/Roastgate.Core --startup-project src/Roastgate.Web --output-dir Data/Migrations
-```
-
-### Conventions (enforced by the build and the tests)
-
-- Everything is written in English, with no em dashes anywhere.
-- No `var`: types are always explicit (`IDE0007` and `IDE0008` are errors).
-- Routes are lowercase with hyphens (`/audit-log`).
-- No ASP.NET Identity: sign-in is a small cookie authentication of our own.
-
-## Layout
-
-```
-src/Roastgate.Core/   host execution, SQLite (EF Core), security, setup, diagnostics
-src/Roastgate.Web/    Blazor Server UI, authentication, middlewares, CLI
-tests/Roastgate.Tests/
 ```
