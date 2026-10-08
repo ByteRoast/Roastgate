@@ -13,6 +13,9 @@ public static class AuthenticationHelper
     public static async Task SignInAsync(HttpContext context, string username)
     {
         ISessionStamp sessionStamp = context.RequestServices.GetRequiredService<ISessionStamp>();
+
+        // The CLI may have renewed the stamp from another process a moment ago: never put a stale cached value in the cookie.
+        sessionStamp.Invalidate();
         string stamp = await sessionStamp.CurrentAsync(context.RequestAborted) ?? string.Empty;
 
         ClaimsIdentity identity = new(
