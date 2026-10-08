@@ -94,7 +94,8 @@
     </MudAlert>
 }
 
-<MudTabs @bind-ActivePanelIndex="_tab" Elevation="0" Outlined="true" Rounded="true" Class="mb-4" TabPanelsClass="pa-4">
+<MudPaper Outlined="true" Elevation="0" Class="mb-4 rg-wizard-settings">
+<MudTabs @bind-ActivePanelIndex="_tab" Elevation="0" Rounded="true" TabPanelsClass="pa-4">
     <MudTabPanel Text="Essentials">
         @if (_isNew)
         {
@@ -250,13 +251,16 @@
         }
     </MudTabPanel>
 </MudTabs>
+</MudPaper>
 
-<div class="rg-editor-actions">
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 rg-wizard-actions">
+<div class="rg-editor-actions rg-editor-actions-flush">
     <MudSwitch T="bool" @bind-Value="_reload" Color="Color.Primary" Label="Reload nginx after saving" />
     <MudSpacer />
     <MudButton Variant="Variant.Outlined" Href="@Info.ListRoute">Cancel</MudButton>
     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isBusy">Save</MudButton>
 </div>
+</MudPaper>
 
 @code {
     private sealed class WizardForm

@@ -386,3 +386,12 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     resize: vertical;
     min-height: 3.5rem;
 }
+
+/* Wizard: the settings (whatever the tab) and the save bar are two separate bordered blocks. */
+.rg-wizard-settings .mud-tabs-toolbar {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rg-editor-actions-flush {
+    margin-top: 0;
+}
