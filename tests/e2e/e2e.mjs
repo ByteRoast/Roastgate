@@ -122,6 +122,7 @@ check('dashboard: Test configuration runs the real nginx -t', true);
 await button('Reload nginx').click();
 await waitText('nginx reloaded.');
 check('dashboard: Reload nginx reloads the real nginx', true);
+await shot('01a-dashboard');
 
 // ---- sites: the existing default site (absolute symlink) ----
 await page.goto(`${base}/sites`);

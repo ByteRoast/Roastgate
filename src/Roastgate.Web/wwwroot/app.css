@@ -211,6 +211,19 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     height: 100%;
 }
 
+/* Buttons at the bottom of a card: spaced apart, and away from the card edges. */
+.mud-card-actions.rg-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem 1.25rem;
+}
+
+.mud-card-actions.rg-card-actions > .mud-button-root {
+    margin: 0;
+}
+
 .rg-editor-actions {
     display: flex;
     flex-wrap: wrap;

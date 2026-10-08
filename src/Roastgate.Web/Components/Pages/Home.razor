@@ -10,7 +10,7 @@
 <MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
 
 <MudGrid>
-    <MudItem xs="12" md="6">
+    <MudItem xs="12" md="7">
         <MudCard Outlined="true">
             <MudCardHeader>
                 <CardHeaderContent>
@@ -37,7 +37,7 @@
                     }
                 }
             </MudCardContent>
-            <MudCardActions>
+            <MudCardActions Class="rg-card-actions">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RefreshAsync" Disabled="_isChecking">Check again</MudButton>
                 <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="_isChecking">Test configuration</MudButton>
                 <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_isChecking">Reload nginx</MudButton>
@@ -46,7 +46,7 @@
         <ResultAlert Result="_result" Class="mt-4" />
     </MudItem>
 
-    <MudItem xs="12" md="6">
+    <MudItem xs="12" md="5">
         <MudCard Outlined="true">
             <MudCardHeader>
                 <CardHeaderContent>
