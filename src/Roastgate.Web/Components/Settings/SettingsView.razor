@@ -40,18 +40,18 @@
     }
 
     <div class="rg-field-row">
-        <MudTextField T="string" @bind-Value="_nginxRoot" Label="nginx directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField T="string" @bind-Value="_whitelistsDirectory" Label="Whitelists directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField T="string" @bind-Value="_acmeWebroot" Label="ACME webroot" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField T="string" @bind-Value="_letsEncryptDirectory" Label="Let's Encrypt directory" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_nginxRoot" Label="nginx directory" Variant="Variant.Outlined" />
+        <MudTextField T="string" @bind-Value="_whitelistsDirectory" Label="Whitelists directory" Variant="Variant.Outlined" />
+        <MudTextField T="string" @bind-Value="_acmeWebroot" Label="ACME webroot" Variant="Variant.Outlined" />
+        <MudTextField T="string" @bind-Value="_letsEncryptDirectory" Label="Let's Encrypt directory" Variant="Variant.Outlined" />
     </div>
     <div class="rg-field-row mt-3">
-        <MudSelect T="CertbotMode" @bind-Value="_certbotMode" Label="Certificate management" Variant="Variant.Outlined" Margin="Margin.Dense">
+        <MudSelect T="CertbotMode" @bind-Value="_certbotMode" Label="Certificate management" Variant="Variant.Outlined">
             <MudSelectItem Value="CertbotMode.Embedded">Embedded certbot (renewed by Roastgate)</MudSelectItem>
             <MudSelectItem Value="CertbotMode.Host">certbot installed on the host</MudSelectItem>
             <MudSelectItem Value="CertbotMode.Disabled">Do not manage certificates</MudSelectItem>
         </MudSelect>
-        <MudTextField T="string" @bind-Value="_acmeEmail" Label="Let's Encrypt e-mail" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_acmeEmail" Label="Let's Encrypt e-mail" Variant="Variant.Outlined" />
     </div>
     <div class="rg-editor-actions">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync">Save settings</MudButton>
@@ -85,9 +85,9 @@
     }
 
     <div class="rg-field-row">
-        <MudTextField T="string" @bind-Value="_currentPassword" Label="Current password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" />
-        <MudTextField T="string" @bind-Value="_newPassword" Label="New password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
-        <MudTextField T="string" @bind-Value="_confirmation" Label="Repeat the new password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField T="string" @bind-Value="_currentPassword" Label="Current password" InputType="InputType.Password" Variant="Variant.Outlined" />
+        <MudTextField T="string" @bind-Value="_newPassword" Label="New password" InputType="InputType.Password" Variant="Variant.Outlined" Immediate="true" />
+        <MudTextField T="string" @bind-Value="_confirmation" Label="Repeat the new password" InputType="InputType.Password" Variant="Variant.Outlined" />
     </div>
     @if (_newPassword.Length > 0)
     {

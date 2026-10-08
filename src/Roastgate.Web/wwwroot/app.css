@@ -236,16 +236,21 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .rg-entry-row {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
-    gap: 0.75rem;
+    gap: 1rem;
     align-items: start;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* The remove button sits level with the 56 px inputs (the top room MudBlazor keeps for the floating label included). */
+.rg-entry-row > .mud-icon-button {
+    margin-top: 1.4rem;
 }
 
 .rg-entry-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
 @media (max-width: 640px) {
@@ -331,11 +336,26 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .rg-switch-row {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: 1.5rem;
 }
 
-.rg-switch-grid {
+/* MudSwitch is wrapped in a .mud-input-control. Next to an input it is as tall as the input (56 px), so it lines up with the input's text. */
+.rg-switch-row > .mud-input-control {
+    min-height: 56px;
+    justify-content: center;
+    /* MudBlazor leaves room above an outlined input for its floating label; the switch needs the same room. */
+    margin-top: 1rem;
+}
+
+/* The switch track has its own padding: pull it back so it starts at the same edge as the inputs. */
+.rg-switch-row > .mud-input-control,
+.rg-switch-grid > .mud-input-control {
+    margin-left: -0.75rem;
+}
+
+.rg-switch-grid,
+.rg-port-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
     gap: 0.25rem 1.5rem;
@@ -348,13 +368,21 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     align-items: start;
 }
 
-.rg-port-row {
+/* A button beside an input is centred on the input (56 px tall, with a few pixels of room MudBlazor keeps above it). */
+.rg-field-row > .rg-field-action {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    align-items: center;
+    min-height: 56px;
+    margin-top: 8px;
 }
 
 .rg-preview {
     max-height: 60vh;
     overflow: auto;
+}
+
+/* Multi-line inputs the user may want taller: a drag handle in the bottom right corner (height only, never wider than the form). */
+.rg-resizable .mud-input > textarea.mud-input-root {
+    resize: vertical;
+    min-height: 3.5rem;
 }

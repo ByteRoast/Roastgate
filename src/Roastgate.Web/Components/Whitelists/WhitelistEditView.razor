@@ -61,11 +61,11 @@
         IReadOnlyList<WhitelistProblem> problems = ProblemsFor(position);
         bool hasError = problems.Any((WhitelistProblem problem) => problem.Severity == ProblemSeverity.Error);
         <div class="rg-entry-row">
-            <MudTextField T="string" @bind-Value="row.Address" Immediate="true" Label="Address" Variant="Variant.Outlined" Margin="Margin.Dense"
+            <MudTextField T="string" @bind-Value="row.Address" Immediate="true" Label="Address" Variant="Variant.Outlined"
                           Placeholder="203.0.113.7 or 10.0.0.0/8 or 2001:db8::/32"
                           Error="hasError" ErrorText="@(hasError ? problems[0].Message : null)"
                           HelperText="@(!hasError && problems.Count > 0 ? problems[0].Message : null)" />
-            <MudTextField T="string" @bind-Value="row.Comment" Immediate="true" Label="Comment" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="alice at home" />
+            <MudTextField T="string" @bind-Value="row.Comment" Immediate="true" Label="Comment" Variant="Variant.Outlined" Placeholder="alice at home" />
             <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveRow(position))" Size="Size.Small" aria-label="@("Remove address " + (position + 1))" />
         </div>
     }
@@ -80,7 +80,7 @@
 
     @if (!string.IsNullOrEmpty(ClientAddress))
     {
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
             This is your address as Roastgate sees it. Behind a reverse proxy it may be the proxy's address:
             enable <code>ROASTGATE_TRUST_FORWARDED_HEADERS</code> only if Roastgate can be reached through your own proxy alone.
         </MudText>
@@ -91,7 +91,7 @@
     <MudText Typo="Typo.h6" Class="mb-2">Paste several addresses</MudText>
     <MudTextField T="string" @bind-Value="_paste" Lines="3" Variant="Variant.Outlined" Immediate="true"
                   Placeholder="One per line, or separated by spaces and commas. Lines like &quot;allow 1.2.3.4;&quot; work too." />
-    <MudButton Variant="Variant.Outlined" OnClick="AddPasted" Disabled="string.IsNullOrWhiteSpace(_paste)" Class="mt-2">Add them to the list</MudButton>
+    <MudButton Variant="Variant.Outlined" OnClick="AddPasted" Disabled="string.IsNullOrWhiteSpace(_paste)" Class="mt-3">Add them to the list</MudButton>
 </MudPaper>
 
 @if (!_isNew && _details is not null)
@@ -101,7 +101,7 @@
         <MudText Class="mb-2">Add these lines inside the <code>server</code> or <code>location</code> you want to restrict:</MudText>
         <pre class="rg-output">@_details.IncludeSnippet
 deny all;</pre>
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="CopySnippetAsync">@(_copied ? "Copied" : "Copy")</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="mt-3" OnClick="CopySnippetAsync">@(_copied ? "Copied" : "Copy")</MudButton>
 
         <MudText Typo="Typo.subtitle1" Class="mt-4 mb-1">Used by</MudText>
         @if (_details.Usage.Count == 0)

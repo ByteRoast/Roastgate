@@ -103,7 +103,7 @@
                           HelperText="@("Optional: the first domain is used when left empty. " + (Area == ConfigArea.Sites ? string.Empty : "The .conf extension is added."))" />
         }
 
-        <MudTextField T="string" @bind-Value="_form.ServerNames" Label="Domain names" Variant="Variant.Outlined" Lines="2" Class="mb-4" Immediate="true"
+        <MudTextField T="string" @bind-Value="_form.ServerNames" Label="Domain names" Variant="Variant.Outlined" Lines="2" Class="mb-4 rg-resizable" Immediate="true"
                       Error="@(ErrorFor(nameof(SiteSpec.ServerNames), _form.ServerNames) is not null)" ErrorText="@ErrorFor(nameof(SiteSpec.ServerNames), _form.ServerNames)"
                       HelperText="One per line or separated by spaces, for example app.example.com www.example.com *.example.com" />
 
@@ -115,7 +115,7 @@
                           HelperText="The application or container that serves the site. Use https:// if it speaks TLS." />
             <div class="rg-switch-row">
                 <MudSwitch T="bool" @bind-Value="_form.Websockets" Color="Color.Primary" Label="Support WebSockets" />
-                <MudNumericField T="int?" @bind-Value="_form.ProxyTimeout" Label="Timeout (seconds)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="3600"
+                <MudNumericField T="int?" @bind-Value="_form.ProxyTimeout" Label="Timeout (seconds)" Variant="Variant.Outlined" Min="1" Max="3600"
                                  HelperText="Empty keeps nginx's 60 s" />
             </div>
         }
@@ -207,16 +207,16 @@
         </div>
 
         <div class="rg-port-row mt-4">
-            <MudNumericField T="int" @bind-Value="_form.HttpPort" Label="HTTP port" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="65535" />
-            <MudNumericField T="int" @bind-Value="_form.HttpsPort" Label="HTTPS port" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="65535" Disabled="!_form.EnableTls" />
+            <MudNumericField T="int" @bind-Value="_form.HttpPort" Label="HTTP port" Variant="Variant.Outlined" Min="1" Max="65535" />
+            <MudNumericField T="int" @bind-Value="_form.HttpsPort" Label="HTTPS port" Variant="Variant.Outlined" Min="1" Max="65535" Disabled="!_form.EnableTls" />
         </div>
         <MudSwitch T="bool" @bind-Value="_form.Ipv6" Color="Color.Primary" Class="mt-2"
                    Label="Also listen on IPv6 (turn off if nginx refuses listen [::] on this host)" />
 
-        <MudTextField T="string" @bind-Value="_form.ExtraServerDirectives" Label="Extra directives in the server block" Variant="Variant.Outlined" Lines="4" Class="mt-4" Immediate="true"
+        <MudTextField T="string" @bind-Value="_form.ExtraServerDirectives" Label="Extra directives in the server block" Variant="Variant.Outlined" Lines="4" Class="mt-4 rg-resizable" Immediate="true"
                       Error="@(ErrorFor(nameof(SiteSpec.ExtraServerDirectives), _form.ExtraServerDirectives) is not null)" ErrorText="@ErrorFor(nameof(SiteSpec.ExtraServerDirectives), _form.ExtraServerDirectives)"
                       HelperText="Raw nginx. Braces must balance so it cannot leave the block." />
-        <MudTextField T="string" @bind-Value="_form.ExtraLocationDirectives" Label="Extra directives in the main location" Variant="Variant.Outlined" Lines="3" Class="mt-4" Immediate="true"
+        <MudTextField T="string" @bind-Value="_form.ExtraLocationDirectives" Label="Extra directives in the main location" Variant="Variant.Outlined" Lines="3" Class="mt-4 rg-resizable" Immediate="true"
                       Error="@(ErrorFor(nameof(SiteSpec.ExtraLocationDirectives), _form.ExtraLocationDirectives) is not null)" ErrorText="@ErrorFor(nameof(SiteSpec.ExtraLocationDirectives), _form.ExtraLocationDirectives)"
                       HelperText="Careful: an add_header here replaces the security headers of the server block for that location." />
     </MudTabPanel>

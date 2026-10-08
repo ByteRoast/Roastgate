@@ -16,15 +16,15 @@
 </div>
 
 <div class="rg-field-row mb-4">
-    <MudSelect T="string" @bind-Value="_area" Label="Area" Variant="Variant.Outlined" Margin="Margin.Dense">
+    <MudSelect T="string" @bind-Value="_area" Label="Area" Variant="Variant.Outlined">
         <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
         @foreach (ConfigArea area in Enum.GetValues<ConfigArea>())
         {
             <MudSelectItem T="string" Value="@area.ToString()">@AreaInfo.For(area).Title</MudSelectItem>
         }
     </MudSelect>
-    <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" Margin="Margin.Dense" />
-    <div><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync">Show</MudButton></div>
+    <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" />
+    <div class="rg-field-action"><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync">Show</MudButton></div>
 </div>
 
 <ResultAlert Result="_result" Class="mb-4" />

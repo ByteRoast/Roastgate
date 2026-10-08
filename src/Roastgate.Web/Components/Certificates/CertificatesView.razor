@@ -130,11 +130,11 @@
             Your site must already answer on port 80 for that domain and serve the ACME webroot (turn on "Let the Let's Encrypt validation through" in the wizard).
             Run a dry run first: it checks all of that without issuing anything.
         </MudText>
-        <MudTextField T="string" @bind-Value="_domains" Label="Domain names" Variant="Variant.Outlined" Lines="2" Class="mb-3" Immediate="true"
+        <MudTextField T="string" @bind-Value="_domains" Label="Domain names" Variant="Variant.Outlined" Lines="2" Class="mb-3 rg-resizable" Immediate="true"
                       HelperText="One per line or separated by spaces. Wildcards are not supported." />
         <div class="rg-field-row">
-            <MudTextField T="string" @bind-Value="_certName" Label="Certificate name (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" HelperText="Defaults to the first domain" />
-            <MudTextField T="string" @bind-Value="_email" Label="E-mail for expiry notices" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField T="string" @bind-Value="_certName" Label="Certificate name (optional)" Variant="Variant.Outlined" HelperText="Defaults to the first domain" />
+            <MudTextField T="string" @bind-Value="_email" Label="E-mail for expiry notices" Variant="Variant.Outlined" />
         </div>
         <MudSwitch T="bool" @bind-Value="_staging" Color="Color.Primary" Label="Use the staging server (untrusted certificates, generous limits)" Class="mt-2" />
         <div class="rg-editor-actions">

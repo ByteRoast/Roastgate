@@ -36,7 +36,7 @@
         }
 
         <div class="rg-field-row mt-3">
-            <MudTextField T="string" @bind-Value="_code" Label="Code from the app" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+            <MudTextField T="string" @bind-Value="_code" Label="Code from the app" Variant="Variant.Outlined" Immediate="true" />
         </div>
         <div class="rg-editor-actions">
             <MudButton Variant="Variant.Outlined" OnClick="Cancel">Cancel</MudButton>
@@ -64,8 +64,8 @@
         <MudText Typo="Typo.subtitle1" Class="mb-1">Get new recovery codes</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">The old ones stop working. Confirm with a code from your app.</MudText>
         <div class="rg-field-row">
-            <MudTextField T="string" @bind-Value="_regenerateCode" Label="Code from the app" Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <div><MudButton Variant="Variant.Outlined" OnClick="RegenerateAsync" Disabled="_isBusy">Get new recovery codes</MudButton></div>
+            <MudTextField T="string" @bind-Value="_regenerateCode" Label="Code from the app" Variant="Variant.Outlined" />
+            <div class="rg-field-action"><MudButton Variant="Variant.Outlined" OnClick="RegenerateAsync" Disabled="_isBusy">Get new recovery codes</MudButton></div>
         </div>
 
         <MudDivider Class="my-4" />
@@ -73,8 +73,8 @@
         <MudText Typo="Typo.subtitle1" Class="mb-1">Turn it off</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Needs your password and a code. Every open session ends.</MudText>
         <div class="rg-field-row">
-            <MudTextField T="string" @bind-Value="_disablePassword" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudTextField T="string" @bind-Value="_disableCode" Label="Code from the app (or a recovery code)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField T="string" @bind-Value="_disablePassword" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
+            <MudTextField T="string" @bind-Value="_disableCode" Label="Code from the app (or a recovery code)" Variant="Variant.Outlined" />
         </div>
         <div class="rg-editor-actions">
             <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DisableAsync" Disabled="_isBusy">Turn off two-factor authentication</MudButton>
