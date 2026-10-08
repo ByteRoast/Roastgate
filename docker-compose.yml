@@ -2,6 +2,10 @@
 #   privileged + pid: host  lets it run `nginx` and `certbot` in the host namespaces (nsenter).
 #   the volumes below      let it read and write the nginx configuration and the certificates.
 # Read the security notes in README.md before exposing the port beyond 127.0.0.1.
+# The project and the volume have fixed names, so the account survives a rebuild whatever the folder you cloned into.
+# Update with `docker compose up -d --build`. Never use `docker compose down -v`: it deletes the account and the backup history.
+name: roastgate
+
 services:
   roastgate:
     build: .
@@ -27,3 +31,4 @@ services:
 
 volumes:
   roastgate-data:
+    name: roastgate-data

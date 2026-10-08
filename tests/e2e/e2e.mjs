@@ -729,6 +729,17 @@ const audit = await body();
 check('the audit log records saves, refusals, enables and deletes', ['config.save', 'config.enable', 'config.disable', 'config.delete', 'nginx.reload', 'nginx.test', 'certbot.issue', 'certbot.renew', 'certbot.delete'].every((a) => audit.includes(a)));
 await shot('05-audit');
 
+// ---- the account survives a restart of the container ----
+execSync(`docker restart ${container}`, { stdio: 'ignore' });
+for (let i = 0; i < 60; i += 1) {
+  try { if ((await fetch(`${base}/login`)).ok) { break; } } catch { /* not up yet */ }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+const restartLogs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
+check('after a restart the existing database is reused', restartLogs.includes('Using the existing database'));
+await page.goto(`${base}/`);
+check('after a restart the account and the session are still there (no setup)', !page.url().includes('/setup') && !page.url().includes('/login'), page.url());
+
 await browser.close();
 console.log('\nbrowser problems:', problems.length ? '\n  ' + [...new Set(problems)].join('\n  ') : 'none');
 const failed = results.filter((r) => !r.ok);

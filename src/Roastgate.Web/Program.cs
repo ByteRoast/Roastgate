@@ -88,7 +88,11 @@ if (options.TrustForwardedHeaders)
 
 WebApplication app = builder.Build();
 
+bool databaseExisted = File.Exists(options.DatabasePath);
 await app.Services.MigrateRoastgateDatabaseAsync();
+app.Logger.LogInformation(
+    databaseExisted ? "Using the existing database {DatabasePath}." : "No database found, created {DatabasePath}. If this container used to be set up, its data volume is missing.",
+    options.DatabasePath);
 
 ISetupService setup = app.Services.GetRequiredService<ISetupService>();
 await setup.InitializeAsync();

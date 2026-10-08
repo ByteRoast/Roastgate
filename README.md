@@ -57,7 +57,12 @@ git pull
 docker compose up -d --build
 ```
 
-The database lives in the `roastgate-data` volume, so your account and backups survive the rebuild.
+The database lives in the `roastgate-data` volume, so your account and backups survive the rebuild and `docker compose down`.
+Only `docker compose down --volumes` (or `docker volume rm roastgate-data`) deletes it. To back it up:
+
+```bash
+docker run --rm -v roastgate-data:/data -v "$PWD":/backup alpine tar czf /backup/roastgate-data.tgz -C /data .
+```
 
 ### Forgot the password?
 
