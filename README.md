@@ -21,9 +21,13 @@ Built with [.NET 10](https://github.com/dotnet/core) and [MudBlazor](https://git
 ```bash
 git clone https://github.com/ByteRoast/Roastgate.git
 cd Roastgate
-docker compose up -d --build
+docker compose up -d
 docker logs roastgate        # prints the setup token
 ```
+
+The compose file pulls `ghcr.io/byteroast/roastgate:latest`, published when `dev` is merged into `main` (the `dev` tag follows every push to
+the `dev` branch). While the package is private, sign in first with `docker login ghcr.io` (a token with `read:packages`).
+To build the image from the sources instead, use `docker compose up -d --build`.
 
 The provided `docker-compose.yml` runs the container as `privileged` with `pid: host` (so it can run `nginx` and `certbot` in the host
 namespaces) and mounts what it needs:
@@ -53,8 +57,9 @@ visit goes to `/setup`:
 
 ```bash
 cd Roastgate
-git pull
-docker compose up -d --build
+git pull                       # only needed when docker-compose.yml changed
+docker compose pull
+docker compose up -d           # or `docker compose up -d --build` to build from source
 ```
 
 The database lives in the `roastgate-data` volume, so your account and backups survive the rebuild and `docker compose down`.
