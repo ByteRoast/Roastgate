@@ -158,6 +158,32 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     background: #dd7b19;
 }
 
+.rg-auth-alternative {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    margin-top: 1rem;
+    text-align: center;
+    color: #525860;
+    font-size: 0.85rem;
+}
+
+.rg-auth-button-secondary {
+    margin-top: 0.25rem;
+    border: 1px solid #dadde1;
+    background: #ffffff;
+}
+
+.rg-auth-button-secondary:hover {
+    background: #f5f6f7;
+}
+
+.rg-auth-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
 /* Setup wizard and layout helpers. */
 .rg-setup-brand {
     display: flex;

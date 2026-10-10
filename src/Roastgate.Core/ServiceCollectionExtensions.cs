@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISettingsStore, SettingsStore>();
         services.AddSingleton<IAuditLog, AuditLog>();
         services.AddSingleton<IAdminAccountStore, AdminAccountStore>();
+        services.AddSingleton<IPasskeyStore, PasskeyStore>();
         services.AddSingleton<AppSettingsService>();
 
         services.AddSingleton<PasswordHasher>(_ => new PasswordHasher());
@@ -37,6 +38,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AccountService>();
         services.AddSingleton<ITwoFactorService, TwoFactorService>();
         services.AddSingleton<TwoFactorChallenges>();
+        services.AddSingleton<PasskeyCeremonies>();
+        services.AddSingleton<IPasskeyService, PasskeyService>();
         services.AddSingleton<LoginThrottle>();
         services.AddSingleton<ISetupService, SetupService>();
 
@@ -54,6 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICertificateService, CertificateService>();
         services.AddSingleton<ICertificateRenewalJob, CertificateRenewalJob>();
         services.AddSingleton<HostDiagnostics>();
+
         return services;
     }
 }

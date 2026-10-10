@@ -58,6 +58,26 @@ public sealed class AdminAccount
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
+/// <summary>A passkey (WebAuthn credential) registered by the administrator.</summary>
+public sealed class PasskeyCredential
+{
+    public int Id { get; set; }
+
+    public required byte[] CredentialId { get; set; }
+
+    /// <summary>The COSE-encoded public key. The private key never leaves the authenticator.</summary>
+    public required byte[] PublicKey { get; set; }
+
+    /// <summary>The signature counter of the last accepted sign-in (always 0 for authenticators that do not count, such as synced passkeys).</summary>
+    public long SignatureCounter { get; set; }
+
+    public required string Name { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset? LastUsedAt { get; set; }
+}
+
 public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> options) : DbContext(options)
 {
     private const int ConfigNameMaximumLength = 100;
@@ -67,6 +87,8 @@ public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> opti
     public DbSet<AuditEntry> AuditLog => Set<AuditEntry>();
 
     public DbSet<AdminAccount> AdminAccounts => Set<AdminAccount>();
+
+    public DbSet<PasskeyCredential> Passkeys => Set<PasskeyCredential>();
 
     public DbSet<ConfigBackup> ConfigBackups => Set<ConfigBackup>();
 
@@ -120,6 +142,20 @@ public sealed class RoastgateDbContext(DbContextOptions<RoastgateDbContext> opti
             entity.Property(account => account.SecurityStamp).HasColumnName("security_stamp").HasMaxLength(64).HasDefaultValue(string.Empty);
             entity.Property(account => account.CreatedAt).HasColumnName("created_at");
             entity.Property(account => account.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<PasskeyCredential>(entity =>
+        {
+            entity.ToTable("passkeys");
+            entity.HasKey(passkey => passkey.Id);
+            entity.Property(passkey => passkey.Id).HasColumnName("id");
+            entity.Property(passkey => passkey.CredentialId).HasColumnName("credential_id");
+            entity.HasIndex(passkey => passkey.CredentialId).IsUnique();
+            entity.Property(passkey => passkey.PublicKey).HasColumnName("public_key");
+            entity.Property(passkey => passkey.SignatureCounter).HasColumnName("signature_counter");
+            entity.Property(passkey => passkey.Name).HasColumnName("name").HasMaxLength(64);
+            entity.Property(passkey => passkey.CreatedAt).HasColumnName("created_at");
+            entity.Property(passkey => passkey.LastUsedAt).HasColumnName("last_used_at");
         });
     }
 }

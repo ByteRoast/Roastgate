@@ -152,6 +152,49 @@ namespace Roastgate.Core.Data.Migrations
                     b.ToTable("config_backups", (string)null);
                 });
 
+            modelBuilder.Entity("Roastgate.Core.Data.PasskeyCredential", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<byte[]>("CredentialId")
+                        .IsRequired()
+                        .HasColumnType("BLOB")
+                        .HasColumnName("credential_id");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("name");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("BLOB")
+                        .HasColumnName("public_key");
+
+                    b.Property<long>("SignatureCounter")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("signature_counter");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId")
+                        .IsUnique();
+
+                    b.ToTable("passkeys", (string)null);
+                });
+
             modelBuilder.Entity("Roastgate.Core.Data.Setting", b =>
                 {
                     b.Property<string>("Key")

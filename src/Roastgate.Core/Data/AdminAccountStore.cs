@@ -11,10 +11,12 @@ public interface IAdminAccountStore
     Task<bool> CreateAsync(string username, string passwordHash, CancellationToken cancellationToken = default);
 
     /// <param name="rotateStamp">True when the password really changed (every open session ends); false when only the hash was upgraded.</param>
-    Task UpdatePasswordHashAsync(string passwordHash, bool rotateStamp = true, CancellationToken cancellationToken = default);
+    Task UpdatePasswordHashAsync(string passwordHash, bool rotateStamp = true,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Turns two-factor authentication on. Every open session ends (the security stamp is renewed).</summary>
-    Task EnableTotpAsync(string secret, IReadOnlyList<string> recoveryCodeHashes, long acceptedStep, CancellationToken cancellationToken = default);
+    Task EnableTotpAsync(string secret, IReadOnlyList<string> recoveryCodeHashes, long acceptedStep,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Turns it off and forgets the secret and the recovery codes. Every open session ends.</summary>
     Task DisableTotpAsync(CancellationToken cancellationToken = default);
@@ -29,6 +31,9 @@ public interface IAdminAccountStore
     Task<bool> TryConsumeRecoveryCodeAsync(string hash, CancellationToken cancellationToken = default);
 
     Task ReplaceRecoveryCodesAsync(IReadOnlyList<string> hashes, CancellationToken cancellationToken = default);
+
+    /// <summary>Renews the security stamp: every open session ends.</summary>
+    Task RotateSecurityStampAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> factory) : IAdminAccountStore
@@ -36,18 +41,22 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
     public async Task<AdminAccount?> GetAsync(CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         return await database.AdminAccounts.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<bool> CreateAsync(string username, string passwordHash, CancellationToken cancellationToken = default)
+    public async Task<bool> CreateAsync(string username, string passwordHash,
+        CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         if (await database.AdminAccounts.AnyAsync(cancellationToken))
         {
             return false;
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        
         database.AdminAccounts.Add(new AdminAccount
         {
             Username = username,
@@ -60,6 +69,7 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
         try
         {
             await database.SaveChangesAsync(cancellationToken);
+            
             return true;
         }
         catch (DbUpdateException)
@@ -69,19 +79,24 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
         }
     }
 
-    public async Task UpdatePasswordHashAsync(string passwordHash, bool rotateStamp = true, CancellationToken cancellationToken = default)
+    public async Task UpdatePasswordHashAsync(string passwordHash, bool rotateStamp = true,
+        CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        
         if (rotateStamp)
         {
             string stamp = NewStamp();
+        
             await database.AdminAccounts.ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(account => account.PasswordHash, passwordHash)
                     .SetProperty(account => account.SecurityStamp, stamp)
                     .SetProperty(account => account.UpdatedAt, now),
                 cancellationToken);
+            
             return;
         }
 
@@ -92,12 +107,16 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
             cancellationToken);
     }
 
-    public async Task EnableTotpAsync(string secret, IReadOnlyList<string> recoveryCodeHashes, long acceptedStep, CancellationToken cancellationToken = default)
+    public async Task EnableTotpAsync(string secret, IReadOnlyList<string> recoveryCodeHashes, long acceptedStep,
+        CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         string stamp = NewStamp();
         string hashes = JsonSerializer.Serialize(recoveryCodeHashes);
+        
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        
         await database.AdminAccounts.ExecuteUpdateAsync(
             setters => setters
                 .SetProperty(account => account.TotpSecret, secret)
@@ -111,8 +130,11 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
     public async Task DisableTotpAsync(CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         string stamp = NewStamp();
+        
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        
         await database.AdminAccounts.ExecuteUpdateAsync(
             setters => setters
                 .SetProperty(account => account.TotpSecret, (string?)null)
@@ -126,9 +148,13 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
     public async Task<bool> TryAdvanceTotpStepAsync(long step, CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         int updated = await database.AdminAccounts
-            .Where(account => account.TotpSecret != null && (account.TotpLastStep == null || account.TotpLastStep < step))
-            .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.TotpLastStep, (long?)step), cancellationToken);
+            .Where(account =>
+                account.TotpSecret != null && (account.TotpLastStep == null || account.TotpLastStep < step))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.TotpLastStep, (long?)step),
+                cancellationToken);
+
         return updated > 0;
     }
 
@@ -138,22 +164,28 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
         for (int attempt = 0; attempt < 3; attempt++)
         {
             await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+            
             AdminAccount? account = await database.AdminAccounts.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+            
             if (account?.RecoveryCodeHashes is not { } current)
             {
                 return false;
             }
 
             List<string> remaining = ParseHashes(current);
+            
             if (!remaining.Remove(hash))
             {
                 return false;
             }
 
             string updatedJson = JsonSerializer.Serialize(remaining);
+            
             int updated = await database.AdminAccounts
                 .Where(item => item.RecoveryCodeHashes == current)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.RecoveryCodeHashes, updatedJson), cancellationToken);
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.RecoveryCodeHashes, updatedJson),
+                    cancellationToken);
+            
             if (updated > 0)
             {
                 return true;
@@ -163,13 +195,33 @@ public sealed class AdminAccountStore(IDbContextFactory<RoastgateDbContext> fact
         return false;
     }
 
-    public async Task ReplaceRecoveryCodesAsync(IReadOnlyList<string> hashes, CancellationToken cancellationToken = default)
+    public async Task ReplaceRecoveryCodesAsync(IReadOnlyList<string> hashes,
+        CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+        
         string json = JsonSerializer.Serialize(hashes);
+        
         await database.AdminAccounts
             .Where(account => account.TotpSecret != null)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.RecoveryCodeHashes, json), cancellationToken);
+            .ExecuteUpdateAsync(setters => setters.SetProperty(account => account.RecoveryCodeHashes, json),
+                cancellationToken);
+    }
+
+    public async Task RotateSecurityStampAsync(CancellationToken cancellationToken = default)
+    {
+        await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+
+        string stamp = NewStamp();
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        await database.AdminAccounts.ExecuteUpdateAsync(
+            setters => setters
+                .SetProperty(account => account.SecurityStamp, stamp)
+                .SetProperty(account => account.UpdatedAt, now),
+            cancellationToken
+        );
     }
 
     /// <summary>The hashes stored in the JSON column (an empty list when there is none or it cannot be read).</summary>

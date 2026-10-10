@@ -1,0 +1,230 @@
+@inject IPasskeyService Passkeys
+@inject AccountService Accounts
+@inject LoginThrottle Throttle
+@inject IAuditLog Audit
+@inject CurrentUser User
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6" Class="mb-1">Passkeys</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        A passkey signs you in with your fingerprint, face or device PIN. It works on its own (no password needed) and as the second step after your
+        password. Once you have one, a correct password is no longer enough to sign in. A passkey only works on the address it was created on.
+    </MudText>
+
+    @if (_errors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3">@string.Join(" ", _errors)</MudAlert>
+    }
+
+    @if (_passkeys.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">No passkey yet.</MudText>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true" Class="mb-3" Outlined="true">
+            <thead>
+                <tr><th>Name</th><th>Added</th><th>Last used</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (PasskeyInfo passkey in _passkeys)
+                {
+                    <tr>
+                        <td>@passkey.Name</td>
+                        <td>@passkey.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                        <td>@(passkey.LastUsedAt is { } used ? used.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "never")</td>
+                        <td class="text-end">
+                            <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text" OnClick="() => AskToRemove(passkey.Id)">Remove</MudButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    }
+
+    @if (_removing is not null)
+    {
+        <MudText Typo="Typo.subtitle1" Class="mb-1">Remove "@_passkeys.FirstOrDefault(passkey => passkey.Id == _removing)?.Name"</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Needs your password. Every open session ends.</MudText>
+        <div class="rg-field-row">
+            <MudTextField T="string" @bind-Value="_password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
+        </div>
+        <div class="rg-editor-actions">
+            <MudButton Variant="Variant.Outlined" OnClick="CancelRemove">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="RemoveAsync" Disabled="_isBusy">Remove the passkey</MudButton>
+        </div>
+    }
+    else if (_adding)
+    {
+        <div class="rg-field-row">
+            <MudTextField T="string" @bind-Value="_name" Label="Name (for example: laptop, phone)" MaxLength="PasskeyService.MaximumNameLength" Variant="Variant.Outlined" />
+            <MudTextField T="string" @bind-Value="_password" Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
+        </div>
+        <div class="rg-editor-actions">
+            <MudButton Variant="Variant.Outlined" OnClick="CancelAdd">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAsync" Disabled="_isBusy">Create the passkey</MudButton>
+        </div>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartAdd">Add a passkey</MudButton>
+    }
+</MudPaper>
+
+@code {
+    private readonly List<string> _errors = [];
+    private IReadOnlyList<PasskeyInfo> _passkeys = [];
+    private string _username = string.Empty;
+    private string _name = string.Empty;
+    private string _password = string.Empty;
+    private bool _adding;
+    private bool _isBusy;
+    private int? _removing;
+
+    private sealed record CreateResult(string? Response, string? Error);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _username = await User.GetNameAsync();
+        _passkeys = await Passkeys.ListAsync();
+    }
+
+    private void StartAdd()
+    {
+        _errors.Clear();
+        _name = string.Empty;
+        _password = string.Empty;
+        _adding = true;
+    }
+
+    private void CancelAdd()
+    {
+        _adding = false;
+        _password = string.Empty;
+        _errors.Clear();
+    }
+
+    private void AskToRemove(int id)
+    {
+        _errors.Clear();
+        _password = string.Empty;
+        _removing = id;
+    }
+
+    private void CancelRemove()
+    {
+        _removing = null;
+        _password = string.Empty;
+        _errors.Clear();
+    }
+
+    /// <summary>Checks the password, counting a wrong one against a limit. False (with the problem in <c>_errors</c>) when it is refused.</summary>
+    private async Task<bool> ConfirmPasswordAsync()
+    {
+        string throttleKey = "passkey-confirm:" + _username;
+        
+        if (Throttle.IsBlocked(throttleKey, out TimeSpan retryAfter))
+        {
+            _errors.Add($"Too many wrong attempts. Try again in {Math.Ceiling(retryAfter.TotalMinutes)} minute(s).");
+
+            return false;
+        }
+
+        if (await Accounts.VerifyCredentialsAsync(_username, _password) is null)
+        {
+            Throttle.RecordFailure(throttleKey);
+
+            await Audit.WriteAsync(_username, "auth.passkey-change", null, false, "wrong password");
+            
+            _errors.Add("The password is not correct.");
+            
+            return false;
+        }
+
+        Throttle.Reset(throttleKey);
+        
+        return true;
+    }
+
+    private async Task AddAsync()
+    {
+        _errors.Clear();
+        _isBusy = true;
+        
+        try
+        {
+            if (!await ConfirmPasswordAsync())
+            {
+                return;
+            }
+
+            PasskeyRelyingParty relyingParty = PasskeyRelyingParty.FromUri(new Uri(Navigation.BaseUri));
+            PasskeyChallenge challenge = await Passkeys.BeginRegistrationAsync(relyingParty, _username);
+            CreateResult created = await JS.InvokeAsync<CreateResult>("roastgatePasskeyCreate", challenge.OptionsJson);
+        
+            if (created.Response is null)
+            {
+                _errors.Add(created.Error ?? "The passkey could not be created.");
+                
+                return;
+            }
+
+            PasskeyInfo? passkey = await Passkeys.CompleteRegistrationAsync(relyingParty, challenge.CeremonyId, created.Response, _name);
+            
+            if (passkey is null)
+            {
+                await Audit.WriteAsync(_username, "auth.passkey-added", null, false, "refused by the server");
+            
+                _errors.Add("The passkey was not accepted. Check that you use the same address as when you signed in.");
+                
+                return;
+            }
+
+            await Audit.WriteAsync(_username, "auth.passkey-added", passkey.Name, true);
+            
+            _passkeys = await Passkeys.ListAsync();
+            _adding = false;
+            _password = string.Empty;
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        _errors.Clear();
+        
+        if (_removing is not { } id)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        
+        try
+        {
+            if (!await ConfirmPasswordAsync())
+            {
+                return;
+            }
+
+            string? name = _passkeys.FirstOrDefault(passkey => passkey.Id == id)?.Name;
+            
+            if (await Passkeys.RemoveAsync(id))
+            {
+                await Audit.WriteAsync(_username, "auth.passkey-removed", name, true);
+            }
+
+            // Removing a credential ended every session (the security stamp changed), this one included.
+            Navigation.NavigateTo("/login?notice=two-factor-changed", forceLoad: true);
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+}
