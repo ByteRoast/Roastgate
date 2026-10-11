@@ -1,12 +1,9 @@
 @page "/whitelists/raw"
 @attribute [Authorize]
-@using Roastgate.Core.Nginx
 
-<PageTitle>Whitelist (raw) · Roastgate</PageTitle>
+<PageTitle>
+    Whitelist (raw) · Roastgate
+</PageTitle>
 
-<ConfigEditView Area="ConfigArea.Whitelists" Name="@Name" />
-
-@code {
-    [SupplyParameterFromQuery(Name = "name")]
-    private string? Name { get; set; }
-}
+<ConfigEditView Area="ConfigArea.Whitelists"
+                Name="@Name" />

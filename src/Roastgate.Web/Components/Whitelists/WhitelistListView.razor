@@ -1,34 +1,75 @@
-@inject IWhitelistService Whitelists
-@inject IConfigStore Store
-@inject CurrentUser User
-@inject IDialogService Dialogs
-
 <div class="rg-page-header">
     <div>
-        <MudText Typo="Typo.h4">Whitelists</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
+        <MudText Typo="Typo.h4">
+            Whitelists
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary">
             Lists of allowed addresses. A whitelist does nothing until a reverse proxy or a site includes it.
         </MudText>
     </div>
+
     <div class="rg-page-actions">
-        <MudButton Variant="Variant.Outlined" OnClick="TestAsync" Disabled="_isBusy">Test nginx</MudButton>
-        <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync" Disabled="_isBusy">Reload nginx</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/whitelists/edit">New whitelist</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   OnClick="TestAsync"
+                   Disabled="_isBusy">
+            Test nginx
+        </MudButton>
+
+        <MudButton Variant="Variant.Outlined"
+                   OnClick="ReloadAsync"
+                   Disabled="_isBusy">
+            Reload nginx
+        </MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Href="/whitelists/edit">
+            New whitelist
+        </MudButton>
     </div>
 </div>
 
-<ResultAlert Result="_result" Class="mb-4" />
+<ResultAlert Result="_result"
+             Class="mb-4" />
 
-<MudTable T="WhitelistSummary" Items="_items" Loading="_items is null" Hover="true" Dense="true" Outlined="true" Elevation="0" Breakpoint="Breakpoint.Sm">
+<MudTable T="WhitelistSummary"
+          Items="_items"
+          Loading="_items is null"
+          Hover="true"
+          Dense="true"
+          Outlined="true"
+          Elevation="0"
+          Breakpoint="Breakpoint.Sm">
     <HeaderContent>
-        <MudTh>Name</MudTh>
-        <MudTh>Addresses</MudTh>
-        <MudTh>Used by</MudTh>
-        <MudTh>Modified</MudTh>
-        <MudTh></MudTh>
+        <MudTh>
+            Name
+        </MudTh>
+
+        <MudTh>
+            Addresses
+        </MudTh>
+
+        <MudTh>
+            Used by
+        </MudTh>
+
+        <MudTh>
+            Modified
+        </MudTh>
+
+        <MudTh>
+        </MudTh>
     </HeaderContent>
+
     <RowTemplate>
-        <MudTd DataLabel="Name"><a href="@EditUrl(context)">@context.Name</a></MudTd>
+        <MudTd DataLabel="Name">
+            <a href="@EditUrl(context)">
+                @context.Name
+            </a>
+        </MudTd>
+
         <MudTd DataLabel="Addresses">
             @if (context.EntryCount is { } count)
             {
@@ -36,94 +77,56 @@
             }
             else
             {
-                <MudText Typo="Typo.body2" Color="Color.Secondary">custom content</MudText>
+                <MudText Typo="Typo.body2"
+                         Color="Color.Secondary">
+                    custom content
+                </MudText>
             }
         </MudTd>
+
         <MudTd DataLabel="Used by">
             @if (context.Usage.Count == 0)
             {
-                <MudText Typo="Typo.body2" Color="Color.Secondary">not used</MudText>
+                <MudText Typo="Typo.body2"
+                         Color="Color.Secondary">
+                    not used
+                </MudText>
             }
             else
             {
                 @foreach (WhitelistUsage usage in context.Usage.DistinctBy((WhitelistUsage item) => item.FileName))
                 {
-                    <MudChip T="string" Size="Size.Small" Variant="@(usage.FileEnabled ? Variant.Filled : Variant.Outlined)"
-                             title="@(usage.FileEnabled ? "Active" : "This file is disabled, so the include has no effect for now")">@usage.FileName</MudChip>
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Variant="@(usage.FileEnabled ? Variant.Filled : Variant.Outlined)"
+                             title="@(usage.FileEnabled ? "Active" : "This file is disabled, so the include has no effect for now")">
+                        @usage.FileName
+                    </MudChip>
                 }
             }
         </MudTd>
-        <MudTd DataLabel="Modified">@context.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</MudTd>
+
+        <MudTd DataLabel="Modified">
+            @context.ModifiedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+        </MudTd>
+
         <MudTd Style="text-align: right">
-            <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@EditUrl(context)" Size="Size.Small" aria-label="@("Edit " + context.Name)" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(context))" Size="Size.Small" Disabled="_isBusy" aria-label="@("Delete " + context.Name)" />
+            <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                           Href="@EditUrl(context)"
+                           Size="Size.Small"
+                           aria-label="@("Edit " + context.Name)" />
+
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           OnClick="@(() => DeleteAsync(context))"
+                           Size="Size.Small"
+                           Disabled="_isBusy"
+                           aria-label="@("Delete " + context.Name)" />
         </MudTd>
     </RowTemplate>
+
     <NoRecordsContent>
-        <MudText>No whitelist yet.</MudText>
+        <MudText>
+            No whitelist yet.
+        </MudText>
     </NoRecordsContent>
 </MudTable>
-
-@code {
-    private IReadOnlyList<WhitelistSummary>? _items;
-    private ConfigResult? _result;
-    private bool _isBusy;
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        _items = await Whitelists.ListAsync();
-    }
-
-    private static string EditUrl(WhitelistSummary summary)
-    {
-        // Whitelists with content the list editor cannot represent open in the raw editor straight away.
-        string route = summary.EntryCount is null ? "/whitelists/raw" : "/whitelists/edit";
-        return route + "?name=" + Uri.EscapeDataString(summary.Name);
-    }
-
-    private async Task TestAsync()
-    {
-        await RunAsync(async () => _result = await Store.TestNginxAsync(await User.GetNameAsync()));
-    }
-
-    private async Task ReloadAsync()
-    {
-        await RunAsync(async () => _result = await Store.ReloadNginxAsync(await User.GetNameAsync()));
-    }
-
-    private async Task DeleteAsync(WhitelistSummary summary)
-    {
-        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Delete " + summary.Name + "?",
-            summary.Usage.Count > 0
-                ? "It is still included by " + string.Join(", ", summary.Usage.Select((WhitelistUsage item) => item.FileName).Distinct()) + ", so deleting will be refused."
-                : "The file is removed and nginx is reloaded. A backup of its content is kept.",
-            yesText: "Delete",
-            cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        await RunAsync(async () => _result = await Whitelists.DeleteAsync(summary.Name, reload: true, await User.GetNameAsync()));
-    }
-
-    private async Task RunAsync(Func<Task> action)
-    {
-        _isBusy = true;
-        try
-        {
-            await action();
-            await LoadAsync();
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-}

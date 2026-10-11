@@ -1,14 +1,11 @@
-@inject IConfigBackupStore Backups
-@inject IConfigStore Store
-@inject CurrentUser User
-@inject IDialogService Dialogs
-@using Roastgate.Core.Data
-@using Roastgate.Core.Nginx
-
 <div class="rg-page-header">
     <div>
-        <MudText Typo="Typo.h4">Backups</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
+        <MudText Typo="Typo.h4">
+            Backups
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary">
             Every change and every deletion keeps the previous content here (the 30 most recent per file). Restoring goes through the same
             test, rollback and reload cycle as a save, and keeps what it replaces.
         </MudText>
@@ -16,89 +13,188 @@
 </div>
 
 <div class="rg-field-row mb-4">
-    <MudSelect T="string" @bind-Value="_area" Label="Area" Variant="Variant.Outlined">
-        <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+    <MudSelect T="string"
+               @bind-Value="_area"
+               Label="Area"
+               Variant="Variant.Outlined">
+        <MudSelectItem T="string"
+                       Value="@string.Empty">
+            All
+        </MudSelectItem>
+
         @foreach (ConfigArea area in Enum.GetValues<ConfigArea>())
         {
-            <MudSelectItem T="string" Value="@area.ToString()">@AreaInfo.For(area).Title</MudSelectItem>
+            <MudSelectItem T="string"
+                           Value="@area.ToString()">
+                @AreaInfo.For(area).Title
+            </MudSelectItem>
         }
     </MudSelect>
-    <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" />
-    <div class="rg-field-action"><MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAsync">Show</MudButton></div>
+
+    <MudTextField T="string"
+                  @bind-Value="_name"
+                  Label="File name"
+                  Variant="Variant.Outlined" />
+
+    <div class="rg-field-action">
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="LoadAsync">
+            Show
+        </MudButton>
+    </div>
 </div>
 
-<ResultAlert Result="_result" Class="mb-4" />
+<ResultAlert Result="_result"
+             Class="mb-4" />
 
-<MudTable T="ConfigBackup" Items="_items" Loading="_items is null" Hover="true" Dense="true" Outlined="true" Elevation="0" Breakpoint="Breakpoint.Sm" Class="mb-4">
+<MudTable T="ConfigBackup"
+          Items="_items"
+          Loading="_items is null"
+          Hover="true"
+          Dense="true"
+          Outlined="true"
+          Elevation="0"
+          Breakpoint="Breakpoint.Sm"
+          Class="mb-4">
     <HeaderContent>
-        <MudTh>When</MudTh>
-        <MudTh>File</MudTh>
-        <MudTh>Taken before</MudTh>
-        <MudTh>Size</MudTh>
-        <MudTh></MudTh>
+        <MudTh>
+            When
+        </MudTh>
+
+        <MudTh>
+            File
+        </MudTh>
+
+        <MudTh>
+            Taken before
+        </MudTh>
+
+        <MudTh>
+            Size
+        </MudTh>
+
+        <MudTh>
+        </MudTh>
     </HeaderContent>
+
     <RowTemplate>
-        <MudTd DataLabel="When">@context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudTd>
+        <MudTd DataLabel="When">
+            @context.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+        </MudTd>
+
         <MudTd DataLabel="File">
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">@AreaTitle(context.Area)</MudText>
+            <MudText Typo="Typo.caption"
+                     Color="Color.Secondary"
+                     Class="d-block">
+                @AreaTitle(context.Area)
+            </MudText>
+
             @context.Name
         </MudTd>
-        <MudTd DataLabel="Taken before">@Describe(context.Reason)</MudTd>
-        <MudTd DataLabel="Size">@(context.Content.Length) chars</MudTd>
+
+        <MudTd DataLabel="Taken before">
+            @Describe(context.Reason)
+        </MudTd>
+
+        <MudTd DataLabel="Size">
+            @(context.Content.Length) chars
+        </MudTd>
+
         <MudTd Style="text-align: right">
-            <MudButton Size="Size.Small" Variant="@(_selected?.Id == context.Id ? Variant.Filled : Variant.Outlined)" OnClick="@(() => SelectAsync(context))">Compare</MudButton>
+            <MudButton Size="Size.Small"
+                       Variant="@(_selected?.Id == context.Id ? Variant.Filled : Variant.Outlined)"
+                       OnClick="@(() => SelectAsync(context))">
+                Compare
+            </MudButton>
         </MudTd>
     </RowTemplate>
+
     <NoRecordsContent>
-        <MudText>No backup yet. They appear when a file is changed or deleted from Roastgate.</MudText>
+        <MudText>
+            No backup yet. They appear when a file is changed or deleted from Roastgate.
+        </MudText>
     </NoRecordsContent>
 </MudTable>
 
 @if (_selected is not null)
 {
-    <MudPaper Outlined="true" Elevation="0" Class="pa-4">
+    <MudPaper Outlined="true"
+              Elevation="0"
+              Class="pa-4">
         <div class="rg-page-header">
             <div>
-                <MudText Typo="Typo.h6">@_selected.Name, as of @_selected.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                <MudText Typo="Typo.h6">
+                    @_selected.Name, as of @_selected.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                </MudText>
+
+                <MudText Typo="Typo.body2"
+                         Color="Color.Secondary">
                     @if (_currentContent is null)
                     {
-                        <span>The file does not exist any more: restoring creates it again.</span>
+                        <span>
+                            The file does not exist any more: restoring creates it again.
+                        </span>
                     }
                     else if (_diff is null)
                     {
-                        <span>Too many lines to compare here.</span>
+                        <span>
+                            Too many lines to compare here.
+                        </span>
                     }
                     else if (!_diff.HasChanges)
                     {
-                        <span>Identical to the current file: restoring changes nothing.</span>
+                        <span>
+                            Identical to the current file: restoring changes nothing.
+                        </span>
                     }
                     else
                     {
-                        <span>Restoring <strong class="rg-diff-added-text">adds @_diff.Added line(s)</strong> and <strong class="rg-diff-removed-text">removes @_diff.Removed line(s)</strong> compared with the current file.</span>
+                        <span>
+                            Restoring <strong class="rg-diff-added-text">adds @_diff.Added line(s)</strong> and <strong class="rg-diff-removed-text">removes @_diff.Removed line(s)</strong> compared with the current file.
+                        </span>
                     }
                 </MudText>
             </div>
+
             <div class="rg-page-actions">
-                <MudButton Variant="Variant.Outlined" Href="@FileUrl(_selected)">Open the file</MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RestoreAsync" Disabled="_isBusy">Restore this version</MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Href="@FileUrl(_selected)">
+                    Open the file
+                </MudButton>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="RestoreAsync"
+                           Disabled="_isBusy">
+                    Restore this version
+                </MudButton>
             </div>
         </div>
 
         @if (_diff is not null && _currentContent is not null)
         {
-            <div class="rg-diff" role="table" aria-label="Differences">
+            <div class="rg-diff"
+                 role="table"
+                 aria-label="Differences">
                 @foreach (DiffRow row in Rows())
                 {
                     if (row.Skipped > 0)
                     {
-                        <div class="rg-diff-skip">... @row.Skipped unchanged line(s) ...</div>
+                        <div class="rg-diff-skip">
+                            ... @row.Skipped unchanged line(s) ...
+                        </div>
                     }
                     else
                     {
                         <div class="@("rg-diff-line rg-diff-" + row.Line!.Kind.ToString().ToLowerInvariant())">
-                            <span class="rg-diff-mark">@(row.Line.Kind == DiffKind.Added ? "+" : row.Line.Kind == DiffKind.Removed ? "-" : " ")</span>
-                            <span class="rg-diff-text">@row.Line.Text</span>
+                            <span class="rg-diff-mark">
+                                @(row.Line.Kind == DiffKind.Added ? "+" : row.Line.Kind == DiffKind.Removed ? "-" : " ")
+                            </span>
+
+                            <span class="rg-diff-text">
+                                @row.Line.Text
+                            </span>
                         </div>
                     }
                 }
@@ -109,173 +205,4 @@
             <pre class="rg-output rg-preview">@_selected.Content</pre>
         }
     </MudPaper>
-}
-
-@code {
-    private sealed record DiffRow(DiffLine? Line, int Skipped);
-
-    private const int ContextLines = 3;
-
-    [Parameter]
-    public string? Area { get; set; }
-
-    [Parameter]
-    public string? Name { get; set; }
-
-    private IReadOnlyList<ConfigBackup>? _items;
-    private ConfigBackup? _selected;
-    private string? _currentContent;
-    private DiffResult? _diff;
-    private ConfigResult? _result;
-    private string _area = string.Empty;
-    private string _name = string.Empty;
-    private bool _isBusy;
-    private bool _initialised;
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_initialised)
-        {
-            return;
-        }
-
-        _initialised = true;
-        _area = Enum.TryParse(Area, out ConfigArea parsed) && Enum.IsDefined(parsed) ? parsed.ToString() : string.Empty;
-        _name = Name ?? string.Empty;
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        string? area = string.IsNullOrEmpty(_area) ? null : _area;
-        string? name = string.IsNullOrWhiteSpace(_name) ? null : _name.Trim();
-        _items = await Backups.ListAsync(area, name, 200);
-        _selected = null;
-    }
-
-    private async Task SelectAsync(ConfigBackup backup)
-    {
-        _selected = backup;
-        _result = null;
-        await ShowDiffAsync(backup);
-    }
-
-    private async Task ShowDiffAsync(ConfigBackup backup)
-    {
-        _currentContent = null;
-        _diff = null;
-        if (Enum.TryParse(backup.Area, out ConfigArea area) && Enum.IsDefined(area))
-        {
-            ConfigFile? current = await Store.ReadAsync(area, backup.Name);
-            _currentContent = current?.Content;
-            if (current is not null)
-            {
-                // What restoring would do: from the current content to the backed up one.
-                _diff = LineDiff.Compute(current.Content, backup.Content);
-            }
-        }
-    }
-
-    private async Task RestoreAsync()
-    {
-        if (_selected is null)
-        {
-            return;
-        }
-
-        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Restore " + _selected.Name + "?",
-            "The file is replaced by this version and nginx is reloaded. The content it replaces is backed up too.",
-            yesText: "Restore",
-            cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        _isBusy = true;
-        try
-        {
-            _result = await Store.RestoreAsync(_selected.Id, reload: true, await User.GetNameAsync());
-            await LoadAsync();
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-
-    /// <summary>The diff, with long runs of unchanged lines folded away.</summary>
-    private List<DiffRow> Rows()
-    {
-        List<DiffRow> rows = [];
-        if (_diff is null)
-        {
-            return rows;
-        }
-
-        IReadOnlyList<DiffLine> lines = _diff.Lines;
-        bool[] keep = new bool[lines.Count];
-        for (int index = 0; index < lines.Count; index++)
-        {
-            if (lines[index].Kind == DiffKind.Same)
-            {
-                continue;
-            }
-
-            for (int near = Math.Max(0, index - ContextLines); near <= Math.Min(lines.Count - 1, index + ContextLines); near++)
-            {
-                keep[near] = true;
-            }
-        }
-
-        int skipped = 0;
-        for (int index = 0; index < lines.Count; index++)
-        {
-            if (keep[index] || !_diff.HasChanges)
-            {
-                if (skipped > 0)
-                {
-                    rows.Add(new DiffRow(null, skipped));
-                    skipped = 0;
-                }
-
-                rows.Add(new DiffRow(lines[index], 0));
-            }
-            else
-            {
-                skipped++;
-            }
-        }
-
-        if (skipped > 0)
-        {
-            rows.Add(new DiffRow(null, skipped));
-        }
-
-        return rows;
-    }
-
-    private static string AreaTitle(string area)
-    {
-        return Enum.TryParse(area, out ConfigArea parsed) && Enum.IsDefined(parsed) ? AreaInfo.For(parsed).Title : area;
-    }
-
-    private static string Describe(string reason)
-    {
-        return reason switch
-        {
-            "save" => "a change",
-            "delete" => "a deletion",
-            "restore" => "a restore",
-            _ => reason,
-        };
-    }
-
-    private static string FileUrl(ConfigBackup backup)
-    {
-        return Enum.TryParse(backup.Area, out ConfigArea parsed) && Enum.IsDefined(parsed)
-            ? AreaInfo.For(parsed).EditUrl(backup.Name)
-            : "/";
-    }
 }

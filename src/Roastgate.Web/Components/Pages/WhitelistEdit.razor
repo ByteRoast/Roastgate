@@ -1,11 +1,8 @@
 @page "/whitelists/edit"
 @attribute [Authorize]
 
-<PageTitle>Whitelist · Roastgate</PageTitle>
+<PageTitle>
+    Whitelist · Roastgate
+</PageTitle>
 
 <WhitelistEditView Name="@Name" />
-
-@code {
-    [SupplyParameterFromQuery(Name = "name")]
-    private string? Name { get; set; }
-}

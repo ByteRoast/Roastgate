@@ -1,17 +1,20 @@
-@inject IWhitelistService Whitelists
-@inject CurrentUser User
-@inject IDialogService Dialogs
-@inject NavigationManager Navigation
-@inject IJSRuntime JS
-
 <div class="rg-page-header">
     <div>
-        <MudText Typo="Typo.h4">@(_isNew ? "New whitelist" : _name)</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            <a href="/whitelists">Whitelists</a>
+        <MudText Typo="Typo.h4">
+            @(_isNew ? "New whitelist" : _name)
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary">
+            <a href="/whitelists">
+                Whitelists
+            </a>
+
             @if (!_isNew)
             {
-                <span> &middot; <a href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))">edit as raw text</a> &middot; <a href="@("/backups?area=Whitelists&name=" + Uri.EscapeDataString(_name))">history</a></span>
+                <span>
+                    &middot; <a href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))">edit as raw text</a> &middot; <a href="@("/backups?area=Whitelists&name=" + Uri.EscapeDataString(_name))">history</a>
+                </span>
             }
         </MudText>
     </div>
@@ -19,39 +22,68 @@
 
 @if (_notFound)
 {
-    <MudAlert Severity="Severity.Error">That whitelist does not exist or cannot be read. <a href="/whitelists">Back to the list</a>.</MudAlert>
+    <MudAlert Severity="Severity.Error">
+        That whitelist does not exist or cannot be read. <a href="/whitelists">Back to the list</a>.
+    </MudAlert>
+
     return;
 }
 
 @if (_unsupported.Count > 0)
 {
-    <MudAlert Severity="Severity.Warning" Class="mb-4">
-        <div>This file contains more than a list of <code>allow</code> lines, so the list editor would lose content. Edit it as raw text instead:</div>
+    <MudAlert Severity="Severity.Warning"
+              Class="mb-4">
+        <div>
+            This file contains more than a list of <code>allow</code> lines, so the list editor would lose content. Edit it as raw text instead:
+        </div>
+
         <ul>
             @foreach (string reason in _unsupported)
             {
-                <li>@reason</li>
+                <li>
+                    @reason
+                </li>
             }
         </ul>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))" Class="mt-2">Open the raw editor</MudButton>
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Href="@("/whitelists/raw?name=" + Uri.EscapeDataString(_name))"
+                   Class="mt-2">
+            Open the raw editor
+        </MudButton>
     </MudAlert>
+
     return;
 }
 
-<ResultAlert Result="_result" Class="mb-4" />
+<ResultAlert Result="_result"
+             Class="mb-4" />
 
 @if (_isNew)
 {
-    <MudTextField T="string" @bind-Value="_name" Label="Name" Variant="Variant.Outlined" Class="mb-4"
+    <MudTextField T="string"
+                  @bind-Value="_name"
+                  Label="Name"
+                  Variant="Variant.Outlined"
+                  Class="mb-4"
                   HelperText="For example alice (the .conf extension is added)" />
 }
 
-<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
-    <MudText Typo="Typo.h6" Class="mb-2">Allowed addresses</MudText>
+<MudPaper Outlined="true"
+          Elevation="0"
+          Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6"
+             Class="mb-2">
+        Allowed addresses
+    </MudText>
 
     @if (_rows.Count == 0)
     {
-        <MudText Color="Color.Secondary" Class="mb-2">No address yet. An empty whitelist allows nobody once it is used with <code>deny all;</code>.</MudText>
+        <MudText Color="Color.Secondary"
+                 Class="mb-2">
+            No address yet. An empty whitelist allows nobody once it is used with <code>deny all;</code>.
+        </MudText>
     }
 
     @for (int index = 0; index < _rows.Count; index++)
@@ -60,53 +92,116 @@
         EntryRow row = _rows[position];
         IReadOnlyList<WhitelistProblem> problems = ProblemsFor(position);
         bool hasError = problems.Any((WhitelistProblem problem) => problem.Severity == ProblemSeverity.Error);
+
         <div class="rg-entry-row">
-            <MudTextField T="string" @bind-Value="row.Address" Immediate="true" Label="Address" Variant="Variant.Outlined"
+            <MudTextField T="string"
+                          @bind-Value="row.Address"
+                          Immediate="true"
+                          Label="Address"
+                          Variant="Variant.Outlined"
                           Placeholder="203.0.113.7 or 10.0.0.0/8 or 2001:db8::/32"
-                          Error="hasError" ErrorText="@(hasError ? problems[0].Message : null)"
+                          Error="hasError"
+                          ErrorText="@(hasError ? problems[0].Message : null)"
                           HelperText="@(!hasError && problems.Count > 0 ? problems[0].Message : null)" />
-            <MudTextField T="string" @bind-Value="row.Comment" Immediate="true" Label="Comment" Variant="Variant.Outlined" Placeholder="alice at home" />
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => RemoveRow(position))" Size="Size.Small" aria-label="@("Remove address " + (position + 1))" />
+
+            <MudTextField T="string"
+                          @bind-Value="row.Comment"
+                          Immediate="true"
+                          Label="Comment"
+                          Variant="Variant.Outlined"
+                          Placeholder="alice at home" />
+
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           OnClick="@(() => RemoveRow(position))"
+                           Size="Size.Small"
+                           aria-label="@("Remove address " + (position + 1))" />
         </div>
     }
 
     <div class="rg-entry-actions">
-        <MudButton Variant="Variant.Outlined" OnClick="AddRow" StartIcon="@Icons.Material.Filled.Add">Add address</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   OnClick="AddRow"
+                   StartIcon="@Icons.Material.Filled.Add">
+            Add address
+        </MudButton>
+
         @if (!string.IsNullOrEmpty(ClientAddress))
         {
-            <MudButton Variant="Variant.Outlined" OnClick="AddMyAddress">Add my address (@ClientAddress)</MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="AddMyAddress">
+                Add my address (@ClientAddress)
+            </MudButton>
         }
     </div>
 
     @if (!string.IsNullOrEmpty(ClientAddress))
     {
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">
+        <MudText Typo="Typo.caption"
+                 Color="Color.Secondary"
+                 Class="d-block mt-3">
             This is your address as Roastgate sees it. Behind a reverse proxy it may be the proxy's address:
             enable <code>ROASTGATE_TRUST_FORWARDED_HEADERS</code> only if Roastgate can be reached through your own proxy alone.
         </MudText>
     }
 </MudPaper>
 
-<MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
-    <MudText Typo="Typo.h6" Class="mb-2">Paste several addresses</MudText>
-    <MudTextField T="string" @bind-Value="_paste" Lines="3" Variant="Variant.Outlined" Immediate="true"
+<MudPaper Outlined="true"
+          Elevation="0"
+          Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6"
+             Class="mb-2">
+        Paste several addresses
+    </MudText>
+
+    <MudTextField T="string"
+                  @bind-Value="_paste"
+                  Lines="3"
+                  Variant="Variant.Outlined"
+                  Immediate="true"
                   Placeholder="One per line, or separated by spaces and commas. Lines like &quot;allow 1.2.3.4;&quot; work too." />
-    <MudButton Variant="Variant.Outlined" OnClick="AddPasted" Disabled="string.IsNullOrWhiteSpace(_paste)" Class="mt-3">Add them to the list</MudButton>
+
+    <MudButton Variant="Variant.Outlined"
+               OnClick="AddPasted"
+               Disabled="string.IsNullOrWhiteSpace(_paste)"
+               Class="mt-3">
+        Add them to the list
+    </MudButton>
 </MudPaper>
 
 @if (!_isNew && _details is not null)
 {
-    <MudPaper Outlined="true" Elevation="0" Class="pa-4 mb-4">
-        <MudText Typo="Typo.h6" Class="mb-2">How to use it</MudText>
-        <MudText Class="mb-2">Add these lines inside the <code>server</code> or <code>location</code> you want to restrict:</MudText>
+    <MudPaper Outlined="true"
+              Elevation="0"
+              Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6"
+                 Class="mb-2">
+            How to use it
+        </MudText>
+
+        <MudText Class="mb-2">
+            Add these lines inside the <code>server</code> or <code>location</code> you want to restrict:
+        </MudText>
+
         <pre class="rg-output">@_details.IncludeSnippet
 deny all;</pre>
-        <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="mt-3" OnClick="CopySnippetAsync">@(_copied ? "Copied" : "Copy")</MudButton>
 
-        <MudText Typo="Typo.subtitle1" Class="mt-4 mb-1">Used by</MudText>
+        <MudButton Variant="Variant.Outlined"
+                   Size="Size.Small"
+                   Class="mt-3"
+                   OnClick="CopySnippetAsync">
+            @(_copied ? "Copied" : "Copy")
+        </MudButton>
+
+        <MudText Typo="Typo.subtitle1"
+                 Class="mt-4 mb-1">
+            Used by
+        </MudText>
+
         @if (_details.Usage.Count == 0)
         {
-            <MudText Color="Color.Secondary">Nothing includes this whitelist yet, so it has no effect.</MudText>
+            <MudText Color="Color.Secondary">
+                Nothing includes this whitelist yet, so it has no effect.
+            </MudText>
         }
         else
         {
@@ -115,14 +210,19 @@ deny all;</pre>
                 {
                     <li>
                         <a href="@UsageUrl(usage)">@usage.FileName</a> (line @usage.Line)
+
                         @if (usage.ViaWildcard)
                         {
-                            <span> through a wildcard include</span>
+                            <span>
+                                through a wildcard include
+                            </span>
                         }
 
                         @if (!usage.FileEnabled)
                         {
-                            <span> &middot; <em>not active: that file is disabled</em></span>
+                            <span>
+                                &middot; <em>not active: that file is disabled</em>
+                            </span>
                         }
                     </li>
                 }
@@ -132,255 +232,27 @@ deny all;</pre>
 }
 
 <div class="rg-editor-actions">
-    <MudSwitch T="bool" @bind-Value="_reload" Color="Color.Primary" Label="Reload nginx after saving" />
+    <MudSwitch T="bool"
+               @bind-Value="_reload"
+               Color="Color.Primary"
+               Label="Reload nginx after saving" />
+
     <MudSpacer />
+
     @if (!_isNew)
     {
-        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" Disabled="_isBusy">Delete</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Error"
+                   OnClick="DeleteAsync"
+                   Disabled="_isBusy">
+            Delete
+        </MudButton>
     }
 
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isBusy || HasBlockingError">Save</MudButton>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               OnClick="SaveAsync"
+               Disabled="_isBusy || HasBlockingError">
+        Save
+    </MudButton>
 </div>
-
-@code {
-    private sealed class EntryRow
-    {
-        public string Address { get; set; } = string.Empty;
-
-        public string Comment { get; set; } = string.Empty;
-    }
-
-    [Parameter]
-    public string? Name { get; set; }
-
-    // Asked from the browser once the page is interactive (the server-side HttpContext only exists during prerendering).
-    private string? ClientAddress { get; set; }
-    private readonly List<EntryRow> _rows = [];
-    private List<string> _unsupported = [];
-    private WhitelistDetails? _details;
-    private ConfigResult? _result;
-    private string _name = string.Empty;
-    private string? _header;
-    private string _paste = string.Empty;
-    private bool _isNew;
-    private bool _notFound;
-    private bool _isBusy;
-    private bool _reload = true;
-    private bool _copied;
-    private string? _loadedName;
-    private bool _loaded;
-
-    private bool HasBlockingError => CurrentProblems().Any((WhitelistProblem problem) => problem.Severity == ProblemSeverity.Error)
-                                     || (_isNew && string.IsNullOrWhiteSpace(_name));
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            string address = await JS.InvokeAsync<string>("roastgateClientAddress");
-            if (!string.IsNullOrWhiteSpace(address))
-            {
-                ClientAddress = address;
-                StateHasChanged();
-            }
-        }
-    }
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_loaded && _loadedName == Name)
-        {
-            return;
-        }
-
-        _loaded = true;
-        _loadedName = Name;
-        _isNew = string.IsNullOrWhiteSpace(Name);
-        _rows.Clear();
-        _unsupported = [];
-        if (_isNew)
-        {
-            _name = string.Empty;
-            AddRow();
-            return;
-        }
-
-        _details = await Whitelists.ReadAsync(Name!);
-        if (_details is null)
-        {
-            _notFound = true;
-            return;
-        }
-
-        _name = _details.Name;
-        ApplyDetails();
-    }
-
-    private void ApplyDetails()
-    {
-        if (_details?.Parse.Document is not { } document)
-        {
-            _unsupported = _details?.Parse.Unsupported.ToList() ?? [];
-            return;
-        }
-
-        _header = document.Header;
-        _rows.Clear();
-        foreach (WhitelistEntry entry in document.Entries)
-        {
-            _rows.Add(new EntryRow { Address = entry.Address, Comment = entry.Comment ?? string.Empty });
-        }
-    }
-
-    private IReadOnlyList<WhitelistProblem> CurrentProblems()
-    {
-        return WhitelistValidator.Validate(ToEntries());
-    }
-
-    private IReadOnlyList<WhitelistProblem> ProblemsFor(int position)
-    {
-        // Entries are validated as a whole (duplicates depend on the other rows); map the result back to this row.
-        List<EntryRow> filled = _rows.Where((EntryRow row) => !IsBlank(row)).ToList();
-        int filledIndex = filled.IndexOf(_rows[position]);
-        return IsBlank(_rows[position])
-            ? []
-            : WhitelistValidator.Validate(ToEntries()).Where((WhitelistProblem problem) => problem.EntryIndex == filledIndex).ToList();
-    }
-
-    private List<WhitelistEntry> ToEntries()
-    {
-        return _rows
-            .Where((EntryRow row) => !IsBlank(row))
-            .Select((EntryRow row) => new WhitelistEntry(row.Address.Trim(), string.IsNullOrWhiteSpace(row.Comment) ? null : row.Comment.Trim()))
-            .ToList();
-    }
-
-    private static bool IsBlank(EntryRow row)
-    {
-        return string.IsNullOrWhiteSpace(row.Address) && string.IsNullOrWhiteSpace(row.Comment);
-    }
-
-    private void AddRow()
-    {
-        _rows.Add(new EntryRow());
-    }
-
-    private void RemoveRow(int position)
-    {
-        _rows.RemoveAt(position);
-    }
-
-    private void AddMyAddress()
-    {
-        if (string.IsNullOrEmpty(ClientAddress))
-        {
-            return;
-        }
-
-        RemoveTrailingBlankRows();
-        _rows.Add(new EntryRow { Address = ClientAddress, Comment = "my address" });
-    }
-
-    private void AddPasted()
-    {
-        RemoveTrailingBlankRows();
-        string[] tokens = _paste.Split([' ', '\t', '\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries);
-        foreach (string token in tokens)
-        {
-            if (!token.Equals("allow", StringComparison.OrdinalIgnoreCase))
-            {
-                _rows.Add(new EntryRow { Address = token });
-            }
-        }
-
-        _paste = string.Empty;
-    }
-
-    private void RemoveTrailingBlankRows()
-    {
-        while (_rows.Count > 0 && IsBlank(_rows[^1]))
-        {
-            _rows.RemoveAt(_rows.Count - 1);
-        }
-    }
-
-    private static string UsageUrl(WhitelistUsage usage)
-    {
-        string route = usage.Area == ConfigArea.Sites ? "/sites/edit" : "/reverse-proxies/edit";
-        return route + "?name=" + Uri.EscapeDataString(usage.FileName);
-    }
-
-    private async Task CopySnippetAsync()
-    {
-        if (_details is null)
-        {
-            return;
-        }
-
-        _copied = await JS.InvokeAsync<bool>("roastgateCopy", _details.IncludeSnippet + "\ndeny all;");
-    }
-
-    private async Task SaveAsync()
-    {
-        _isBusy = true;
-        try
-        {
-            string actor = await User.GetNameAsync();
-            ConfigResult result = await Whitelists.SaveAsync(_name, new WhitelistDocument(_header, ToEntries()), _reload, actor);
-            _result = result;
-            if (!result.Succeeded)
-            {
-                return;
-            }
-
-            string? normalized = ConfigNames.Normalize(ConfigArea.Whitelists, _name);
-            if (normalized is null)
-            {
-                return;
-            }
-
-            _details = await Whitelists.ReadAsync(normalized);
-            if (_isNew)
-            {
-                _isNew = false;
-                _name = normalized;
-                _loadedName = normalized;
-                Navigation.NavigateTo("/whitelists/edit?name=" + Uri.EscapeDataString(normalized), replace: true);
-            }
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-
-    private async Task DeleteAsync()
-    {
-        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Delete " + _name + "?",
-            "The file is removed and nginx is reloaded. A backup of its content is kept.",
-            yesText: "Delete",
-            cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        _isBusy = true;
-        try
-        {
-            ConfigResult result = await Whitelists.DeleteAsync(_name, _reload, await User.GetNameAsync());
-            if (result.Succeeded)
-            {
-                Navigation.NavigateTo("/whitelists");
-                return;
-            }
-
-            _result = result;
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-}

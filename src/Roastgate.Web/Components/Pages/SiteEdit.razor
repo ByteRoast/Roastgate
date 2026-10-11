@@ -1,12 +1,9 @@
 @page "/sites/edit"
 @attribute [Authorize]
-@using Roastgate.Core.Nginx
 
-<PageTitle>Site · Roastgate</PageTitle>
+<PageTitle>
+    Site · Roastgate
+</PageTitle>
 
-<ConfigEditView Area="ConfigArea.Sites" Name="@Name" />
-
-@code {
-    [SupplyParameterFromQuery(Name = "name")]
-    private string? Name { get; set; }
-}
+<ConfigEditView Area="ConfigArea.Sites"
+                Name="@Name" />

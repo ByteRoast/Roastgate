@@ -1,11 +1,9 @@
 @page "/reverse-proxies/wizard"
 @attribute [Authorize]
 
-<PageTitle>Wizard · Roastgate</PageTitle>
+<PageTitle>
+    Wizard · Roastgate
+</PageTitle>
 
-<SiteWizardView Area="ConfigArea.ReverseProxies" Name="@Name" />
-
-@code {
-    [SupplyParameterFromQuery(Name = "name")]
-    private string? Name { get; set; }
-}
+<SiteWizardView Area="ConfigArea.ReverseProxies"
+                Name="@Name" />

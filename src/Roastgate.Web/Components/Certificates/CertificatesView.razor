@@ -1,43 +1,56 @@
-@inject ICertificateService Certificates
-@inject ICertificateCatalog Catalog
-@inject ICertificateRenewalJob RenewalJob
-@inject AppSettingsService SettingsService
-@inject CurrentUser User
-@inject IDialogService Dialogs
-@using Roastgate.Core.Certificates
-
 <div class="rg-page-header">
     <div>
-        <MudText Typo="Typo.h4">Certificates</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Let's Encrypt certificates, read from <code>@(_listing?.Directory ?? "/etc/letsencrypt/live")</code>.</MudText>
+        <MudText Typo="Typo.h4">
+            Certificates
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary">
+            Let's Encrypt certificates, read from <code>@(_listing?.Directory ?? "/etc/letsencrypt/live")</code>.
+        </MudText>
     </div>
+
     <div class="rg-page-actions">
-        <MudButton Variant="Variant.Outlined" OnClick="@(() => RenewAsync(null, false))" Disabled="_isBusy || _mode == CertbotMode.Disabled">Renew what is due</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   OnClick="@(() => RenewAsync(null, false))"
+                   Disabled="_isBusy || _mode == CertbotMode.Disabled">
+            Renew what is due
+        </MudButton>
     </div>
 </div>
 
 @switch (_mode)
 {
     case CertbotMode.Disabled:
-        <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudAlert Severity="Severity.Info"
+                  Class="mb-4">
             Certificate management is turned off in the settings, so Roastgate only lists the certificates it finds.
         </MudAlert>
         break;
+
     case CertbotMode.Embedded:
-        <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudAlert Severity="Severity.Info"
+                  Class="mb-4">
             Roastgate uses its <strong>embedded certbot</strong> and renews certificates itself, twice a day.
+
             @if (_status?.LastRun is { } lastRun)
             {
-                <span> Last check: @lastRun.ToLocalTime().ToString("yyyy-MM-dd HH:mm") (@(_status.LastSucceeded == true ? "ok" : "failed"): @_status.Summary).</span>
+                <span>
+                    Last check: @lastRun.ToLocalTime().ToString("yyyy-MM-dd HH:mm") (@(_status.LastSucceeded == true ? "ok" : "failed"): @_status.Summary).
+                </span>
             }
             else
             {
-                <span> No automatic check has run yet.</span>
+                <span>
+                    No automatic check has run yet.
+                </span>
             }
         </MudAlert>
         break;
+
     default:
-        <MudAlert Severity="Severity.Info" Class="mb-4">
+        <MudAlert Severity="Severity.Info"
+                  Class="mb-4">
             Roastgate drives the <strong>certbot installed on the host</strong>. Renewal is left to the host's own certbot timer.
         </MudAlert>
         break;
@@ -45,8 +58,13 @@
 
 @if (_output is not null)
 {
-    <MudAlert Severity="@(_outputFailed ? Severity.Error : Severity.Success)" Variant="Variant.Outlined" Class="mb-4">
-        <div>@_outputMessage</div>
+    <MudAlert Severity="@(_outputFailed ? Severity.Error : Severity.Success)"
+              Variant="Variant.Outlined"
+              Class="mb-4">
+        <div>
+            @_outputMessage
+        </div>
+
         @if (!string.IsNullOrWhiteSpace(_output))
         {
             <pre class="rg-output">@_output</pre>
@@ -56,7 +74,8 @@
 
 @if (_listing is not null && !_listing.DirectoryExists)
 {
-    <MudAlert Severity="Severity.Warning" Class="mb-4">
+    <MudAlert Severity="Severity.Warning"
+              Class="mb-4">
         The directory <code>@_listing.Directory</code> does not exist or is not visible to Roastgate. Mount the host's
         <code>/etc/letsencrypt</code> into the container (see the compose file) so that nginx and Roastgate share the certificates.
     </MudAlert>
@@ -64,177 +83,193 @@
 
 @if (_listing is not null && _listing.Unreadable.Count > 0)
 {
-    <MudAlert Severity="Severity.Warning" Class="mb-4">These certificate directories could not be read: @string.Join(", ", _listing.Unreadable).</MudAlert>
+    <MudAlert Severity="Severity.Warning"
+              Class="mb-4">
+        These certificate directories could not be read: @string.Join(", ", _listing.Unreadable).
+    </MudAlert>
 }
 
-<MudTable T="CertificateEntry" Items="_listing?.Certificates" Loading="_listing is null" Hover="true" Dense="true" Outlined="true" Elevation="0" Breakpoint="Breakpoint.Sm" Class="mb-6">
+<MudTable T="CertificateEntry"
+          Items="_listing?.Certificates"
+          Loading="_listing is null"
+          Hover="true"
+          Dense="true"
+          Outlined="true"
+          Elevation="0"
+          Breakpoint="Breakpoint.Sm"
+          Class="mb-6">
     <HeaderContent>
-        <MudTh>Certificate</MudTh>
-        <MudTh>Domains</MudTh>
-        <MudTh>Expires</MudTh>
-        <MudTh>Used by</MudTh>
-        <MudTh></MudTh>
+        <MudTh>
+            Certificate
+        </MudTh>
+
+        <MudTh>
+            Domains
+        </MudTh>
+
+        <MudTh>
+            Expires
+        </MudTh>
+
+        <MudTh>
+            Used by
+        </MudTh>
+
+        <MudTh>
+        </MudTh>
     </HeaderContent>
+
     <RowTemplate>
         <MudTd DataLabel="Certificate">
             @context.Certificate.Name
+
             @if (context.Certificate.IsStaging)
             {
-                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="ml-2" title="Issued by the staging server: browsers do not trust it">staging</MudChip>
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Color="Color.Warning"
+                         Variant="Variant.Outlined"
+                         Class="ml-2"
+                         title="Issued by the staging server: browsers do not trust it">
+                    staging
+                </MudChip>
             }
         </MudTd>
+
         <MudTd DataLabel="Domains">
             @foreach (string domain in context.Certificate.Domains)
             {
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@domain</MudChip>
+                <MudChip T="string"
+                         Size="Size.Small"
+                         Variant="Variant.Outlined">
+                    @domain
+                </MudChip>
             }
         </MudTd>
+
         <MudTd DataLabel="Expires">
             <MudText Color="@ExpiryColor(context.Certificate)">
                 @context.Certificate.NotAfter.ToLocalTime().ToString("yyyy-MM-dd")
                 (@ExpiryText(context.Certificate))
             </MudText>
         </MudTd>
+
         <MudTd DataLabel="Used by">
             @if (context.Usage.Count == 0)
             {
-                <MudText Typo="Typo.body2" Color="Color.Secondary">not used</MudText>
+                <MudText Typo="Typo.body2"
+                         Color="Color.Secondary">
+                    not used
+                </MudText>
             }
             else
             {
                 @foreach (CertificateUsage usage in context.Usage.DistinctBy((CertificateUsage item) => item.FileName))
                 {
-                    <MudChip T="string" Size="Size.Small" Variant="@(usage.FileEnabled ? Variant.Filled : Variant.Outlined)"
-                             title="@(usage.FileEnabled ? "Active" : "This file is disabled")">@usage.FileName</MudChip>
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Variant="@(usage.FileEnabled ? Variant.Filled : Variant.Outlined)"
+                             title="@(usage.FileEnabled ? "Active" : "This file is disabled")">
+                        @usage.FileName
+                    </MudChip>
                 }
             }
         </MudTd>
+
         <MudTd Style="text-align: right">
-            <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => RenewAsync(context.Certificate.Name, true))" Disabled="_isBusy || _mode == CertbotMode.Disabled"
-                       aria-label="@("Renew " + context.Certificate.Name + " now")">Renew now</MudButton>
-            <MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="@(() => DeleteAsync(context.Certificate))" Size="Size.Small" Disabled="_isBusy || _mode == CertbotMode.Disabled"
+            <MudButton Size="Size.Small"
+                       Variant="Variant.Outlined"
+                       OnClick="@(() => RenewAsync(context.Certificate.Name, true))"
+                       Disabled="_isBusy || _mode == CertbotMode.Disabled"
+                       aria-label="@("Renew " + context.Certificate.Name + " now")">
+                Renew now
+            </MudButton>
+
+            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                           OnClick="@(() => DeleteAsync(context.Certificate))"
+                           Size="Size.Small"
+                           Disabled="_isBusy || _mode == CertbotMode.Disabled"
                            aria-label="@("Delete " + context.Certificate.Name)" />
         </MudTd>
     </RowTemplate>
+
     <NoRecordsContent>
-        <MudText>No certificate yet.</MudText>
+        <MudText>
+            No certificate yet.
+        </MudText>
     </NoRecordsContent>
 </MudTable>
 
 @if (_mode != CertbotMode.Disabled)
 {
-    <MudPaper Outlined="true" Elevation="0" Class="pa-4">
-        <MudText Typo="Typo.h6" Class="mb-1">Get a certificate</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+    <MudPaper Outlined="true"
+              Elevation="0"
+              Class="pa-4">
+        <MudText Typo="Typo.h6"
+                 Class="mb-1">
+            Get a certificate
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary"
+                 Class="mb-3">
             Let's Encrypt validates each domain by fetching a file from <code>http://&lt;domain&gt;/.well-known/acme-challenge/</code>.
             Your site must already answer on port 80 for that domain and serve the ACME webroot (turn on "Let the Let's Encrypt validation through" in the wizard).
             Run a dry run first: it checks all of that without issuing anything.
         </MudText>
-        <MudTextField T="string" @bind-Value="_domains" Label="Domain names" Variant="Variant.Outlined" Lines="2" Class="mb-3 rg-resizable" Immediate="true"
+
+        <MudTextField T="string"
+                      @bind-Value="_domains"
+                      Label="Domain names"
+                      Variant="Variant.Outlined"
+                      Lines="2"
+                      Class="mb-3 rg-resizable"
+                      Immediate="true"
                       HelperText="One per line or separated by spaces. Wildcards are not supported." />
+
         <div class="rg-field-row">
-            <MudTextField T="string" @bind-Value="_certName" Label="Certificate name (optional)" Variant="Variant.Outlined" HelperText="Defaults to the first domain" />
-            <MudTextField T="string" @bind-Value="_email" Label="E-mail for expiry notices" Variant="Variant.Outlined" />
+            <MudTextField T="string"
+                          @bind-Value="_certName"
+                          Label="Certificate name (optional)"
+                          Variant="Variant.Outlined"
+                          HelperText="Defaults to the first domain" />
+
+            <MudTextField T="string"
+                          @bind-Value="_email"
+                          Label="E-mail for expiry notices"
+                          Variant="Variant.Outlined" />
         </div>
-        <MudSwitch T="bool" @bind-Value="_staging" Color="Color.Primary" Label="Use the staging server (untrusted certificates, generous limits)" Class="mt-2" />
+
+        <MudSwitch T="bool"
+                   @bind-Value="_staging"
+                   Color="Color.Primary"
+                   Label="Use the staging server (untrusted certificates, generous limits)"
+                   Class="mt-2" />
+
         <div class="rg-editor-actions">
-            <MudButton Variant="Variant.Outlined" OnClick="@(() => IssueAsync(true))" Disabled="_isBusy">Test first (dry run)</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => IssueAsync(false))" Disabled="_isBusy">Get the certificate</MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="@(() => IssueAsync(true))"
+                       Disabled="_isBusy">
+                Test first (dry run)
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="@(() => IssueAsync(false))"
+                       Disabled="_isBusy">
+                Get the certificate
+            </MudButton>
+
             @if (_isBusy)
             {
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-                <MudText Typo="Typo.body2" Color="Color.Secondary">certbot is working, this can take a minute...</MudText>
+                <MudProgressCircular Indeterminate="true"
+                                     Size="Size.Small" />
+
+                <MudText Typo="Typo.body2"
+                         Color="Color.Secondary">
+                    certbot is working, this can take a minute...
+                </MudText>
             }
         </div>
     </MudPaper>
-}
-
-@code {
-    private CertificateListing? _listing;
-    private RenewalStatus? _status;
-    private CertbotMode _mode = CertbotMode.Embedded;
-    private string _domains = string.Empty;
-    private string _certName = string.Empty;
-    private string _email = string.Empty;
-    private bool _staging;
-    private bool _isBusy;
-    private string? _output;
-    private string? _outputMessage;
-    private bool _outputFailed;
-
-    protected override async Task OnInitializedAsync()
-    {
-        AppSettings settings = await SettingsService.GetAsync();
-        _mode = settings.CertbotMode;
-        _email = settings.AcmeEmail ?? string.Empty;
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        _listing = await Catalog.ListAsync();
-        _status = await RenewalJob.GetStatusAsync();
-    }
-
-    private async Task IssueAsync(bool dryRun)
-    {
-        string[] domains = _domains.Split([' ', '\t', '\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries);
-        await RunAsync(async () => Show(await Certificates.IssueAsync(
-            new IssueRequest(domains, _certName, _email, _staging, dryRun),
-            await User.GetNameAsync())));
-    }
-
-    private async Task RenewAsync(string? name, bool force)
-    {
-        await RunAsync(async () => Show(await Certificates.RenewAsync(name, force, await User.GetNameAsync())));
-    }
-
-    private async Task DeleteAsync(CertificateInfo certificate)
-    {
-        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Delete " + certificate.Name + "?",
-            "certbot deletes the certificate and its private key. Let's Encrypt can issue it again later.",
-            yesText: "Delete",
-            cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        await RunAsync(async () => Show(await Certificates.DeleteAsync(certificate.Name, await User.GetNameAsync())));
-    }
-
-    private void Show(CertificateOperation operation)
-    {
-        _outputFailed = !operation.Succeeded;
-        _outputMessage = operation.Message;
-        _output = operation.Output ?? string.Empty;
-    }
-
-    private async Task RunAsync(Func<Task> action)
-    {
-        _isBusy = true;
-        _output = null;
-        try
-        {
-            await action();
-            await LoadAsync();
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-
-    private static Color ExpiryColor(CertificateInfo certificate)
-    {
-        int days = certificate.DaysLeft(DateTimeOffset.UtcNow);
-        return days < 14 ? Color.Error : days < 30 ? Color.Warning : Color.Default;
-    }
-
-    private static string ExpiryText(CertificateInfo certificate)
-    {
-        int days = certificate.DaysLeft(DateTimeOffset.UtcNow);
-        return days < 0 ? "expired " + (-days) + " days ago" : "in " + days + " days";
-    }
 }

@@ -1,12 +1,9 @@
 @page "/reverse-proxies/edit"
 @attribute [Authorize]
-@using Roastgate.Core.Nginx
 
-<PageTitle>Reverse proxy · Roastgate</PageTitle>
+<PageTitle>
+    Reverse proxy · Roastgate
+</PageTitle>
 
-<ConfigEditView Area="ConfigArea.ReverseProxies" Name="@Name" />
-
-@code {
-    [SupplyParameterFromQuery(Name = "name")]
-    private string? Name { get; set; }
-}
+<ConfigEditView Area="ConfigArea.ReverseProxies"
+                Name="@Name" />
