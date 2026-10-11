@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
+using Roastgate.Core;
 using Roastgate.Core.Data;
 using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Data.Models;
@@ -60,7 +61,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
         HttpResponseMessage response = await client.GetAsync("/setup");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("Set up Roastgate", await response.Content.ReadAsStringAsync());
+        Assert.Contains($"Set up {AppInfo.AppName}", await response.Content.ReadAsStringAsync());
     }
 
     // ---- After the setup --------------------------------------------------------------

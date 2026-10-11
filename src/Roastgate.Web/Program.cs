@@ -38,7 +38,7 @@ builder.Services.AddHostedService<CertificateRenewalService>();
 
 // Session cookies and antiforgery tokens are encrypted with these keys. They live in the data volume so that
 // recreating the container (an upgrade, for instance) does not sign everybody out.
-builder.Services.AddDataProtection().SetApplicationName("Roastgate");
+builder.Services.AddDataProtection().SetApplicationName(AppInfo.AppName);
 builder.Services.AddOptions<KeyManagementOptions>()
     .Configure<RoastgateOptions, ILoggerFactory>((KeyManagementOptions keys, RoastgateOptions current,
             ILoggerFactory loggerFactory) =>

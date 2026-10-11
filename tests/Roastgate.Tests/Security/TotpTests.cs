@@ -1,4 +1,5 @@
 using System.Text;
+using Roastgate.Core;
 using Roastgate.Core.Security;
 
 namespace Roastgate.Tests.Security;
@@ -166,7 +167,7 @@ public sealed class TotpTests
     [Fact]
     public void The_provisioning_uri_has_everything_an_authenticator_app_reads()
     {
-        string uri = Totp.ProvisioningUri("Roastgate", "admin", "JBSWY3DPEHPK3PXP");
+        string uri = Totp.ProvisioningUri(AppInfo.AppName, "admin", "JBSWY3DPEHPK3PXP");
 
         Assert.Equal("otpauth://totp/Roastgate:admin?secret=JBSWY3DPEHPK3PXP&issuer=Roastgate&algorithm=SHA1&digits=6&period=30", uri);
     }

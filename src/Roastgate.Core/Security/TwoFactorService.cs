@@ -35,7 +35,7 @@ public interface ITwoFactorService
 
 public sealed class TwoFactorService(IAdminAccountStore store, ISessionStamp sessionStamp, TimeProvider timeProvider) : ITwoFactorService
 {
-    public const string Issuer = "Roastgate";
+    public const string Issuer = AppInfo.AppName;
 
     public async Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default)
     {
