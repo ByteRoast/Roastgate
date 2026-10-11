@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Web.Authentication;
 
 namespace Roastgate.Web.Controllers;

@@ -4,7 +4,8 @@ using System.Text;
 using System.Text.Json;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 
 namespace Roastgate.Core.Security;
 

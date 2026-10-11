@@ -2,7 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Security;
 using Roastgate.Web.Authentication;
 

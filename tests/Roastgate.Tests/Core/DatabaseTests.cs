@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Tests.Support;
 
 namespace Roastgate.Tests.Core;
@@ -14,7 +16,9 @@ public sealed class DatabaseTests
         await database.Services.MigrateRoastgateDatabaseAsync();
 
         ISettingsStore settings = database.Get<ISettingsStore>();
+        
         await settings.SetAsync("key", "value");
+        
         Assert.Equal("value", await settings.GetAsync("key"));
     }
 
@@ -22,6 +26,7 @@ public sealed class DatabaseTests
     public async Task The_model_has_no_pending_changes_compared_to_the_migrations()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IDbContextFactory<RoastgateDbContext> factory = database.Get<IDbContextFactory<RoastgateDbContext>>();
 
         await using RoastgateDbContext context = await factory.CreateDbContextAsync();
@@ -36,14 +41,15 @@ public sealed class DatabaseTests
     public async Task Settings_can_be_created_updated_and_deleted()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         ISettingsStore settings = database.Get<ISettingsStore>();
 
         Assert.Null(await settings.GetAsync("missing"));
 
         await settings.SetAsync("theme", "light");
         await settings.SetAsync("theme", "dark");
-        Assert.Equal("dark", await settings.GetAsync("theme"));
 
+        Assert.Equal("dark", await settings.GetAsync("theme"));
         Assert.True(await settings.DeleteAsync("theme"));
         Assert.False(await settings.DeleteAsync("theme"));
         Assert.Null(await settings.GetAsync("theme"));
@@ -53,6 +59,7 @@ public sealed class DatabaseTests
     public async Task Audit_entries_are_listed_newest_first_and_keep_their_fields()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IAuditLog audit = database.Get<IAuditLog>();
 
         await audit.WriteAsync("admin", "config.save", "conf.d/app.conf", true);
@@ -73,7 +80,9 @@ public sealed class DatabaseTests
     public async Task Audit_listing_honours_the_requested_count()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IAuditLog audit = database.Get<IAuditLog>();
+        
         for (int index = 0; index < 5; index++)
         {
             await audit.WriteAsync("admin", "action-" + index, null, true);
@@ -89,6 +98,7 @@ public sealed class DatabaseTests
     public async Task Only_one_administrator_can_ever_be_created()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IAdminAccountStore accounts = database.Get<IAdminAccountStore>();
 
         Assert.Null(await accounts.GetAsync());
@@ -96,6 +106,7 @@ public sealed class DatabaseTests
         Assert.False(await accounts.CreateAsync("someone-else", "hash-2"));
 
         AdminAccount? account = await accounts.GetAsync();
+        
         Assert.NotNull(account);
         Assert.Equal("admin", account.Username);
         Assert.Equal("hash-1", account.PasswordHash);
@@ -106,9 +117,10 @@ public sealed class DatabaseTests
     public async Task The_password_hash_can_be_replaced()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IAdminAccountStore accounts = database.Get<IAdminAccountStore>();
-        await accounts.CreateAsync("admin", "old-hash");
 
+        await accounts.CreateAsync("admin", "old-hash");
         await accounts.UpdatePasswordHashAsync("new-hash");
 
         Assert.Equal("new-hash", (await accounts.GetAsync())!.PasswordHash);

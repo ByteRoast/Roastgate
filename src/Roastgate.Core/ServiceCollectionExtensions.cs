@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Roastgate.Core.Certificates;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Stores;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
@@ -27,8 +29,9 @@ public static class ServiceCollectionExtensions
             Directory.CreateDirectory(current.DataDirectory);
             builder.UseSqlite($"Data Source={current.DatabasePath};Foreign Keys=True");
         });
+        
         services.AddSingleton<ISettingsStore, SettingsStore>();
-        services.AddSingleton<IAuditLog, AuditLog>();
+        services.AddSingleton<IAuditLog, AuditLogStore>();
         services.AddSingleton<IAdminAccountStore, AdminAccountStore>();
         services.AddSingleton<IPasskeyStore, PasskeyStore>();
         services.AddSingleton<AppSettingsService>();

@@ -1,5 +1,6 @@
 using System.Text.Json;
-using Roastgate.Core.Data;
+using Microsoft.Extensions.Time.Testing;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Security;
 using Roastgate.Tests.Support;
 
@@ -264,8 +265,7 @@ public sealed class PasskeyServiceTests
     [Fact]
     public void Ceremonies_expire_and_the_table_stays_bounded()
     {
-        Microsoft.Extensions.Time.Testing.FakeTimeProvider time = new(DateTimeOffset.UtcNow);
-        
+        FakeTimeProvider time = new(DateTimeOffset.UtcNow);
         PasskeyCeremonies ceremonies = new(time);
 
         string id = ceremonies.Issue(PasskeyCeremonyKind.SignIn, "{}", null);

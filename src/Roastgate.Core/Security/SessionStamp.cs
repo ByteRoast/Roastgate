@@ -1,4 +1,5 @@
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 
 namespace Roastgate.Core.Security;
 
@@ -37,7 +38,9 @@ public sealed class SessionStamp(IAdminAccountStore store, TimeProvider timeProv
         }
 
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         string? stamp = account?.SecurityStamp;
+        
         lock (_lock)
         {
             _cached = stamp;

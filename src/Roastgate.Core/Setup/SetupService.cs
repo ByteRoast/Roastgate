@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Security;
 using Roastgate.Core.Settings;
 
@@ -53,9 +53,11 @@ public sealed class SetupService(
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         _initialized = await accounts.GetAsync(cancellationToken) is not null;
+        
         if (_initialized)
         {
             _token = null;
+        
             return;
         }
 
@@ -78,6 +80,7 @@ public sealed class SetupService(
     public bool VerifyToken(string candidate)
     {
         string? token = _token;
+        
         if (token is null)
         {
             return false;
@@ -89,6 +92,7 @@ public sealed class SetupService(
     public async Task<SetupResult> CompleteAsync(SetupRequest request, CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
+        
         try
         {
             if (_initialized)
@@ -102,16 +106,19 @@ public sealed class SetupService(
             }
 
             string username = request.Username.Trim().ToLowerInvariant();
+            
             List<string> problems = [];
             problems.AddRange(CredentialPolicy.ValidateUsername(username));
             problems.AddRange(CredentialPolicy.ValidatePassword(request.Password, username));
             problems.AddRange(request.Settings.Validate());
+            
             if (problems.Count > 0)
             {
                 return new SetupResult(false, problems);
             }
 
             await appSettings.SaveAsync(request.Settings, cancellationToken);
+            
             if (!await accounts.CreateAsync(username, hasher.Hash(request.Password), cancellationToken))
             {
                 return SetupResult.Failure("An administrator already exists.");
@@ -119,7 +126,9 @@ public sealed class SetupService(
 
             _initialized = true;
             _token = null;
+            
             await audit.WriteAsync(username, "setup.completed", null, true, null, cancellationToken);
+            
             return SetupResult.Success;
         }
         finally

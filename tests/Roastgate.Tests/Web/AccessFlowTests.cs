@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 using Roastgate.Web.Authentication;
 
@@ -25,6 +27,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     private static string? LocationOf(HttpResponseMessage response)
     {
         Uri? location = response.Headers.Location;
+
         if (location is null)
         {
             return null;
@@ -54,7 +57,6 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task The_setup_page_is_reachable_before_the_setup()
     {
         HttpClient client = _factory.CreateBrowser();
-
         HttpResponseMessage response = await client.GetAsync("/setup");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -67,6 +69,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task After_the_setup_the_setup_page_no_longer_exists()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage response = await client.GetAsync("/setup");
@@ -80,6 +83,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Protected_pages_send_anonymous_visitors_to_the_login_page_and_remember_where_they_were_going(string path)
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage response = await client.GetAsync(path);
@@ -92,6 +96,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task The_login_page_is_public()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage response = await client.GetAsync("/login");
@@ -104,6 +109,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Correct_credentials_sign_in_and_open_the_dashboard()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage login = await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword);
@@ -113,6 +119,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
         Assert.Contains(login.Headers.GetValues("Set-Cookie"), (string cookie) => cookie.StartsWith("roastgate.auth=") && cookie.Contains("httponly", StringComparison.OrdinalIgnoreCase) && cookie.Contains("samesite=strict", StringComparison.OrdinalIgnoreCase));
 
         HttpResponseMessage dashboard = await client.GetAsync("/");
+        
         Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
         Assert.Contains("Dashboard", await dashboard.Content.ReadAsStringAsync());
     }
@@ -121,6 +128,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Signing_in_returns_to_the_page_that_was_requested()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage login = await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword, "/login?returnUrl=%2Faudit-log");
@@ -132,6 +140,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task A_return_url_pointing_to_another_site_is_ignored()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage login = await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword, "/login?returnUrl=https%3A%2F%2Fevil.example%2F");
@@ -143,6 +152,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Wrong_credentials_show_a_generic_error_and_do_not_sign_in()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         HttpResponseMessage login = await HtmlForm.PostLoginAsync(client, "admin", "not-the-password-1!");
@@ -156,6 +166,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Repeated_failures_lock_the_client_out_even_for_the_right_password()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
 
         for (int attempt = 0; attempt < LoginThrottle.MaxFailures; attempt++)
@@ -174,6 +185,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Sign_ins_and_failures_are_recorded_in_the_audit_log()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
         await HtmlForm.PostLoginAsync(client, "admin", "not-the-password-1!");
         await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword);
@@ -188,8 +200,10 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Signing_out_ends_the_session()
     {
         HttpClient client = _factory.CreateBrowser();
+        
         await _factory.CompleteSetupAsync();
         await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword);
+        
         string dashboard = await client.GetStringAsync("/");
 
         HttpResponseMessage logout = await client.PostAsync("/logout", new FormUrlEncodedContent(HtmlForm.HiddenFields(dashboard)));
@@ -203,6 +217,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task Signing_out_requires_the_antiforgery_token()
     {
         HttpClient client = _factory.CreateBrowser();
+
         await _factory.CompleteSetupAsync();
         await HtmlForm.PostLoginAsync(client, "admin", RoastgateFactory.AdminPassword);
 
@@ -218,16 +233,19 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task A_sign_in_ticket_opens_a_session_exactly_once()
     {
         HttpClient client = _factory.CreateBrowser();
+        
         string username = await _factory.CompleteSetupAsync();
         string ticket = _factory.Services.GetRequiredService<SignInTicketService>().Issue(username);
 
         HttpResponseMessage first = await client.GetAsync($"/sign-in/{ticket}");
+        
         Assert.Equal(HttpStatusCode.Redirect, first.StatusCode);
         Assert.Equal("/", LocationOf(first));
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
 
         HttpClient otherBrowser = _factory.CreateBrowser();
         HttpResponseMessage replay = await otherBrowser.GetAsync($"/sign-in/{ticket}");
+        
         Assert.Equal("/login", LocationOf(replay));
         Assert.Equal(HttpStatusCode.Redirect, (await otherBrowser.GetAsync("/")).StatusCode);
     }
@@ -251,9 +269,11 @@ public sealed class AccessFlowTests : IAsyncLifetime
     {
         HttpClient laptop = _factory.CreateBrowser();
         HttpClient stolen = _factory.CreateBrowser();
+        
         await _factory.CompleteSetupAsync();
         await HtmlForm.PostLoginAsync(laptop, "admin", RoastgateFactory.AdminPassword);
         await HtmlForm.PostLoginAsync(stolen, "admin", RoastgateFactory.AdminPassword);
+        
         Assert.Equal(HttpStatusCode.OK, (await laptop.GetAsync("/")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await stolen.GetAsync("/")).StatusCode);
 
@@ -263,7 +283,9 @@ public sealed class AccessFlowTests : IAsyncLifetime
         Assert.Empty(problems);
         Assert.Equal(HttpStatusCode.Redirect, (await laptop.GetAsync("/")).StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, (await stolen.GetAsync("/audit-log")).StatusCode);
+        
         HttpResponseMessage signedInAgain = await HtmlForm.PostLoginAsync(laptop, "admin", "A-brand-new-Passw0rd");
+        
         Assert.Equal(HttpStatusCode.Redirect, signedInAgain.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await laptop.GetAsync("/")).StatusCode);
     }
@@ -272,9 +294,9 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task A_session_opened_after_the_change_is_not_affected_by_it()
     {
         HttpClient client = _factory.CreateBrowser();
+        
         await _factory.CompleteSetupAsync();
         await _factory.Services.GetRequiredService<AccountService>().ChangePasswordAsync(RoastgateFactory.AdminPassword, "A-brand-new-Passw0rd");
-
         await HtmlForm.PostLoginAsync(client, "admin", "A-brand-new-Passw0rd");
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
@@ -287,6 +309,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task The_sign_in_page_explains_why_the_session_ended(string notice, string text)
     {
         HttpClient client = _factory.CreateBrowser();
+        
         await _factory.CompleteSetupAsync();
 
         string html = await client.GetStringAsync($"/login?notice={notice}");
@@ -298,6 +321,7 @@ public sealed class AccessFlowTests : IAsyncLifetime
     public async Task An_unknown_notice_shows_nothing()
     {
         HttpClient client = _factory.CreateBrowser();
+        
         await _factory.CompleteSetupAsync();
 
         string html = await client.GetStringAsync("/login?notice=%3Cscript%3Ealert(1)%3C/script%3E");

@@ -1,5 +1,6 @@
 using Roastgate.Core;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 using Roastgate.Core.Settings;
 using Roastgate.Core.Setup;
@@ -20,7 +21,9 @@ public sealed class SetupServiceTests
     {
         TestDatabase database = await TestDatabase.CreateAsync();
         ISetupService setup = database.Get<ISetupService>();
+        
         await setup.InitializeAsync();
+        
         return (database, setup);
     }
 
@@ -28,6 +31,7 @@ public sealed class SetupServiceTests
     public async Task A_fresh_instance_is_not_initialized_and_exposes_the_configured_token()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+
         await using TestDatabase _ = database;
 
         Assert.False(setup.IsInitialized);
@@ -38,6 +42,7 @@ public sealed class SetupServiceTests
     public async Task Without_a_configured_token_a_random_one_is_generated()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync((RoastgateOptions options) => options.SetupToken = null);
+        
         ISetupService setup = database.Get<ISetupService>();
 
         await setup.InitializeAsync();
@@ -58,6 +63,7 @@ public sealed class SetupServiceTests
     public async Task The_token_is_verified_exactly()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+
         await using TestDatabase _ = database;
 
         Assert.True(setup.VerifyToken(TestDatabase.SetupToken));
@@ -70,9 +76,10 @@ public sealed class SetupServiceTests
     public async Task Completing_the_setup_creates_the_administrator_and_stores_the_settings()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
-        AppSettings settings = new() { NginxRoot = "/srv/nginx", WhitelistsDirectory = "/srv/nginx/wl", CertbotMode = CertbotMode.Host, AcmeEmail = "ops@example.com" };
 
+        AppSettings settings = new() { NginxRoot = "/srv/nginx", WhitelistsDirectory = "/srv/nginx/wl", CertbotMode = CertbotMode.Host, AcmeEmail = "ops@example.com" };
         SetupResult result = await setup.CompleteAsync(new SetupRequest(TestDatabase.SetupToken, "Admin", StrongPassword, settings));
 
         Assert.True(result.Succeeded);
@@ -81,11 +88,13 @@ public sealed class SetupServiceTests
         Assert.NotNull(await database.Get<AccountService>().VerifyCredentialsAsync("admin", StrongPassword));
 
         AppSettings stored = await database.Get<AppSettingsService>().GetAsync();
+        
         Assert.Equal("/srv/nginx", stored.NginxRoot);
         Assert.Equal(CertbotMode.Host, stored.CertbotMode);
         Assert.Equal("ops@example.com", stored.AcmeEmail);
 
         IReadOnlyList<AuditEntry> audit = await database.Get<IAuditLog>().ListRecentAsync(5);
+        
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "setup.completed" && entry.Actor == "admin");
     }
 
@@ -93,6 +102,7 @@ public sealed class SetupServiceTests
     public async Task The_setup_can_only_run_once()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
         await setup.CompleteAsync(ValidRequest());
 
@@ -106,6 +116,7 @@ public sealed class SetupServiceTests
     public async Task A_wrong_token_is_refused_and_nothing_is_created()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
 
         SetupResult result = await setup.CompleteAsync(ValidRequest() with { Token = "not-the-token" });
@@ -122,6 +133,7 @@ public sealed class SetupServiceTests
     public async Task Invalid_credentials_are_refused(string username, string password)
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
 
         SetupResult result = await setup.CompleteAsync(ValidRequest() with { Username = username, Password = password });
@@ -135,6 +147,7 @@ public sealed class SetupServiceTests
     public async Task Invalid_settings_are_refused()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
 
         SetupResult result = await setup.CompleteAsync(ValidRequest() with { Settings = new AppSettings { NginxRoot = "../etc; rm -rf /" } });
@@ -147,6 +160,7 @@ public sealed class SetupServiceTests
     public async Task Initialization_is_remembered_across_restarts()
     {
         (TestDatabase database, ISetupService setup) = await CreateAsync();
+        
         await using TestDatabase _ = database;
         await setup.CompleteAsync(ValidRequest());
 

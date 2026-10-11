@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
+using Roastgate.Core.Data.Stores;
 
 namespace Roastgate.Core.Security;
 
@@ -55,20 +57,25 @@ public sealed class TwoFactorService(IAdminAccountStore store, ISessionStamp ses
         }
 
         IReadOnlyList<string> codes = RecoveryCodes.Generate();
+        
         await store.EnableTotpAsync(secret, codes.Select(HashOf).ToList(), step, cancellationToken);
+        
         sessionStamp.Invalidate();
+        
         return codes;
     }
 
     public async Task<bool> VerifyAsync(string input, CancellationToken cancellationToken = default)
     {
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         if (account?.TotpSecret is not { } secret)
         {
             return false;
         }
 
         string? recovery = RecoveryCodes.Normalize(input);
+        
         if (recovery is not null)
         {
             return await store.TryConsumeRecoveryCodeAsync(RecoveryCodes.Hash(recovery), cancellationToken);
@@ -86,19 +93,23 @@ public sealed class TwoFactorService(IAdminAccountStore store, ISessionStamp ses
     public async Task DisableAsync(CancellationToken cancellationToken = default)
     {
         await store.DisableTotpAsync(cancellationToken);
+        
         sessionStamp.Invalidate();
     }
 
     public async Task<IReadOnlyList<string>> RegenerateRecoveryCodesAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<string> codes = RecoveryCodes.Generate();
+        
         await store.ReplaceRecoveryCodesAsync(codes.Select(HashOf).ToList(), cancellationToken);
+        
         return codes;
     }
 
     public async Task<int> RemainingRecoveryCodesAsync(CancellationToken cancellationToken = default)
     {
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         return AdminAccountStore.ParseHashes(account?.RecoveryCodeHashes).Count;
     }
 
@@ -132,13 +143,16 @@ public sealed class TwoFactorChallenges(TimeProvider timeProvider)
     public string Issue(string username)
     {
         DateTimeOffset now = timeProvider.GetUtcNow();
+        
         foreach (KeyValuePair<string, Challenge> expired in _challenges.Where((KeyValuePair<string, Challenge> pair) => pair.Value.ExpiresAt <= now))
         {
             _challenges.TryRemove(expired.Key, out _);
         }
 
         string ticket = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        
         _challenges[ticket] = new Challenge(username, now + Lifetime);
+        
         return ticket;
     }
 
@@ -164,6 +178,7 @@ public sealed class TwoFactorChallenges(TimeProvider timeProvider)
         if (Interlocked.Increment(ref challenge.FailureCount) >= MaximumAttempts)
         {
             _challenges.TryRemove(ticket, out _);
+          
             return false;
         }
 

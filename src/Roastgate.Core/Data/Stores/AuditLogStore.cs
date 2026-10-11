@@ -1,22 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 
-namespace Roastgate.Core.Data;
+namespace Roastgate.Core.Data.Stores;
 
-public interface IAuditLog
-{
-    Task WriteAsync(
-        string actor,
-        string action,
-        string? target,
-        bool success,
-        string? details = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>Most recent entries first.</summary>
-    Task<IReadOnlyList<AuditEntry>> ListRecentAsync(int count, CancellationToken cancellationToken = default);
-}
-
-public sealed class AuditLog(IDbContextFactory<RoastgateDbContext> factory) : IAuditLog
+public sealed class AuditLogStore(IDbContextFactory<RoastgateDbContext> factory) : IAuditLog
 {
     public async Task WriteAsync(
         string actor,
@@ -27,6 +15,7 @@ public sealed class AuditLog(IDbContextFactory<RoastgateDbContext> factory) : IA
         CancellationToken cancellationToken = default)
     {
         await using RoastgateDbContext database = await factory.CreateDbContextAsync(cancellationToken);
+
         database.AuditLog.Add(new AuditEntry
         {
             OccurredAt = DateTimeOffset.UtcNow,
@@ -36,6 +25,7 @@ public sealed class AuditLog(IDbContextFactory<RoastgateDbContext> factory) : IA
             Success = success,
             Details = details,
         });
+
         await database.SaveChangesAsync(cancellationToken);
     }
 

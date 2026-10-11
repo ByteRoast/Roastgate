@@ -1,6 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
 using Roastgate.Core;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Security;
 
 namespace Roastgate.Web.Cli;

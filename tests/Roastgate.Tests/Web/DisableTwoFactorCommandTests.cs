@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Roastgate.Core;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 using Roastgate.Tests.Support;
 using Roastgate.Web.Cli;
