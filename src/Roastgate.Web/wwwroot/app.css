@@ -57,7 +57,7 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     top: 0.5rem;
 }
 
-/* Sign-in, error and not-found pages (static, no MudBlazor). */
+/* Sign-in, error and not-found pages (static SSR; the sign-in fields come from MudBlazor.StaticInput). */
 .rg-auth {
     min-height: 100vh;
     display: flex;
@@ -101,24 +101,6 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-}
-
-.rg-auth-form label {
-    font-size: 0.85rem;
-    color: #525860;
-}
-
-.rg-auth-form input {
-    padding: 0.55rem 0.7rem;
-    border: 1px solid #dadde1;
-    border-radius: 0.4rem;
-    font: inherit;
-}
-
-.rg-auth-form input:focus {
-    outline: 2px solid #ee8a26;
-    outline-offset: 0;
-    border-color: #ee8a26;
 }
 
 .rg-auth-help {

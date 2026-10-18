@@ -26,23 +26,19 @@
               class="rg-auth-form">
         <DataAnnotationsValidator />
 
-        <label for="username">
-            Username
-        </label>
+        <MudStaticTextField @bind-Value="Input!.Username"
+                            For="() => Input!.Username"
+                            Label="Username"
+                            Variant="Variant.Outlined"
+                            autocomplete="username"
+                            autofocus />
 
-        <InputText id="username"
-                   @bind-Value="Input!.Username"
-                   autocomplete="username"
-                   autofocus />
-
-        <label for="password">
-            Password
-        </label>
-
-        <InputText id="password"
-                   type="password"
-                   @bind-Value="Input!.Password"
-                   autocomplete="current-password" />
+        <MudStaticTextField @bind-Value="Input!.Password"
+                            For="() => Input!.Password"
+                            Label="Password"
+                            Variant="Variant.Outlined"
+                            InputType="InputType.Password"
+                            autocomplete="current-password" />
 
         @if (_error is not null)
         {
@@ -100,15 +96,13 @@ else
 
         @if (_totpEnabled)
         {
-            <label for="code">
-                Authentication code
-            </label>
-
-            <InputText id="code"
-                       @bind-Value="Code!.Code"
-                       autocomplete="one-time-code"
-                       inputmode="text"
-                       autofocus />
+            <MudStaticTextField @bind-Value="Code!.Code"
+                                For="() => Code!.Code"
+                                Label="Authentication code"
+                                Variant="Variant.Outlined"
+                                autocomplete="one-time-code"
+                                InputMode="InputMode.text"
+                                autofocus />
         }
 
         @if (_error is not null)
