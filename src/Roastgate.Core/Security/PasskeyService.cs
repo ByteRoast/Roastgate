@@ -266,8 +266,8 @@ public sealed class PasskeyService(
     {
         return new Fido2(new Fido2Configuration
         {
-            ServerDomain = relyingParty.Id,
-            ServerName = TwoFactorService.Issuer,
+            RPID = relyingParty.Id,
+            RPName = TwoFactorService.Issuer,
             Origins = new HashSet<string> { relyingParty.Origin },
         });
     }
