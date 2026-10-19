@@ -1,0 +1,156 @@
+@page "/login"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@attribute [ExcludeFromInteractiveRouting]
+
+<AppPageTitle Title="Sign in" />
+
+@if (NoticeText is not null)
+{
+    <p class="rg-auth-notice"
+       role="status">
+        @NoticeText
+    </p>
+}
+
+@if (_ticket is null)
+{
+    <h1 class="rg-auth-title">
+        Sign in
+    </h1>
+
+    <EditForm Model="Input"
+              FormName="login"
+              OnValidSubmit="SignInAsync"
+              Enhance="false"
+              class="rg-auth-form">
+        <DataAnnotationsValidator />
+
+        <MudStaticTextField @bind-Value="Input!.Username"
+                            For="() => Input!.Username"
+                            Label="Username"
+                            Variant="Variant.Outlined"
+                            autocomplete="username"
+                            autofocus />
+
+        <MudStaticTextField @bind-Value="Input!.Password"
+                            For="() => Input!.Password"
+                            Label="Password"
+                            Variant="Variant.Outlined"
+                            InputType="InputType.Password"
+                            autocomplete="current-password" />
+
+        @if (_error is not null)
+        {
+            <p class="rg-auth-error"
+               role="alert">
+                @_error
+            </p>
+        }
+
+        <button type="submit"
+                class="rg-auth-button">
+            Sign in
+        </button>
+    </EditForm>
+
+    <div class="rg-auth-alternative">
+        <span>
+            or
+        </span>
+
+        <button type="button"
+                class="rg-auth-button rg-auth-button-secondary"
+                data-passkey-signin
+                data-passkey-error="passkey-error">
+            Sign in with a passkey
+        </button>
+
+        <p id="passkey-error"
+           class="rg-auth-error"
+           role="alert"
+           hidden>
+        </p>
+    </div>
+}
+else
+{
+    <h1 class="rg-auth-title">
+        Two-step verification
+    </h1>
+
+    <p class="rg-auth-help">
+        @SecondStepHelp
+    </p>
+
+    <EditForm Model="Code"
+              FormName="login-code"
+              OnValidSubmit="VerifyCodeAsync"
+              Enhance="false"
+              class="rg-auth-form">
+        <DataAnnotationsValidator />
+
+        <InputText id="ticket"
+                   type="hidden"
+                   @bind-Value="Code!.Ticket" />
+
+        @if (_totpEnabled)
+        {
+            <MudStaticTextField @bind-Value="Code!.Code"
+                                For="() => Code!.Code"
+                                Label="Authentication code"
+                                Variant="Variant.Outlined"
+                                autocomplete="one-time-code"
+                                InputMode="InputMode.text"
+                                autofocus />
+        }
+
+        @if (_error is not null)
+        {
+            <p class="rg-auth-error"
+               role="alert">
+                @_error
+            </p>
+        }
+
+        @if (_totpEnabled)
+        {
+            <button type="submit"
+                    class="rg-auth-button">
+                Verify
+            </button>
+        }
+    </EditForm>
+
+    @if (_hasPasskeys)
+    {
+        <div class="rg-auth-alternative">
+            @if (_totpEnabled)
+            {
+                <span>
+                    or
+                </span>
+            }
+
+            <button type="button"
+                    class="rg-auth-button rg-auth-button-secondary"
+                    data-passkey-signin
+                    data-passkey-ticket="ticket"
+                    data-passkey-error="passkey-error">
+                Use a passkey
+            </button>
+
+            <p id="passkey-error"
+               class="rg-auth-error"
+               role="alert"
+               hidden>
+            </p>
+        </div>
+    }
+
+    <p class="rg-auth-help">
+        <a href="/login">
+            Start again
+        </a>
+    </p>
+}

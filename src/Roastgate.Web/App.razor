@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <base href="/" />
+
+    <ResourcePreloader />
+
+    <link rel="icon"
+          href="favicon.ico" />
+
+    <link rel="stylesheet"
+          href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+
+    <link rel="stylesheet"
+          href="@Assets["app.css"]" />
+
+    <ImportMap />
+
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageRenderMode" />
+
+    <ReconnectModal />
+
+    <script src="_content/BlazorMonaco/jsInterop.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
+    
+    <script src="@Assets["js/nginx-language.js"]"></script>
+    <script src="@Assets["js/roastgate.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+</body>
+</html>

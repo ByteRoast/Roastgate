@@ -122,6 +122,7 @@ check('dashboard: Test configuration runs the real nginx -t', true);
 await button('Reload nginx').click();
 await waitText('nginx reloaded.');
 check('dashboard: Reload nginx reloads the real nginx', true);
+await shot('01a-dashboard');
 
 // ---- sites: the existing default site (absolute symlink) ----
 await page.goto(`${base}/sites`);
@@ -340,6 +341,20 @@ await page.goto(`${base}/reverse-proxies/wizard?name=proxied.example.com.conf`);
 await waitField('Forward to');
 check('reopening the wizard restores the settings', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:8091' && (await page.getByLabel('Domain names').inputValue()).includes('proxied.example.com'));
 await page.getByLabel('Timeout (seconds)').fill('90');
+// Layout: the WebSockets switch lines up with the timeout input, and the switches start where the inputs start.
+const centerY = async (locator) => { const box = await locator.boundingBox(); return box.y + box.height / 2; };
+const switchY = await centerY(page.locator('.rg-switch-row .mud-switch').first());
+const timeoutY = await centerY(page.locator('.rg-switch-row .mud-input-outlined').first());
+check('the WebSockets switch is vertically centred on the timeout input', Math.abs(switchY - timeoutY) <= 3, `${switchY} vs ${timeoutY}`);
+await tab('Advanced').click();
+const trackX = (await page.locator('.rg-switch-grid .mud-switch-track').first().boundingBox()).x;
+const portX = (await page.getByLabel('HTTP port').boundingBox()).x;
+check('in Advanced the switches start at the same edge as the port inputs', Math.abs(trackX - portX) <= 3, `${trackX} vs ${portX}`);
+const httpsX = (await page.getByLabel('HTTPS port').boundingBox()).x;
+const secondTrackX = (await page.locator('.rg-switch-grid .mud-switch-track').nth(1).boundingBox()).x;
+check('the second switch column lines up with the HTTPS port input', Math.abs(secondTrackX - httpsX) <= 3, `${secondTrackX} vs ${httpsX}`);
+await tab('Essentials').click();
+check('the Domain names text area can be resized by the user', (await page.getByLabel('Domain names').evaluate((element) => getComputedStyle(element).resize)) === 'vertical');
 await button('Save').click();
 await expectSaved();
 check('a change in the form is regenerated into the file', sh('cat /etc/nginx/conf.d/proxied.example.com.conf').includes('proxy_read_timeout 90s;'));
@@ -429,6 +444,7 @@ check('HTTPS is really served with the certificate, behind the whitelist (127.0.
 await page.goto(`${base}/certificates`);
 await waitText('No certificate yet');
 check('the page says certificates are handled by the embedded certbot', /embedded certbot/i.test(await body()));
+check('the certificate Domain names text area can be resized', (await page.getByLabel('Domain names').evaluate((element) => getComputedStyle(element).resize)) === 'vertical');
 await page.getByLabel('Domain names').fill('lets.example.com');
 await button('Test first (dry run)').click();
 await waitText('The dry run succeeded');
@@ -496,6 +512,9 @@ await button('Save').click();
 await expectSaved();
 await page.goto(`${base}/backups?area=ReverseProxies&name=app.example.com.conf`);
 await waitText('Taken before');
+const showBox = await button('Show').boundingBox();
+const fileInput = await page.locator('.mud-input-outlined').filter({ has: page.getByLabel('File name') }).boundingBox();
+check('the Show button is centred on the filter inputs', Math.abs((showBox.y + showBox.height / 2) - (fileInput.y + fileInput.height / 2)) <= 3, `${showBox.y + showBox.height / 2} vs ${fileInput.y + fileInput.height / 2}`);
 check('the backups of a file are listed', /a change/i.test(await body()));
 await button('Compare').first().click();
 await waitText('Restoring');
@@ -658,6 +677,9 @@ await second.context.close();
 await page.goto(`${base}/settings`);
 await waitText('Two-factor authentication is');
 await page.getByLabel('Code from the app', { exact: true }).fill(recovery[1]);
+const inputMiddle = (await page.locator('.mud-input-outlined').filter({ has: page.getByLabel('Code from the app', { exact: true }) }).boundingBox());
+const buttonBox = await button('Get new recovery codes').boundingBox();
+check('the recovery codes button is centred on its code input', Math.abs((inputMiddle.y + inputMiddle.height / 2) - (buttonBox.y + buttonBox.height / 2)) <= 3, `${inputMiddle.y + inputMiddle.height / 2} vs ${buttonBox.y + buttonBox.height / 2}`);
 await button('Get new recovery codes').click();
 await waitText('Save these recovery codes now');
 const regenerated = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
@@ -706,6 +728,17 @@ await waitText('config.save');
 const audit = await body();
 check('the audit log records saves, refusals, enables and deletes', ['config.save', 'config.enable', 'config.disable', 'config.delete', 'nginx.reload', 'nginx.test', 'certbot.issue', 'certbot.renew', 'certbot.delete'].every((a) => audit.includes(a)));
 await shot('05-audit');
+
+// ---- the account survives a restart of the container ----
+execSync(`docker restart ${container}`, { stdio: 'ignore' });
+for (let i = 0; i < 60; i += 1) {
+  try { if ((await fetch(`${base}/login`)).ok) { break; } } catch { /* not up yet */ }
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+const restartLogs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
+check('after a restart the existing database is reused', restartLogs.includes('Using the existing database'));
+await page.goto(`${base}/`);
+check('after a restart the account and the session are still there (no setup)', !page.url().includes('/setup') && !page.url().includes('/login'), page.url());
 
 await browser.close();
 console.log('\nbrowser problems:', problems.length ? '\n  ' + [...new Set(problems)].join('\n  ') : 'none');

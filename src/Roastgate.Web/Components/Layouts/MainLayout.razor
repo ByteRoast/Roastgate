@@ -1,0 +1,115 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="RoastgateTheme.Theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer"
+                       aria-label="Toggle navigation" />
+
+        <img src="/img/logo.svg"
+             alt=""
+             class="rg-logo" />
+
+        <MudText Typo="Typo.h6"
+                 Class="ml-2 rg-brand">
+            Roastgate
+        </MudText>
+
+        <MudSpacer />
+
+        <AuthorizeView>
+            <Authorized>
+                <MudText Typo="Typo.body2"
+                         Class="mr-3">
+                    @context.User.Identity?.Name
+                </MudText>
+
+                <form method="post"
+                      action="/logout"
+                      class="rg-inline-form">
+                    <AntiforgeryToken />
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               Size="Size.Small">
+                        Sign out
+                    </MudButton>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen"
+               Elevation="0"
+               Variant="DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always">
+        <MudNavMenu>
+            <MudNavLink Href="/"
+                        Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Dashboard">
+                Dashboard
+            </MudNavLink>
+
+            <MudNavLink Href="/reverse-proxies"
+                        Icon="@Icons.Material.Filled.AltRoute">
+                Reverse proxies
+            </MudNavLink>
+
+            <MudNavLink Href="/sites"
+                        Icon="@Icons.Material.Filled.Language">
+                Sites
+            </MudNavLink>
+
+            <MudNavLink Href="/whitelists"
+                        Icon="@Icons.Material.Filled.Shield">
+                Whitelists
+            </MudNavLink>
+
+            <MudNavLink Href="/certificates"
+                        Icon="@Icons.Material.Filled.Lock">
+                Certificates
+            </MudNavLink>
+
+            <MudNavLink Href="/backups"
+                        Icon="@Icons.Material.Filled.Restore">
+                Backups
+            </MudNavLink>
+
+            <MudNavLink Href="/audit-log"
+                        Icon="@Icons.Material.Filled.History">
+                Audit log
+            </MudNavLink>
+
+            <MudNavLink Href="/settings"
+                        Icon="@Icons.Material.Filled.Settings">
+                Settings
+            </MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge"
+                      Class="my-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui"
+     data-nosnippet>
+    An unhandled error has occurred.
+    <a href="."
+       class="reload">Reload</a>
+
+    <span class="dismiss">
+        🗙
+    </span>
+</div>

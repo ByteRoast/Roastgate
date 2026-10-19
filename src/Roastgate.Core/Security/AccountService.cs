@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 
 namespace Roastgate.Core.Security;
 
@@ -13,6 +14,7 @@ public sealed class AccountService(IAdminAccountStore store, PasswordHasher hash
     public async Task<AdminAccount?> VerifyCredentialsAsync(string username, string password, CancellationToken cancellationToken = default)
     {
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         if (account is null || password.Length > MaximumAcceptedPasswordLength)
         {
             return null;
@@ -20,6 +22,7 @@ public sealed class AccountService(IAdminAccountStore store, PasswordHasher hash
 
         // The hash is always checked, even when the username is wrong, so both failures take the same time.
         PasswordVerification verification = hasher.Verify(password, account.PasswordHash);
+        
         bool usernameMatches = CryptographicOperations.FixedTimeEquals(
             Encoding.UTF8.GetBytes(username.Trim().ToLowerInvariant()),
             Encoding.UTF8.GetBytes(account.Username));
@@ -42,19 +45,23 @@ public sealed class AccountService(IAdminAccountStore store, PasswordHasher hash
     public async Task<IReadOnlyList<string>> ResetPasswordAsync(string newPassword, CancellationToken cancellationToken = default)
     {
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         if (account is null)
         {
             return ["No administrator exists yet. Complete the setup first."];
         }
 
         IReadOnlyList<string> problems = CredentialPolicy.ValidatePassword(newPassword, account.Username);
+        
         if (problems.Count > 0)
         {
             return problems;
         }
 
         await store.UpdatePasswordHashAsync(hasher.Hash(newPassword), rotateStamp: true, cancellationToken);
+        
         sessionStamp.Invalidate();
+        
         return [];
     }
 
@@ -65,6 +72,7 @@ public sealed class AccountService(IAdminAccountStore store, PasswordHasher hash
     public async Task<IReadOnlyList<string>> ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken cancellationToken = default)
     {
         AdminAccount? account = await store.GetAsync(cancellationToken);
+        
         if (account is null)
         {
             return ["No administrator exists yet. Complete the setup first."];

@@ -1,37 +1,47 @@
-@inject IConfigStore Store
-@inject CurrentUser User
-@inject IDialogService Dialogs
-@inject NavigationManager Navigation
-@inject IJSRuntime JS
-@using BlazorMonaco
-@using BlazorMonaco.Editor
-@using Roastgate.Core.Nginx
-@using Roastgate.Web.Services
-
 <div class="rg-page-header">
     <div>
-        <MudText Typo="Typo.h4">@(_isNew ? "New " + Info.Singular : _name)</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            <a href="@Info.ListRoute">@Info.Title</a>
+        <MudText Typo="Typo.h4">
+            @(_isNew ? "New " + Info.Singular : _name)
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary">
+            <a href="@Info.ListRoute">
+                @Info.Title
+            </a>
+
             @if (!_isNew)
             {
-                <span> &middot; <a href="@Info.BackupsUrl(_name)">history</a></span>
+                <span>
+                    &middot; <a href="@Info.BackupsUrl(_name)">history</a>
+                </span>
             }
+
             @if (!_isNew && _file is not null && Area != ConfigArea.Whitelists && SiteMetadataFormat.IsWizardFile(_file.Content))
             {
-                <span> &middot; <a href="@Info.WizardUrl(_name)">open in the wizard</a> (hand edits will be replaced)</span>
+                <span>
+                    &middot; <a href="@Info.WizardUrl(_name)">open in the wizard</a> (hand edits will be replaced)
+                </span>
             }
             else if (!_isNew && _file is not null && Area != ConfigArea.Whitelists)
             {
-                <span> &middot; <a href="@Info.WizardUrl(_name)" data-testid="import-link">import into the wizard</a> (the file is regenerated, a backup is kept)</span>
+                <span>
+                    &middot; <a href="@Info.WizardUrl(_name)" data-testid="import-link">import into the wizard</a> (the file is regenerated, a backup is kept)
+                </span>
             }
+
             @if (Area == ConfigArea.Whitelists && !_isNew)
             {
-                <span> &middot; <a href="@("/whitelists/edit?name=" + Uri.EscapeDataString(_name))">edit as a list</a></span>
+                <span>
+                    &middot; <a href="@("/whitelists/edit?name=" + Uri.EscapeDataString(_name))">edit as a list</a>
+                </span>
             }
+
             @if (!_isNew && _file is not null && Area != ConfigArea.Whitelists)
             {
-                <span> &middot; @(_file.Enabled ? "enabled" : "disabled")</span>
+                <span>
+                    &middot; @(_file.Enabled ? "enabled" : "disabled")
+                </span>
             }
         </MudText>
     </div>
@@ -39,15 +49,23 @@
 
 @if (_notFound)
 {
-    <MudAlert Severity="Severity.Error">That file does not exist or cannot be read. <a href="@Info.ListRoute">Back to the list</a>.</MudAlert>
+    <MudAlert Severity="Severity.Error">
+        That file does not exist or cannot be read. <a href="@Info.ListRoute">Back to the list</a>.
+    </MudAlert>
+
     return;
 }
 
-<ResultAlert Result="_result" Class="mb-4" />
+<ResultAlert Result="_result"
+             Class="mb-4" />
 
 @if (_isNew)
 {
-    <MudTextField T="string" @bind-Value="_name" Label="File name" Variant="Variant.Outlined" Class="mb-4"
+    <MudTextField T="string"
+                  @bind-Value="_name"
+                  Label="File name"
+                  Variant="Variant.Outlined"
+                  Class="mb-4"
                   HelperText="@(Area == ConfigArea.Sites ? "For example example.com" : "For example app.example.com.conf (.conf is added when missing)")" />
 }
 
@@ -56,210 +74,50 @@
     <div class="rg-editor">
         @if (_monacoReady)
         {
-            <StandaloneCodeEditor @ref="_editor" Id="@("config-editor-" + Area)" ConstructionOptions="BuildOptions" OnDidInit="OnEditorInitAsync" />
+            <StandaloneCodeEditor @ref="_editor"
+                                  Id="@("config-editor-" + Area)"
+                                  ConstructionOptions="BuildOptions"
+                                  OnDidInit="OnEditorInitAsync" />
         }
         else
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <MudProgressLinear Indeterminate="true"
+                               Color="Color.Primary" />
         }
     </div>
 }
 
 <div class="rg-editor-actions">
-    <MudSwitch T="bool" @bind-Value="_reload" Color="Color.Primary" Label="Reload nginx after saving" />
+    <MudSwitch T="bool"
+               @bind-Value="_reload"
+               Color="Color.Primary"
+               Label="Reload nginx after saving" />
+
     <MudSpacer />
+
     @if (!_isNew)
     {
         @if (Area != ConfigArea.Whitelists && _file is not null)
         {
-            <MudButton Variant="Variant.Outlined" OnClick="ToggleEnabledAsync" Disabled="_isBusy">@(_file.Enabled ? "Disable" : "Enable")</MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="ToggleEnabledAsync"
+                       Disabled="_isBusy">
+                @(_file.Enabled ? "Disable" : "Enable")
+            </MudButton>
         }
 
-        <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteAsync" Disabled="_isBusy">Delete</MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Error"
+                   OnClick="DeleteAsync"
+                   Disabled="_isBusy">
+            Delete
+        </MudButton>
     }
 
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_isBusy || !_editorReady">Save</MudButton>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               OnClick="SaveAsync"
+               Disabled="_isBusy || !_editorReady">
+        Save
+    </MudButton>
 </div>
-
-@code {
-    [Parameter, EditorRequired]
-    public ConfigArea Area { get; set; }
-
-    [Parameter]
-    public string? Name { get; set; }
-
-    private StandaloneCodeEditor? _editor;
-    private ConfigFile? _file;
-    private ConfigResult? _result;
-    private string _name = string.Empty;
-    private string _initialContent = string.Empty;
-    private bool _isNew;
-    private bool _isLoaded;
-    private bool _notFound;
-    private bool _editorReady;
-    private bool _monacoReady;
-    private bool _isBusy;
-    private bool _reload = true;
-    private string? _loadedName;
-
-    private AreaInfo Info => AreaInfo.For(Area);
-
-    protected override async Task OnParametersSetAsync()
-    {
-        if (_isLoaded && _loadedName == Name)
-        {
-            return;
-        }
-
-        _isNew = string.IsNullOrWhiteSpace(Name);
-        _loadedName = Name;
-        if (_isNew)
-        {
-            _name = string.Empty;
-            _initialContent = string.Empty;
-            _file = null;
-            _isLoaded = true;
-            return;
-        }
-
-        _file = await Store.ReadAsync(Area, Name!);
-        if (_file is null)
-        {
-            _notFound = true;
-            return;
-        }
-
-        _name = _file.Name;
-        _initialContent = _file.Content;
-        _isLoaded = true;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Never create the editor before Monaco has finished loading, or the whole circuit crashes.
-            await JS.InvokeVoidAsync("roastgateMonacoReady");
-            _monacoReady = true;
-            StateHasChanged();
-        }
-    }
-
-    private StandaloneEditorConstructionOptions BuildOptions(StandaloneCodeEditor editor)
-    {
-        return new StandaloneEditorConstructionOptions
-        {
-            AutomaticLayout = true,
-            Value = _initialContent,
-            Language = "plaintext",
-            Theme = "vs",
-            FontSize = 13,
-            TabSize = 4,
-            InsertSpaces = true,
-            ScrollBeyondLastLine = false,
-            Minimap = new EditorMinimapOptions { Enabled = false },
-        };
-    }
-
-    private async Task OnEditorInitAsync()
-    {
-        await JS.InvokeVoidAsync("roastgateRegisterNginx");
-        if (_editor is not null)
-        {
-            TextModel model = await _editor.GetModel();
-            await Global.SetModelLanguage(JS, model, "nginx");
-            await Global.SetTheme(JS, "roastgate");
-        }
-
-        _editorReady = true;
-        StateHasChanged();
-    }
-
-    private async Task SaveAsync()
-    {
-        if (_editor is null)
-        {
-            return;
-        }
-
-        string content = await _editor.GetValue();
-        await RunAsync(async () =>
-        {
-            string actor = await User.GetNameAsync();
-            ConfigResult result = await Store.SaveAsync(Area, _name, content, _reload, actor);
-            _result = result;
-            if (!result.Succeeded)
-            {
-                return;
-            }
-
-            string? normalized = ConfigNames.Normalize(Area, _name);
-            if (normalized is null)
-            {
-                return;
-            }
-
-            _file = await Store.ReadAsync(Area, normalized);
-            if (_isNew)
-            {
-                // Switch the page to the saved file without reloading the editor (query-only navigation).
-                _isNew = false;
-                _name = normalized;
-                _loadedName = normalized;
-                Navigation.NavigateTo(Info.EditUrl(normalized), replace: true);
-            }
-        });
-    }
-
-    private async Task ToggleEnabledAsync()
-    {
-        if (_file is null)
-        {
-            return;
-        }
-
-        await RunAsync(async () =>
-        {
-            _result = await Store.SetEnabledAsync(Area, _file.Name, !_file.Enabled, _reload, await User.GetNameAsync());
-            _file = await Store.ReadAsync(Area, _file.Name);
-        });
-    }
-
-    private async Task DeleteAsync()
-    {
-        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
-            "Delete " + _name + "?",
-            "The file is removed and nginx is reloaded. A backup of its content is kept.",
-            yesText: "Delete",
-            cancelText: "Cancel");
-        if (confirmed != true)
-        {
-            return;
-        }
-
-        await RunAsync(async () =>
-        {
-            ConfigResult result = await Store.DeleteAsync(Area, _name, _reload, await User.GetNameAsync());
-            if (result.Succeeded)
-            {
-                Navigation.NavigateTo(Info.ListRoute);
-                return;
-            }
-
-            _result = result;
-        });
-    }
-
-    private async Task RunAsync(Func<Task> action)
-    {
-        _isBusy = true;
-        try
-        {
-            await action();
-        }
-        finally
-        {
-            _isBusy = false;
-        }
-    }
-}

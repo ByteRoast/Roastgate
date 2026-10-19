@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Settings;
@@ -58,13 +58,16 @@ public sealed partial class CertificateService(
     public async Task<CertificateOperation> IssueAsync(IssueRequest request, string actor, CancellationToken cancellationToken = default)
     {
         AppSettings settings = await settingsService.GetAsync(cancellationToken);
+        
         string? problem = ValidateIssue(request, settings);
+        
         if (problem is not null)
         {
             return new CertificateOperation(false, problem);
         }
 
         string name = (request.CertName?.Trim()).NullIfEmpty() ?? request.Domains[0].ToLowerInvariant();
+        
         List<string> arguments =
         [
             "certonly", "--webroot", "-w", settings.AcmeWebroot,
@@ -72,6 +75,7 @@ public sealed partial class CertificateService(
             "--non-interactive", "--agree-tos", "--no-eff-email", "--expand",
             "--preferred-challenges", "http",
         ];
+        
         foreach (string domain in request.Domains)
         {
             arguments.Add("-d");
@@ -99,11 +103,15 @@ public sealed partial class CertificateService(
         }
 
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             HostCommandResult result = await RunCertbotAsync(settings, arguments, cancellationToken);
+            
             string action = request.DryRun ? "certbot.dry-run" : "certbot.issue";
+            
             await audit.WriteAsync(actor, action, name, result.Succeeded, Truncate(result.CombinedOutput), cancellationToken);
+            
             if (!result.Succeeded)
             {
                 return new CertificateOperation(false, "certbot could not issue the certificate. The output below says why.", result.CombinedOutput);
@@ -112,6 +120,7 @@ public sealed partial class CertificateService(
             string message = request.DryRun
                 ? "The dry run succeeded: Let's Encrypt can validate your domains. Nothing was issued."
                 : $"The certificate {name} was issued.";
+            
             return new CertificateOperation(true, message, result.CombinedOutput);
         }
         finally
@@ -123,6 +132,7 @@ public sealed partial class CertificateService(
     public async Task<CertificateOperation> RenewAsync(string? name, bool force, string actor, CancellationToken cancellationToken = default)
     {
         AppSettings settings = await settingsService.GetAsync(cancellationToken);
+        
         if (settings.CertbotMode == CertbotMode.Disabled)
         {
             return new CertificateOperation(false, "Certificate management is disabled in the settings.");
@@ -134,15 +144,18 @@ public sealed partial class CertificateService(
         }
 
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             Dictionary<string, DateTimeOffset> before = await SnapshotAsync(cancellationToken);
+        
             if (name is not null && !before.ContainsKey(name))
             {
                 return new CertificateOperation(false, $"There is no certificate named {name}.");
             }
 
             List<string> arguments = ["renew", "--non-interactive"];
+            
             if (name is not null)
             {
                 arguments.Add("--cert-name");
@@ -163,6 +176,7 @@ public sealed partial class CertificateService(
                 .ToList();
 
             string target = name ?? "all";
+            
             if (!result.Succeeded && renewed.Count == 0)
             {
                 await audit.WriteAsync(actor, "certbot.renew", target, false, Truncate(result.CombinedOutput), cancellationToken);
@@ -176,8 +190,11 @@ public sealed partial class CertificateService(
 
             // nginx keeps serving the old certificate until it is reloaded.
             ConfigResult reload = await store.ReloadNginxAsync(actor, cancellationToken);
+            
             await audit.WriteAsync(actor, "certbot.renew", string.Join(", ", renewed), result.Succeeded && reload.Succeeded, Truncate(result.CombinedOutput), cancellationToken);
+            
             string summary = $"Renewed {string.Join(", ", renewed)}.";
+            
             if (!reload.Succeeded)
             {
                 return new CertificateOperation(false, summary + " nginx could not be reloaded, so it still serves the old certificate: " + reload.Message, result.CombinedOutput);
@@ -194,6 +211,7 @@ public sealed partial class CertificateService(
     public async Task<CertificateOperation> DeleteAsync(string name, string actor, CancellationToken cancellationToken = default)
     {
         AppSettings settings = await settingsService.GetAsync(cancellationToken);
+        
         if (settings.CertbotMode == CertbotMode.Disabled)
         {
             return new CertificateOperation(false, "Certificate management is disabled in the settings.");
@@ -201,6 +219,7 @@ public sealed partial class CertificateService(
 
         CertificateListing listing = await catalog.ListAsync(cancellationToken);
         CertificateEntry? entry = listing.Certificates.FirstOrDefault((CertificateEntry item) => item.Certificate.Name == name);
+        
         if (entry is null)
         {
             return new CertificateOperation(false, $"There is no certificate named {name}.");
@@ -213,10 +232,13 @@ public sealed partial class CertificateService(
         }
 
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             HostCommandResult result = await RunCertbotAsync(settings, ["delete", "--cert-name", name, "--non-interactive"], cancellationToken);
+        
             await audit.WriteAsync(actor, "certbot.delete", name, result.Succeeded, Truncate(result.CombinedOutput), cancellationToken);
+            
             return result.Succeeded
                 ? new CertificateOperation(true, $"The certificate {name} was deleted.", result.CombinedOutput)
                 : new CertificateOperation(false, "certbot could not delete the certificate.", result.CombinedOutput);
@@ -294,12 +316,14 @@ public sealed partial class CertificateService(
             "--work-dir", Path.Combine(options.DataDirectory, "certbot", "work"),
             "--logs-dir", Path.Combine(options.DataDirectory, "certbot", "logs"),
         ]);
+        
         return localExec.RunAsync("certbot", arguments, CertbotTimeout, cancellationToken);
     }
 
     private async Task<Dictionary<string, DateTimeOffset>> SnapshotAsync(CancellationToken cancellationToken)
     {
         CertificateListing listing = await catalog.ListAsync(cancellationToken);
+        
         return listing.Certificates.ToDictionary((CertificateEntry entry) => entry.Certificate.Name, (CertificateEntry entry) => entry.Certificate.NotAfter);
     }
 

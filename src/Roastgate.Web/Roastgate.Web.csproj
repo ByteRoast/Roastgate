@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="BlazorMonaco" Version="3.5.0" />
+    <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="4.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -22,5 +23,13 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Roastgate.Tests" />
   </ItemGroup>
+
+  <Target Name="CheckRazorImports" BeforeTargets="BeforeBuild">
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Linux')) Or $([MSBuild]::IsOSPlatform('OSX'))"
+          Command="bash &quot;$(MSBuildThisFileDirectory)../../scripts/check-razor-imports.sh&quot; &quot;$(MSBuildProjectDirectory)&quot;" />
+
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))"
+          Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)\..\..\scripts\check-razor-imports.ps1&quot; -Root &quot;$(MSBuildProjectDirectory)&quot;" />
+  </Target>
 
 </Project>

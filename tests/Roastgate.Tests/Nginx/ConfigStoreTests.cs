@@ -1,4 +1,6 @@
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
+using Roastgate.Core.Data.Stores;
 using Roastgate.Core.Nginx;
 using Roastgate.Tests.Support;
 
@@ -29,7 +31,6 @@ public sealed class ConfigStoreTests
     public async Task The_file_content_is_normalised_to_unix_line_endings_with_one_trailing_newline()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app.conf", "a;\r\nb;\r\n\r\n\r\n", reload: false, "admin");
 
         Assert.Equal("a;\nb;\n", await File.ReadAllTextAsync(Path.Combine(nginx.ConfD, "app.conf")));
@@ -89,7 +90,6 @@ public sealed class ConfigStoreTests
     public async Task No_temporary_file_is_left_behind()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "ok", GoodProxy, reload: false, "admin");
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "bad", BrokenProxy, reload: false, "admin");
 
@@ -101,7 +101,6 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "first;", reload: false, "admin");
-
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "second;", reload: false, "admin");
 
         IReadOnlyList<ConfigBackup> backups = await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 10);
@@ -127,6 +126,7 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.Whitelists, "office", "allow 203.0.113.0/24;", reload: false, "admin");
+        
         nginx.Controller.FailureRule = () => File.Exists(Path.Combine(nginx.Whitelists, "office.conf")) ? null : "nginx: [emerg] open() failed";
 
         ConfigResult result = await nginx.Store.DeleteAsync(ConfigArea.Whitelists, "office", reload: true, "admin");
@@ -159,6 +159,7 @@ public sealed class ConfigStoreTests
         }
 
         IReadOnlyList<ConfigBackup> backups = await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 100);
+        
         Assert.Equal(ConfigBackupStore.KeptPerFile, backups.Count);
         Assert.Equal("version " + (ConfigBackupStore.KeptPerFile + 4) + ";\n", backups[0].Content);
     }
@@ -180,6 +181,7 @@ public sealed class ConfigStoreTests
     public async Task A_failing_reload_still_reports_the_file_as_saved_but_says_the_reload_failed()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        
         nginx.Controller.ReloadFails = true;
 
         ConfigResult result = await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", GoodProxy, reload: true, "admin");
@@ -220,6 +222,7 @@ public sealed class ConfigStoreTests
     public async Task Saving_creates_the_whitelists_directory_when_it_is_missing()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync(createDirectories: false);
+
         Directory.CreateDirectory(nginx.ConfD);
 
         ConfigResult result = await nginx.Store.SaveAsync(ConfigArea.Whitelists, "alice", "allow 203.0.113.7;", reload: false, "admin");
@@ -253,7 +256,9 @@ public sealed class ConfigStoreTests
 
         Assert.True(result.Succeeded, result.Message);
         Assert.False(File.Exists(Path.Combine(nginx.ConfD, "app.conf")));
+        
         IReadOnlyList<ConfigBackup> backups = await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 10);
+        
         Assert.Contains(backups, (ConfigBackup backup) => backup.Reason == "delete" && backup.Content == GoodProxy + "\n");
     }
 
@@ -262,6 +267,7 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.Whitelists, "office", "allow 203.0.113.0/24;", reload: false, "admin");
+        
         nginx.Controller.FailureRule = () => File.Exists(Path.Combine(nginx.Whitelists, "office.conf")) ? null : "nginx: [emerg] open() \"office.conf\" failed";
 
         ConfigResult result = await nginx.Store.DeleteAsync(ConfigArea.Whitelists, "office", reload: true, "admin");
@@ -295,7 +301,9 @@ public sealed class ConfigStoreTests
         Assert.True(disabled.Succeeded, disabled.Message);
         Assert.False(File.Exists(Path.Combine(nginx.ConfD, "app.conf")));
         Assert.True(File.Exists(Path.Combine(nginx.ConfD, "app.conf.disabled")));
+        
         ConfigFile? file = await nginx.Store.ReadAsync(ConfigArea.ReverseProxies, "app.conf");
+        
         Assert.NotNull(file);
         Assert.False(file.Enabled);
 
@@ -325,6 +333,7 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", GoodProxy, reload: false, "admin");
+        
         int testsBefore = nginx.Controller.Tests;
 
         ConfigResult result = await nginx.Store.SetEnabledAsync(ConfigArea.ReverseProxies, "app", enabled: true, reload: true, "admin");
@@ -352,12 +361,15 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.Sites, "example.com", GoodProxy, reload: false, "admin");
+        
         Assert.False((await nginx.Store.ReadAsync(ConfigArea.Sites, "example.com"))!.Enabled);
 
         ConfigResult enabled = await nginx.Store.SetEnabledAsync(ConfigArea.Sites, "example.com", enabled: true, reload: true, "admin");
 
         Assert.True(enabled.Succeeded, enabled.Message);
+        
         string link = Path.Combine(nginx.SitesEnabled, "example.com");
+        
         Assert.Equal(Path.Combine("..", "sites-available", "example.com"), new FileInfo(link).LinkTarget);
         Assert.True((await nginx.Store.ReadAsync(ConfigArea.Sites, "example.com"))!.Enabled);
 
@@ -400,7 +412,9 @@ public sealed class ConfigStoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.Sites, "example.com", GoodProxy, reload: false, "admin");
+        
         string squatter = Path.Combine(nginx.SitesEnabled, "example.com");
+        
         await File.WriteAllTextAsync(squatter, "# a hand-made copy");
 
         ConfigResult result = await nginx.Store.SetEnabledAsync(ConfigArea.Sites, "example.com", enabled: true, reload: true, "admin");
@@ -437,8 +451,8 @@ public sealed class ConfigStoreTests
         await File.WriteAllTextAsync(Path.Combine(nginx.ConfD, "a.conf"), "current;");
 
         ConfigListing listing = await nginx.Store.ListAsync(ConfigArea.ReverseProxies);
-
         ConfigEntry entry = Assert.Single(listing.Entries);
+
         Assert.True(entry.Enabled);
     }
 
@@ -478,7 +492,9 @@ public sealed class ConfigStoreTests
         Assert.True((await nginx.Store.TestNginxAsync("admin")).Succeeded);
 
         await File.WriteAllTextAsync(Path.Combine(nginx.ConfD, "x.conf"), BrokenProxy);
+        
         ConfigResult failing = await nginx.Store.TestNginxAsync("admin");
+        
         Assert.False(failing.Succeeded);
         Assert.Contains("unknown directive", failing.NginxOutput);
     }
@@ -517,6 +533,7 @@ public sealed class ConfigStoreTests
         await nginx.Store.DeleteAsync(ConfigArea.ReverseProxies, "app", reload: true, "oskar");
 
         IReadOnlyList<AuditEntry> audit = await nginx.Database.Get<IAuditLog>().ListRecentAsync(10);
+        
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "config.save" && entry.Target == "conf.d/app.conf" && entry.Success && entry.Actor == "oskar");
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "config.save" && entry.Target == "conf.d/broken.conf" && !entry.Success);
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "config.delete" && entry.Target == "conf.d/app.conf" && entry.Success);

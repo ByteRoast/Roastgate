@@ -1,4 +1,5 @@
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 using Roastgate.Tests.Support;
 
@@ -11,7 +12,9 @@ public sealed class AccountServiceTests
     private static async Task<TestDatabase> CreateWithAdminAsync()
     {
         TestDatabase database = await TestDatabase.CreateAsync();
+        
         await database.Get<IAdminAccountStore>().CreateAsync("admin", database.Get<PasswordHasher>().Hash(Password));
+        
         return database;
     }
 
@@ -65,13 +68,17 @@ public sealed class AccountServiceTests
     public async Task A_hash_with_too_few_iterations_is_upgraded_on_sign_in()
     {
         await using TestDatabase database = await TestDatabase.CreateAsync();
+        
         IAdminAccountStore store = database.Get<IAdminAccountStore>();
+        
         string weakHash = new PasswordHasher(10).Hash(Password);
+        
         await store.CreateAsync("admin", weakHash);
 
         Assert.NotNull(await database.Get<AccountService>().VerifyCredentialsAsync("admin", Password));
 
         string upgraded = (await store.GetAsync())!.PasswordHash;
+        
         Assert.NotEqual(weakHash, upgraded);
         Assert.StartsWith("pbkdf2-sha512$1000$", upgraded);
     }
@@ -80,6 +87,7 @@ public sealed class AccountServiceTests
     public async Task Resetting_the_password_replaces_it()
     {
         await using TestDatabase database = await CreateWithAdminAsync();
+        
         AccountService accounts = database.Get<AccountService>();
 
         IReadOnlyList<string> problems = await accounts.ResetPasswordAsync("A-brand-new-Passw0rd");
@@ -93,8 +101,8 @@ public sealed class AccountServiceTests
     public async Task Resetting_to_a_weak_password_is_refused_and_keeps_the_old_one()
     {
         await using TestDatabase database = await CreateWithAdminAsync();
+        
         AccountService accounts = database.Get<AccountService>();
-
         IReadOnlyList<string> problems = await accounts.ResetPasswordAsync("short");
 
         Assert.NotEmpty(problems);

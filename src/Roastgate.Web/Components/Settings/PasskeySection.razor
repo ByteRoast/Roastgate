@@ -1,0 +1,146 @@
+<MudPaper Outlined="true"
+          Elevation="0"
+          Class="pa-4 mb-4">
+    <MudText Typo="Typo.h6"
+             Class="mb-1">
+        Passkeys
+    </MudText>
+
+    <MudText Typo="Typo.body2"
+             Color="Color.Secondary"
+             Class="mb-3">
+        A passkey signs you in with your fingerprint, face or device PIN. It works on its own (no password needed) and as the second step after your
+        password. Once you have one, a correct password is no longer enough to sign in. A passkey only works on the address it was created on.
+    </MudText>
+
+    @if (_errors.Count > 0)
+    {
+        <MudAlert Severity="Severity.Error"
+                  Class="mb-3">
+            @string.Join(" ", _errors)
+        </MudAlert>
+    }
+
+    @if (_passkeys.Count == 0)
+    {
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary"
+                 Class="mb-3">
+            No passkey yet.
+        </MudText>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true"
+                        Class="mb-3"
+                        Outlined="true">
+            <thead>
+                <tr>
+                    <th>Name</th><th>Added</th><th>Last used</th><th></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (PasskeyInfo passkey in _passkeys)
+                {
+                    <tr>
+                        <td>
+                            @passkey.Name
+                        </td>
+
+                        <td>
+                            @passkey.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")
+                        </td>
+
+                        <td>
+                            @(passkey.LastUsedAt is { } used ? used.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "never")
+                        </td>
+
+                        <td class="text-end">
+                            <MudButton Size="Size.Small"
+                                       Color="Color.Error"
+                                       Variant="Variant.Text"
+                                       OnClick="() => AskToRemove(passkey.Id)">
+                                Remove
+                            </MudButton>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    }
+
+    @if (_removing is not null)
+    {
+        <MudText Typo="Typo.subtitle1"
+                 Class="mb-1">
+            Remove "@_passkeys.FirstOrDefault(passkey => passkey.Id == _removing)?.Name"
+        </MudText>
+
+        <MudText Typo="Typo.body2"
+                 Color="Color.Secondary"
+                 Class="mb-2">
+            Needs your password. Every open session ends.
+        </MudText>
+
+        <div class="rg-field-row">
+            <MudTextField T="string"
+                          @bind-Value="_password"
+                          Label="Password"
+                          InputType="InputType.Password"
+                          Variant="Variant.Outlined" />
+        </div>
+
+        <div class="rg-editor-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="CancelRemove">
+                Cancel
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Error"
+                       OnClick="RemoveAsync"
+                       Disabled="_isBusy">
+                Remove the passkey
+            </MudButton>
+        </div>
+    }
+    else if (_adding)
+    {
+        <div class="rg-field-row">
+            <MudTextField T="string"
+                          @bind-Value="_name"
+                          Label="Name (for example: laptop, phone)"
+                          MaxLength="PasskeyService.MaximumNameLength"
+                          Variant="Variant.Outlined" />
+
+            <MudTextField T="string"
+                          @bind-Value="_password"
+                          Label="Password"
+                          InputType="InputType.Password"
+                          Variant="Variant.Outlined" />
+        </div>
+
+        <div class="rg-editor-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="CancelAdd">
+                Cancel
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="AddAsync"
+                       Disabled="_isBusy">
+                Create the passkey
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="StartAdd">
+            Add a passkey
+        </MudButton>
+    }
+</MudPaper>

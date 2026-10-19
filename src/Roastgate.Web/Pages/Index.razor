@@ -1,0 +1,104 @@
+@page "/"
+@attribute [Authorize]
+
+<AppPageTitle Title="Dashboard" />
+
+<MudText Typo="Typo.h4"
+         GutterBottom="true">
+    Dashboard
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12"
+             md="7">
+        <MudCard Outlined="true">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        nginx on the host
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+
+            <MudCardContent>
+                @if (_probe is null)
+                {
+                    <MudProgressCircular Indeterminate="true"
+                                         Size="Size.Small" />
+                }
+                else if (_probe.Available)
+                {
+                    <MudAlert Severity="Severity.Success"
+                              Dense="true">
+                        nginx @(_probe.Version ?? "(unknown version)") is reachable.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error"
+                              Dense="true">
+                        nginx is not reachable from Roastgate.
+                    </MudAlert>
+
+                    @if (_probe.Output.Length > 0)
+                    {
+                        <pre class="rg-output">@_probe.Output</pre>
+                    }
+                }
+            </MudCardContent>
+
+            <MudCardActions Class="rg-card-actions">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="RefreshAsync"
+                           Disabled="_isChecking">
+                    Check again
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="TestAsync"
+                           Disabled="_isChecking">
+                    Test configuration
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           OnClick="ReloadAsync"
+                           Disabled="_isChecking">
+                    Reload nginx
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        <ResultAlert Result="_result"
+                     Class="mt-4" />
+    </MudItem>
+
+    <MudItem xs="12"
+             md="5">
+        <MudCard Outlined="true">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        Runtime
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+
+            <MudCardContent>
+                <MudSimpleTable Dense="true"
+                                Hover="false"
+                                Elevation="0">
+                    <tbody>
+                        <tr>
+                            <td>Host execution</td><td>@Options.HostExecMode</td>
+                        </tr>
+
+                        <tr>
+                            <td>Data directory</td><td><code>@Options.DataDirectory</code></td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

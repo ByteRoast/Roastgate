@@ -1,4 +1,5 @@
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Nginx;
 using Roastgate.Tests.Support;
 
@@ -12,6 +13,7 @@ public sealed class ConfigRestoreTests
     private static async Task<long> LatestBackupIdAsync(NginxTestbed nginx, string area, string name)
     {
         IReadOnlyList<ConfigBackup> backups = await nginx.Database.Get<IConfigBackupStore>().ListAsync(area, name, 1);
+        
         return backups.Single().Id;
     }
 
@@ -21,6 +23,7 @@ public sealed class ConfigRestoreTests
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "version one;", reload: false, "admin");
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "version two;", reload: false, "admin");
+        
         long backupOfVersionOne = await LatestBackupIdAsync(nginx, "ReverseProxies", "app.conf");
 
         ConfigResult result = await nginx.Store.RestoreAsync(backupOfVersionOne, reload: true, "admin");
@@ -28,8 +31,10 @@ public sealed class ConfigRestoreTests
         Assert.True(result.Succeeded, result.Message);
         Assert.Equal("Restored. nginx reloaded.", result.Message);
         Assert.Equal("version one;\n", await File.ReadAllTextAsync(Path.Combine(nginx.ConfD, "app.conf")));
+        
         IReadOnlyList<ConfigBackup> backups = await nginx.Database.Get<IConfigBackupStore>().ListAsync("ReverseProxies", "app.conf", 10);
         ConfigBackup restoreBackup = backups[0];
+        
         Assert.Equal("restore", restoreBackup.Reason);
         Assert.Equal("version two;\n", restoreBackup.Content);
     }
@@ -40,7 +45,9 @@ public sealed class ConfigRestoreTests
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", Good, reload: false, "admin");
         await nginx.Store.DeleteAsync(ConfigArea.ReverseProxies, "app", reload: false, "admin");
+        
         Assert.False(File.Exists(Path.Combine(nginx.ConfD, "app.conf")));
+        
         long backupId = await LatestBackupIdAsync(nginx, "ReverseProxies", "app.conf");
 
         ConfigResult result = await nginx.Store.RestoreAsync(backupId, reload: false, "admin");
@@ -54,6 +61,7 @@ public sealed class ConfigRestoreTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await File.WriteAllTextAsync(Path.Combine(nginx.ConfD, "app.conf"), Good);
+        
         // An old version that used a directive the installed nginx does not know, saved when it was still valid.
         long backupId = await nginx.Database.Get<IConfigBackupStore>().AddAsync("ReverseProxies", "app.conf", "save", Broken);
 
@@ -83,6 +91,7 @@ public sealed class ConfigRestoreTests
     public async Task A_tampered_backup_row_cannot_be_used_to_write_elsewhere(string area, string name)
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
+        
         long backupId = await nginx.Database.Get<IConfigBackupStore>().AddAsync(area, name, "save", Good);
 
         ConfigResult result = await nginx.Store.RestoreAsync(backupId, reload: true, "admin");
@@ -98,10 +107,10 @@ public sealed class ConfigRestoreTests
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "one;", reload: false, "admin");
         await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", "two;", reload: false, "admin");
-
         await nginx.Store.RestoreAsync(await LatestBackupIdAsync(nginx, "ReverseProxies", "app.conf"), reload: false, "oskar");
 
         IReadOnlyList<AuditEntry> audit = await nginx.Database.Get<IAuditLog>().ListRecentAsync(5);
+
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "config.restore" && entry.Target == "conf.d/app.conf" && entry.Actor == "oskar" && entry.Success);
     }
 

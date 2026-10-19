@@ -1,5 +1,6 @@
 using System.Text;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Nginx.Generation;
 using Roastgate.Core.Settings;
 
@@ -47,18 +48,22 @@ public sealed class ConfigStore(
     public async Task<ConfigListing> ListAsync(ConfigArea area, CancellationToken cancellationToken = default)
     {
         ConfigLocations locations = await GetLocationsAsync(cancellationToken);
+        
         string directory = locations.Directory(area);
+        
         if (!Directory.Exists(directory))
         {
             return new ConfigListing([], directory, false);
         }
 
         Dictionary<string, ConfigEntry> entries = new(StringComparer.Ordinal);
+        
         foreach (string path in Directory.EnumerateFiles(directory))
         {
             string fileName = Path.GetFileName(path);
             bool disabledFile = area == ConfigArea.ReverseProxies && fileName.EndsWith(ConfigNames.ConfigSuffix + ConfigNames.DisabledSuffix, StringComparison.Ordinal);
             string name = disabledFile ? fileName[..^ConfigNames.DisabledSuffix.Length] : fileName;
+        
             if (!ConfigNames.IsValid(name) || (area != ConfigArea.Sites && !name.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal)))
             {
                 continue;
@@ -71,47 +76,56 @@ public sealed class ConfigStore(
             }
 
             FileInfo info = new(path);
+            
             bool enabled = area switch
             {
                 ConfigArea.ReverseProxies => !disabledFile,
                 ConfigArea.Sites => IsLinkedTo(Path.Combine(locations.SitesEnabledDirectory, name), path),
                 _ => true,
             };
+            
             entries[name] = new ConfigEntry(name, area, enabled, info.Length, info.LastWriteTimeUtc, IsWizardFile(path));
         }
 
         List<ConfigEntry> sorted = entries.Values.OrderBy((ConfigEntry entry) => entry.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        
         return new ConfigListing(sorted, directory, true);
     }
 
     public async Task<ConfigFile?> ReadAsync(ConfigArea area, string name, CancellationToken cancellationToken = default)
     {
         string? normalized = ConfigNames.Normalize(area, name);
+        
         if (normalized is null)
         {
             return null;
         }
 
         ConfigLocations locations = await GetLocationsAsync(cancellationToken);
+        
         string? path = Locate(locations, area, normalized, out bool disabledFile);
+        
         if (path is null)
         {
             return null;
         }
 
         FileInfo info = new(path);
+        
         if (info.Length > ConfigNames.MaximumContentBytes)
         {
             return null;
         }
 
         string content = await File.ReadAllTextAsync(path, cancellationToken);
+        
         bool enabled = area switch
         {
             ConfigArea.ReverseProxies => !disabledFile,
             ConfigArea.Sites => IsLinkedTo(Path.Combine(locations.SitesEnabledDirectory, normalized), path),
             _ => true,
         };
+        
         return new ConfigFile(normalized, area, content, enabled, info.LastWriteTimeUtc);
     }
 
@@ -131,6 +145,7 @@ public sealed class ConfigStore(
     public async Task<ConfigResult> RestoreAsync(long backupId, bool reload, string actor, CancellationToken cancellationToken = default)
     {
         ConfigBackup? backup = await backups.GetAsync(backupId, cancellationToken);
+        
         if (backup is null || !Enum.TryParse(backup.Area, out ConfigArea area) || !Enum.IsDefined(area))
         {
             return new ConfigResult(false, "That backup does not exist.");
@@ -150,18 +165,21 @@ public sealed class ConfigStore(
         CancellationToken cancellationToken)
     {
         string? normalized = ConfigNames.Normalize(area, name);
+        
         if (normalized is null)
         {
             return new ConfigResult(false, InvalidNameMessage(area));
         }
 
         string text = NormalizeContent(content);
+        
         if (Encoding.UTF8.GetByteCount(text) > ConfigNames.MaximumContentBytes)
         {
             return new ConfigResult(false, "The file is larger than 1 MiB.");
         }
 
         ConfigLocations locations = await GetLocationsAsync(cancellationToken);
+        
         string directory = locations.Directory(area);
         string? existing = Locate(locations, area, normalized, out _);
         string path = existing ?? Path.Combine(directory, normalized);
@@ -202,8 +220,11 @@ public sealed class ConfigStore(
     public async Task<ConfigResult> DeleteAsync(ConfigArea area, string name, bool reload, string actor, CancellationToken cancellationToken = default)
     {
         string? normalized = ConfigNames.Normalize(area, name);
+        
         ConfigLocations locations = await GetLocationsAsync(cancellationToken);
+        
         string? path = normalized is null ? null : Locate(locations, area, normalized, out _);
+        
         if (normalized is null || path is null)
         {
             return new ConfigResult(false, "That file does not exist.");
@@ -222,6 +243,7 @@ public sealed class ConfigStore(
             async () =>
             {
                 deletionBackup = await backups.AddAsync(area.ToString(), normalized, "delete", previous, cancellationToken);
+        
                 if (wasLinked)
                 {
                     File.Delete(linkPath);
@@ -233,6 +255,7 @@ public sealed class ConfigStore(
             {
                 await DiscardBackupAsync(deletionBackup);
                 await WriteAtomicAsync(path, previous, CancellationToken.None);
+                
                 if (wasLinked)
                 {
                     CreateLink(linkPath, path);
@@ -256,19 +279,24 @@ public sealed class ConfigStore(
         }
 
         string? normalized = ConfigNames.Normalize(area, name);
+        
         ConfigLocations locations = await GetLocationsAsync(cancellationToken);
+        
         string? path = normalized is null ? null : Locate(locations, area, normalized, out bool disabledFile);
+        
         if (normalized is null || path is null)
         {
             return new ConfigResult(false, "That file does not exist.");
         }
 
         string action = enabled ? "config.enable" : "config.disable";
+        
         if (area == ConfigArea.ReverseProxies)
         {
             string activePath = Path.Combine(locations.Directory(area), normalized);
             string disabledPath = activePath + ConfigNames.DisabledSuffix;
             bool isDisabled = path == disabledPath;
+        
             if (isDisabled != enabled)
             {
                 return new ConfigResult(true, enabled ? "Already enabled." : "Already disabled.");
@@ -276,6 +304,7 @@ public sealed class ConfigStore(
 
             string from = enabled ? disabledPath : activePath;
             string to = enabled ? activePath : disabledPath;
+            
             return await MutateAsync(
                 actor,
                 action,
@@ -297,6 +326,7 @@ public sealed class ConfigStore(
 
         string linkPath = Path.Combine(locations.SitesEnabledDirectory, normalized);
         bool linked = IsLinkedTo(linkPath, path);
+        
         if (linked == enabled)
         {
             return new ConfigResult(true, enabled ? "Already enabled." : "Already disabled.");
@@ -349,10 +379,13 @@ public sealed class ConfigStore(
     public async Task<ConfigResult> TestNginxAsync(string actor, CancellationToken cancellationToken = default)
     {
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             NginxResult result = await nginx.TestAsync(cancellationToken);
+        
             await audit.WriteAsync(actor, "nginx.test", null, result.Succeeded, Truncate(result.Output), cancellationToken);
+            
             return result.Succeeded
                 ? new ConfigResult(true, "The configuration is valid.", result.Output)
                 : new ConfigResult(false, "nginx rejects the current configuration.", result.Output);
@@ -366,17 +399,22 @@ public sealed class ConfigStore(
     public async Task<ConfigResult> ReloadNginxAsync(string actor, CancellationToken cancellationToken = default)
     {
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             NginxResult test = await nginx.TestAsync(cancellationToken);
+        
             if (!test.Succeeded)
             {
                 await audit.WriteAsync(actor, "nginx.reload", null, false, Truncate(test.Output), cancellationToken);
+            
                 return new ConfigResult(false, "nginx was not reloaded because the configuration is invalid.", test.Output);
             }
 
             NginxResult reload = await nginx.ReloadAsync(cancellationToken);
+            
             await audit.WriteAsync(actor, "nginx.reload", null, reload.Succeeded, Truncate(reload.Output), cancellationToken);
+            
             return reload.Succeeded
                 ? new ConfigResult(true, "nginx reloaded.", reload.Output, Reloaded: true)
                 : new ConfigResult(false, "nginx accepted the configuration but the reload failed.", reload.Output);
@@ -400,10 +438,13 @@ public sealed class ConfigStore(
         CancellationToken cancellationToken)
     {
         await Gate.WaitAsync(cancellationToken);
+        
         try
         {
             ConfigResult result = await RunCycleAsync(apply, undo, reload, successMessage, cancellationToken);
+        
             await audit.WriteAsync(actor, action, target, result.Succeeded, Truncate(result.NginxOutput ?? result.Message), cancellationToken);
+            
             return result;
         }
         finally
@@ -426,17 +467,22 @@ public sealed class ConfigStore(
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             await TryUndoAsync(undo);
+            
             return new ConfigResult(false, $"The file system refused the change: {exception.Message}", RolledBack: true);
         }
 
         NginxResult test = await nginx.TestAsync(cancellationToken);
+        
         if (!test.Succeeded)
         {
             await TryUndoAsync(undo);
+        
             NginxResult baseline = await nginx.TestAsync(cancellationToken);
+            
             string message = baseline.Succeeded
                 ? "nginx rejected the change, so it was undone."
                 : "nginx -t also fails without this change (the configuration is broken elsewhere), so the change was undone.";
+            
             return new ConfigResult(false, message, test.Output, RolledBack: true);
         }
 
@@ -446,6 +492,7 @@ public sealed class ConfigStore(
         }
 
         NginxResult reloaded = await nginx.ReloadAsync(cancellationToken);
+
         return reloaded.Succeeded
             ? new ConfigResult(true, successMessage + " nginx reloaded.", reloaded.Output, Reloaded: true)
             : new ConfigResult(true, successMessage + " The configuration is valid, but reloading nginx failed.", reloaded.Output, Warning: true);
@@ -479,8 +526,10 @@ public sealed class ConfigStore(
         try
         {
             using StreamReader reader = new(path);
+        
             char[] buffer = new char[1024];
             int read = reader.Read(buffer, 0, buffer.Length);
+            
             return SiteMetadataFormat.IsWizardFile(new string(buffer, 0, read));
         }
         catch (IOException)
@@ -498,7 +547,9 @@ public sealed class ConfigStore(
     private static string? Locate(ConfigLocations locations, ConfigArea area, string name, out bool disabledFile)
     {
         string path = Path.Combine(locations.Directory(area), name);
+        
         disabledFile = false;
+        
         if (File.Exists(path))
         {
             return path;
@@ -507,6 +558,7 @@ public sealed class ConfigStore(
         if (area == ConfigArea.ReverseProxies && File.Exists(path + ConfigNames.DisabledSuffix))
         {
             disabledFile = true;
+        
             return path + ConfigNames.DisabledSuffix;
         }
 
@@ -516,15 +568,18 @@ public sealed class ConfigStore(
     private static string NormalizeContent(string content)
     {
         string text = content.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd();
+        
         return text.Length == 0 ? string.Empty : text + "\n";
     }
 
     private static async Task WriteAtomicAsync(string path, string content, CancellationToken cancellationToken)
     {
         string temporary = path + TemporarySuffix;
+        
         try
         {
             await File.WriteAllTextAsync(temporary, content, Utf8WithoutBom, cancellationToken);
+        
             if (!OperatingSystem.IsWindows() && File.Exists(path))
             {
                 File.SetUnixFileMode(temporary, File.GetUnixFileMode(path));
@@ -545,24 +600,28 @@ public sealed class ConfigStore(
     internal static bool IsLinkedTo(string linkPath, string file)
     {
         FileInfo link = new(linkPath);
+        
         if (link.LinkTarget is null)
         {
             return false;
         }
 
         FileSystemInfo? resolved = link.ResolveLinkTarget(returnFinalTarget: true);
+        
         if (resolved is null)
         {
             return false;
         }
 
         StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        
         return string.Equals(Path.GetFullPath(resolved.FullName), Path.GetFullPath(file), comparison);
     }
 
     private static void CreateLink(string linkPath, string file)
     {
         string relativeTarget = Path.GetRelativePath(Path.GetDirectoryName(linkPath)!, file);
+        
         File.CreateSymbolicLink(linkPath, relativeTarget);
     }
 
@@ -574,12 +633,14 @@ public sealed class ConfigStore(
             ConfigArea.Sites => "sites-available",
             _ => "whitelists",
         };
+        
         return directory + "/" + name;
     }
 
     private static string InvalidNameMessage(ConfigArea area)
     {
         string suffix = area == ConfigArea.Sites ? string.Empty : " (the .conf extension is added when missing)";
+        
         return "The name may only contain letters, digits, dots, hyphens and underscores, must start with a letter or digit, and be at most "
                + ConfigNames.MaximumLength + " characters" + suffix + ".";
     }

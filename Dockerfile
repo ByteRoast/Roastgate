@@ -9,6 +9,7 @@ COPY src/Roastgate.Core/Roastgate.Core.csproj src/Roastgate.Core/
 COPY src/Roastgate.Web/Roastgate.Web.csproj src/Roastgate.Web/
 RUN dotnet restore src/Roastgate.Web/Roastgate.Web.csproj
 
+COPY scripts/ scripts/
 COPY src/ src/
 
 # No --no-restore on purpose: the layer above restored without wwwroot present, and publishing on top of that

@@ -1,7 +1,8 @@
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Roastgate.Core;
 using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 
 namespace Roastgate.Web.Cli;
@@ -25,27 +26,33 @@ internal static class ResetPasswordCommand
     {
         ServiceCollection services = new();
         services.AddRoastgateCore(options);
-        await using ServiceProvider provider = services.BuildServiceProvider();
 
+        await using ServiceProvider provider = services.BuildServiceProvider();
         await provider.MigrateRoastgateDatabaseAsync();
 
         AdminAccount? account = await provider.GetRequiredService<IAdminAccountStore>().GetAsync();
+        
         if (account is null)
         {
             await output.WriteLineAsync("No administrator exists yet. Open /setup in the browser first.");
+         
             return 1;
         }
 
         await output.WriteLineAsync($"Resetting the password of '{account.Username}'.");
+        
         string password = readSecret("New password: ");
         string confirmation = readSecret("Repeat the password: ");
+        
         if (password != confirmation)
         {
             await output.WriteLineAsync("The passwords do not match.");
+        
             return 1;
         }
 
         IReadOnlyList<string> problems = await provider.GetRequiredService<AccountService>().ResetPasswordAsync(password);
+
         if (problems.Count > 0)
         {
             foreach (string problem in problems)
@@ -58,23 +65,29 @@ internal static class ResetPasswordCommand
 
         await provider.GetRequiredService<IAuditLog>().WriteAsync("cli", "auth.password-reset", account.Username, true);
         await output.WriteLineAsync("Password updated.");
+        
         return 0;
     }
 
     private static string ReadSecretFromConsole(string prompt)
     {
         Console.Error.Write(prompt);
+        
         if (Console.IsInputRedirected)
         {
             string line = Console.In.ReadLine() ?? string.Empty;
+        
             Console.Error.WriteLine();
+            
             return line;
         }
 
         StringBuilder builder = new();
+        
         while (true)
         {
             ConsoleKeyInfo key = Console.ReadKey(intercept: true);
+        
             if (key.Key == ConsoleKey.Enter)
             {
                 break;
@@ -94,6 +107,7 @@ internal static class ResetPasswordCommand
         }
 
         Console.Error.WriteLine();
+        
         return builder.ToString();
     }
 }

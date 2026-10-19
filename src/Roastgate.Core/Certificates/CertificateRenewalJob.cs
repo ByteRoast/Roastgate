@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Certificates;
@@ -31,6 +31,7 @@ public sealed class CertificateRenewalJob(
     public async Task RunOnceAsync(CancellationToken cancellationToken = default)
     {
         AppSettings current = await settingsService.GetAsync(cancellationToken);
+        
         if (current.CertbotMode != CertbotMode.Embedded)
         {
             return;
@@ -38,12 +39,14 @@ public sealed class CertificateRenewalJob(
 
         CertificateOperation result = await certificates.RenewAsync(null, force: false, "system", cancellationToken);
         RenewalStatus status = new(timeProvider.GetUtcNow(), result.Succeeded, result.Message);
+        
         await settings.SetAsync(StatusKey, JsonSerializer.Serialize(status, JsonOptions), cancellationToken);
     }
 
     public async Task<RenewalStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         string? json = await settings.GetAsync(StatusKey, cancellationToken);
+        
         if (json is null)
         {
             return new RenewalStatus(null, null, null);

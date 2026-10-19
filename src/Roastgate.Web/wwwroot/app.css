@@ -57,7 +57,7 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     top: 0.5rem;
 }
 
-/* Sign-in, error and not-found pages (static, no MudBlazor). */
+/* Sign-in, error and not-found pages (static SSR; the sign-in fields come from MudBlazor.StaticInput). */
 .rg-auth {
     min-height: 100vh;
     display: flex;
@@ -103,24 +103,6 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     gap: 0.5rem;
 }
 
-.rg-auth-form label {
-    font-size: 0.85rem;
-    color: #525860;
-}
-
-.rg-auth-form input {
-    padding: 0.55rem 0.7rem;
-    border: 1px solid #dadde1;
-    border-radius: 0.4rem;
-    font: inherit;
-}
-
-.rg-auth-form input:focus {
-    outline: 2px solid #ee8a26;
-    outline-offset: 0;
-    border-color: #ee8a26;
-}
-
 .rg-auth-help {
     margin: 0 0 1rem;
     color: #525860;
@@ -156,6 +138,32 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 
 .rg-auth-button:hover {
     background: #dd7b19;
+}
+
+.rg-auth-alternative {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    margin-top: 1rem;
+    text-align: center;
+    color: #525860;
+    font-size: 0.85rem;
+}
+
+.rg-auth-button-secondary {
+    margin-top: 0.25rem;
+    border: 1px solid #dadde1;
+    background: #ffffff;
+}
+
+.rg-auth-button-secondary:hover {
+    background: #f5f6f7;
+}
+
+.rg-auth-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 /* Setup wizard and layout helpers. */
@@ -211,6 +219,19 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     height: 100%;
 }
 
+/* Buttons at the bottom of a card: spaced apart, and away from the card edges. */
+.mud-card-actions.rg-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem 1.25rem;
+}
+
+.mud-card-actions.rg-card-actions > .mud-button-root {
+    margin: 0;
+}
+
 .rg-editor-actions {
     display: flex;
     flex-wrap: wrap;
@@ -223,16 +244,21 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .rg-entry-row {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
-    gap: 0.75rem;
+    gap: 1rem;
     align-items: start;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* The remove button sits level with the 56 px inputs (the top room MudBlazor keeps for the floating label included). */
+.rg-entry-row > .mud-icon-button {
+    margin-top: 1.4rem;
 }
 
 .rg-entry-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
 @media (max-width: 640px) {
@@ -318,11 +344,26 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .rg-switch-row {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: 1.5rem;
 }
 
-.rg-switch-grid {
+/* MudSwitch is wrapped in a .mud-input-control. Next to an input it is as tall as the input (56 px), so it lines up with the input's text. */
+.rg-switch-row > .mud-input-control {
+    min-height: 56px;
+    justify-content: center;
+    /* MudBlazor leaves room above an outlined input for its floating label; the switch needs the same room. */
+    margin-top: 1rem;
+}
+
+/* The switch track has its own padding: pull it back so it starts at the same edge as the inputs. */
+.rg-switch-row > .mud-input-control,
+.rg-switch-grid > .mud-input-control {
+    margin-left: -0.75rem;
+}
+
+.rg-switch-grid,
+.rg-port-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
     gap: 0.25rem 1.5rem;
@@ -335,13 +376,198 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     align-items: start;
 }
 
-.rg-port-row {
+/* A button beside an input is centred on the input (56 px tall, with a few pixels of room MudBlazor keeps above it). */
+.rg-field-row > .rg-field-action {
     display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
+    align-items: center;
+    min-height: 56px;
+    margin-top: 8px;
 }
 
 .rg-preview {
     max-height: 60vh;
     overflow: auto;
+}
+
+/* Multi-line inputs the user may want taller: a drag handle in the bottom right corner (height only, never wider than the form). */
+.rg-resizable .mud-input > textarea.mud-input-root {
+    resize: vertical;
+    min-height: 3.5rem;
+}
+
+/* Wizard: the settings (whatever the tab) and the save bar are two separate bordered blocks. */
+.rg-wizard-settings .mud-tabs-toolbar {
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.rg-editor-actions-flush {
+    margin-top: 0;
+}
+
+/* Connection lost dialog (Components/Layout/ReconnectModal.razor). This lives here because scoped component CSS is not linked in App.razor. */
+/* Each element below is shown only in the connection states it belongs to (the script sets the components-reconnect-* class on the dialog). */
+.components-reconnect-first-attempt-visible,
+.components-reconnect-repeated-attempt-visible,
+.components-reconnect-failed-visible,
+.components-pause-visible,
+.components-resume-failed-visible,
+.components-rejoining-animation {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-show .components-reconnect-first-attempt-visible,
+#components-reconnect-modal.components-reconnect-show .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-paused .components-pause-visible,
+#components-reconnect-modal.components-reconnect-resume-failed .components-resume-failed-visible,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-retrying .components-reconnect-repeated-attempt-visible,
+#components-reconnect-modal.components-reconnect-retrying .components-rejoining-animation,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-failed .components-reconnect-failed-visible {
+    display: block;
+}
+
+#components-reconnect-modal:focus-visible {
+    outline: none;
+}
+
+#components-reconnect-modal {
+    width: min(24rem, calc(100vw - 2rem));
+    margin: 20vh auto 0;
+    padding: 2rem 1.75rem 1.75rem;
+    color: #1c1e21;
+    background-color: #ffffff !important;
+    border: 1px solid #dadde1;
+    border-radius: 0.8rem;
+    /* The orange accent along the top edge follows the rounded corners. */
+    box-shadow: inset 0 4px 0 #ee8a26, 0 12px 32px rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transition: display 0.3s allow-discrete, overlay 0.3s allow-discrete;
+    animation: components-reconnect-modal-fadeOutOpacity 0.3s both;
+}
+
+#components-reconnect-modal[open] {
+    animation: components-reconnect-modal-slideUp 0.5s cubic-bezier(0.05, 0.89, 0.25, 1.02), components-reconnect-modal-fadeInOpacity 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+#components-reconnect-modal::backdrop {
+    background-color: rgba(28, 30, 33, 0.45);
+    backdrop-filter: blur(2px);
+    animation: components-reconnect-modal-fadeInOpacity 0.3s ease-out;
+}
+
+.components-reconnect-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    text-align: center;
+}
+
+.rg-reconnect-icon {
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-bottom: 0.25rem;
+}
+
+/* The spinner is a ring that turns; the warning sign replaces it once the connection is down for good. */
+.components-rejoining-animation {
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 4px solid #fbe3c8;
+    border-top-color: #ee8a26;
+    border-radius: 50%;
+    animation: components-rejoining-spin 0.9s linear infinite;
+}
+
+.rg-reconnect-warning {
+    width: 3rem;
+    height: 3rem;
+    color: #ee8a26;
+}
+
+#components-reconnect-modal h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+#components-reconnect-modal p {
+    margin: 0;
+    color: #525860;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+#components-reconnect-modal button {
+    /* MudBlazor ships its own rules for this dialog (margin: 40px auto !important, background): override them. */
+    margin: 0.5rem 0 0 !important;
+    padding: 0.6rem 1.75rem;
+    border: 0;
+    border-radius: 0.4rem;
+    background: #ee8a26;
+    color: #1c1e21;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#components-reconnect-modal button:hover {
+    background: #dd7b19;
+}
+
+#components-reconnect-modal button:focus-visible {
+    outline: 2px solid #1c1e21;
+    outline-offset: 2px;
+}
+
+@keyframes components-rejoining-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes components-reconnect-modal-slideUp {
+    0% {
+        transform: translateY(24px) scale(0.97);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+@keyframes components-reconnect-modal-fadeInOpacity {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes components-reconnect-modal-fadeOutOpacity {
+    0% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .components-rejoining-animation {
+        animation-duration: 3s;
+    }
+
+    #components-reconnect-modal,
+    #components-reconnect-modal[open] {
+        animation: none;
+        opacity: 1;
+    }
 }

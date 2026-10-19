@@ -1,0 +1,268 @@
+@page "/setup"
+@layout SetupLayout
+@attribute [AllowAnonymous]
+
+<AppPageTitle Title="Setup" />
+
+<MudText Typo="Typo.h4"
+         GutterBottom="true">
+    Set up Roastgate
+</MudText>
+
+<MudText Typo="Typo.body2"
+         Color="Color.Secondary"
+         Class="mb-2">
+    Step @_step of @StepCount: @StepTitle
+</MudText>
+
+<MudProgressLinear Value="@(_step * 100.0 / StepCount)"
+                   Color="Color.Primary"
+                   Class="mb-6" />
+
+@if (_errors.Count > 0)
+{
+    <MudAlert Severity="Severity.Error"
+              Class="mb-4">
+        @foreach (string error in _errors)
+        {
+            <div>
+                @error
+            </div>
+        }
+    </MudAlert>
+}
+
+@switch (_step)
+{
+    case 1:
+        <MudText Class="mb-3">
+            Roastgate is not configured yet. Enter the setup token printed in the container logs
+            (<code>docker logs roastgate</code>) or provided through <code>ROASTGATE_SETUP_TOKEN</code>.
+        </MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="_token"
+                      Label="Setup token"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Password"
+                      Immediate="true" />
+
+        <div class="rg-step-actions">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="VerifyToken">
+                Continue
+            </MudButton>
+        </div>
+        break;
+
+    case 2:
+        <MudText Class="mb-3">
+            Create the administrator account. It is the only account Roastgate has.
+        </MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="_username"
+                      Label="Username"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudTextField T="string"
+                      @bind-Value="_password"
+                      Label="Password"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Password"
+                      Immediate="true"
+                      Class="mb-3" />
+
+        @if (_password.Length > 0)
+        {
+            IReadOnlyList<string> passwordProblems = CredentialPolicy.ValidatePassword(_password, _username);
+
+            @foreach (string problem in passwordProblems)
+            {
+                <MudText Typo="Typo.caption"
+                         Color="Color.Error"
+                         Class="d-block">
+                    @problem
+                </MudText>
+            }
+        }
+
+        <MudTextField T="string"
+                      @bind-Value="_confirmation"
+                      Label="Repeat the password"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Password"
+                      Class="mt-3" />
+
+        <div class="rg-step-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="@(() => GoTo(1))">
+                Back
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ContinueFromAccount">
+                Continue
+            </MudButton>
+        </div>
+        break;
+
+    case 3:
+        <MudText Class="mb-3">
+            Tell Roastgate where nginx lives. These paths must be visible inside the Roastgate container.
+        </MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="_nginxRoot"
+                      Label="nginx directory"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudTextField T="string"
+                      @bind-Value="_whitelistsDirectory"
+                      Label="Whitelists directory"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudTextField T="string"
+                      @bind-Value="_acmeWebroot"
+                      Label="ACME webroot (Let's Encrypt challenges)"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudTextField T="string"
+                      @bind-Value="_letsEncryptDirectory"
+                      Label="Let's Encrypt directory (certificates)"
+                      Variant="Variant.Outlined"
+                      Class="mb-3" />
+
+        <MudSelect T="CertbotMode"
+                   @bind-Value="_certbotMode"
+                   Label="Certificate management"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            <MudSelectItem Value="CertbotMode.Embedded">
+                Embedded certbot (shipped with Roastgate)
+            </MudSelectItem>
+
+            <MudSelectItem Value="CertbotMode.Host">
+                certbot installed on the host
+            </MudSelectItem>
+
+            <MudSelectItem Value="CertbotMode.Disabled">
+                Do not manage certificates
+            </MudSelectItem>
+        </MudSelect>
+
+        <MudTextField T="string"
+                      @bind-Value="_acmeEmail"
+                      Label="Let's Encrypt e-mail (optional)"
+                      Variant="Variant.Outlined" />
+
+        <div class="rg-step-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="@(() => GoTo(2))">
+                Back
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ContinueFromPathsAsync">
+                Continue
+            </MudButton>
+        </div>
+        break;
+
+    case 4:
+        <MudText Class="mb-3">
+            Roastgate checked your host. Errors do not block the setup, but they must be fixed before configs can be managed.
+        </MudText>
+
+        @if (_isChecking)
+        {
+            <MudProgressCircular Indeterminate="true"
+                                 Size="Size.Small" />
+        }
+        else
+        {
+            <DiagnosticsTable Checks="_checks" />
+        }
+
+        <div class="rg-step-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="@(() => GoTo(3))">
+                Back
+            </MudButton>
+
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="RunDiagnosticsAsync"
+                       Disabled="_isChecking">
+                Check again
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="@(() => GoTo(5))"
+                       Disabled="_isChecking">
+                Continue
+            </MudButton>
+        </div>
+        break;
+
+    default:
+        <MudText Class="mb-3">
+            Review and finish. You will be signed in automatically.
+        </MudText>
+
+        <MudSimpleTable Dense="true"
+                        Elevation="0"
+                        Outlined="true">
+            <tbody>
+                <tr>
+                    <td>Administrator</td><td>@_username.Trim().ToLowerInvariant()</td>
+                </tr>
+
+                <tr>
+                    <td>nginx directory</td><td><code>@_nginxRoot</code></td>
+                </tr>
+
+                <tr>
+                    <td>Whitelists directory</td><td><code>@_whitelistsDirectory</code></td>
+                </tr>
+
+                <tr>
+                    <td>ACME webroot</td><td><code>@_acmeWebroot</code></td>
+                </tr>
+
+                <tr>
+                    <td>Let's Encrypt directory</td><td><code>@_letsEncryptDirectory</code></td>
+                </tr>
+
+                <tr>
+                    <td>Certificates</td><td>@_certbotMode</td>
+                </tr>
+
+                <tr>
+                    <td>Let's Encrypt e-mail</td><td>@(string.IsNullOrWhiteSpace(_acmeEmail) ? "(none)" : _acmeEmail)</td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+
+        <div class="rg-step-actions">
+            <MudButton Variant="Variant.Outlined"
+                       OnClick="@(() => GoTo(4))">
+                Back
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="FinishAsync"
+                       Disabled="_isFinishing">
+                Finish setup
+            </MudButton>
+        </div>
+        break;
+}

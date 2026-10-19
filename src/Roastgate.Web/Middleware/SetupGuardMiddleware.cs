@@ -8,7 +8,7 @@ namespace Roastgate.Web.Middleware;
 /// </summary>
 public sealed class SetupGuardMiddleware(RequestDelegate next, ISetupService setup)
 {
-    private static readonly string[] AllowedBeforeSetup = ["/_blazor", "/_framework", "/_content", "/error", "/not-found"];
+    private static readonly string[] AllowedBeforeSetup = ["/_blazor", "/_framework", "/_content", "/error", "/error/not-found"];
 
     public Task InvokeAsync(HttpContext context)
     {

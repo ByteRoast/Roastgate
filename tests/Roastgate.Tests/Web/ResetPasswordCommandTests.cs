@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Roastgate.Core;
-using Roastgate.Core.Data;
+using Roastgate.Core.Data.Interfaces;
+using Roastgate.Core.Data.Models;
 using Roastgate.Core.Security;
 using Roastgate.Tests.Support;
 using Roastgate.Web.Cli;
@@ -23,6 +24,7 @@ public sealed class ResetPasswordCommandTests : IDisposable
     private static Func<string, string> Typing(params string[] answers)
     {
         Queue<string> queue = new(answers);
+
         return (string _) => queue.Dequeue();
     }
 
@@ -35,6 +37,7 @@ public sealed class ResetPasswordCommandTests : IDisposable
     private async Task<AdminAccount?> VerifyAsync(string password)
     {
         await using TestDatabase database = await TestDatabase.CreateAsync((RoastgateOptions options) => options.DataDirectory = _directory);
+     
         return await database.Get<AccountService>().VerifyCredentialsAsync("admin", password);
     }
 
@@ -60,7 +63,9 @@ public sealed class ResetPasswordCommandTests : IDisposable
         Assert.NotNull(await VerifyAsync("Brand-New-Passw0rd"));
 
         await using TestDatabase database = await TestDatabase.CreateAsync((RoastgateOptions options) => options.DataDirectory = _directory);
+        
         IReadOnlyList<AuditEntry> audit = await database.Get<IAuditLog>().ListRecentAsync(5);
+        
         Assert.Contains(audit, (AuditEntry entry) => entry.Action == "auth.password-reset" && entry.Actor == "cli");
     }
 
