@@ -21,3 +21,4 @@ the README). -->
 - [ ] `dotnet test` passes
 - [ ] The README is updated if the behaviour, the configuration or the installation changed
 - [ ] Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`...)
+- [ ] I accept the [contributor license agreement](https://github.com/ByteRoast/Roastgate/blob/main/CONTRIBUTING.md#contributor-license-agreement)
