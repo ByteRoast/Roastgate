@@ -284,3 +284,17 @@ The database schema is managed with EF Core migrations:
 ```bash
 dotnet dotnet-ef migrations add <Name> --project src/Roastgate.Core --startup-project src/Roastgate.Web --output-dir Data/Migrations
 ```
+
+## License
+
+Copyright (C) 2026 Byte Roast
+
+Roastgate is free software: you can redistribute it and/or modify it under the terms of the
+[GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version (`AGPL-3.0-or-later`).
+
+Roastgate is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of
+merchantability or fitness for a particular purpose. See the [LICENSE](LICENSE) file for the full terms.
+
+In short: you can use, study, change and share it freely. If you distribute a modified version, **or let other people use a
+modified version over a network**, you must offer them its source code under the same license.

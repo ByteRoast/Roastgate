@@ -1,16 +1,13 @@
 # Builds the Docker image and publishes it to the GitHub Container Registry:
 #   push on dev                                  -> ghcr.io/byteroast/roastgate:dev
-#   tag v*                                       -> ghcr.io/byteroast/roastgate:<tag>
-#   pull request from dev merged into main       -> ghcr.io/byteroast/roastgate:latest
+#   push on main (dev merged into it)            -> ghcr.io/byteroast/roastgate:latest
+#   tag v*                                       -> ghcr.io/byteroast/roastgate:<version>
 name: docker
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, main]
     tags: ['v*']
-  pull_request:
-    types: [closed]
-    branches: [main]
 
 env:
   IMAGE: ghcr.io/byteroast/roastgate
@@ -19,18 +16,13 @@ jobs:
   publish:
     name: Build and publish the image
     runs-on: ubuntu-latest
-    # A push on dev always publishes; a pull request only when it was merged and came from dev.
-    if: github.event_name == 'push' || (github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'dev')
     permissions:
       contents: read
       packages: write
     steps:
       - name: Check out the code
         uses: actions/checkout@v7
-        with:
-          # For a merged pull request, build exactly the commit that landed on main.
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
-        
+
       - name: Compute the image tags
         id: meta
         uses: docker/metadata-action@v6
@@ -39,9 +31,11 @@ jobs:
           flavor: latest=false
           tags: |
             type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -65,4 +59,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max,ignore-error=true
