@@ -7,6 +7,9 @@ your `/etc/nginx` stays the source of truth.
 Built with [.NET 10](https://github.com/dotnet/core) and [MudBlazor](https://github.com/MudBlazor/MudBlazor), with the
 [Monaco editor](https://github.com/microsoft/monaco-editor) (through [BlazorMonaco](https://github.com/serdarciplak/BlazorMonaco)) for raw editing.
 
+> **Alpha.** Roastgate is still in its `0.x` alpha releases: settings, the database schema and the behaviour can change between
+> versions. Keep a backup of the data volume before each update (see [Update](#update)).
+
 ## Installation
 
 ### Requirements
@@ -25,9 +28,17 @@ docker compose up -d
 docker logs roastgate        # prints the setup token
 ```
 
-The compose file pulls `ghcr.io/byteroast/roastgate:latest`, published when `dev` is merged into `main` (the `dev` tag follows every push to
-the `dev` branch). While the package is private, sign in first with `docker login ghcr.io` (a token with `read:packages`).
-To build the image from the sources instead, use `docker compose up -d --build`.
+The compose file pulls `ghcr.io/byteroast/roastgate:latest`. The image is published with these tags:
+
+| Tag | Follows |
+|---|---|
+| `latest` | `main`: published when `dev` is merged into it |
+| `0.1.0-alpha.1`, `0.1.0`… | a release: published when its `v*` git tag is pushed |
+| `0.1`, `1.2`… | the latest stable release of that minor version (pre-releases such as alphas don't move it) |
+| `dev` | every push to the `dev` branch (unstable) |
+
+To stay on one version, replace `latest` with a release tag in `docker-compose.yml`. While the package is private, sign in first with
+`docker login ghcr.io` (a token with `read:packages`). To build the image from the sources instead, use `docker compose up -d --build`.
 
 The provided `docker-compose.yml` runs the container as `privileged` with `pid: host` (so it can run `nginx` and `certbot` in the host
 namespaces) and mounts what it needs:
@@ -121,7 +132,19 @@ In **Settings**, scan the QR code with any authenticator app ([Google Authentica
 
 - Codes follow RFC 6238 (SHA-1, 30 s, 6 digits). One step of clock drift is tolerated; a code that was used cannot be used again (the check is atomic in the database).
 - Five wrong codes end the attempt, and a client address is locked out after five failures, whatever the password.
-- Lost the phone and the codes? From the host: `docker exec roastgate roastgate disable-2fa`.
+- Lost the phone, the codes and the passkeys? From the host: `docker exec roastgate roastgate disable-2fa`. It turns two-factor off,
+  removes every passkey and ends every session, so the password alone signs you in again.
+
+### Passkeys
+
+In **Settings**, add a passkey (fingerprint, face, device PIN or a security key) with a name and your current password. A passkey
+signs you in **on its own**, without the password, and also works **as the second step** after the password, in place of a code.
+
+- Once a passkey exists, a correct password alone is **no longer enough** to sign in.
+- A passkey only works on the **address it was created on** (`127.0.0.1`, or the domain of your HTTPS server block). Browsers only
+  allow passkeys on `localhost`/`127.0.0.1` or over HTTPS, so a plain `http://` domain will not work.
+- The list shows when each passkey was created and last used. Removing one asks for the password and ends every open session.
+- Wrong answers are throttled like passwords, and every addition, removal and sign-in is written to the audit log.
 
 ### Settings
 
@@ -209,6 +232,8 @@ in practice, root on the host. Treat it accordingly:
 - The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored unencrypted, so keep `/data` readable by root only.
 - **Two-factor authentication** (TOTP, any authenticator app) is available in the settings: a code is asked after the password, a code can be used only once, and
   wrong codes are throttled separately from passwords. Turning it on or off ends every other session.
+- **Passkeys** sign you in without a password, or replace the code as the second step. Once one exists the password alone is refused,
+  and removing one ends every session.
 
 ## Development
 
@@ -222,8 +247,37 @@ dotnet run --project src/Roastgate.Web          # http://localhost:5009, host co
 
 On Windows or macOS there is no nginx to drive, so the dashboard reports it as unreachable; everything else works.
 
+Every build of `Roastgate.Web` first runs `scripts/check-razor-imports.sh` (Linux/macOS) or `scripts/check-razor-imports.ps1` (Windows).
+It fails the build when a `@using` is already provided by an `_Imports.razor` of the same or a parent folder, by the implicit usings,
+or is repeated in the same file. Each feature folder keeps its own `_Imports.razor`, so same-named types don't collide. Run it by hand
+with `scripts/check-razor-imports.sh src/Roastgate.Web`.
+
 The tests that fake nginx live in `tests/Roastgate.Tests`. A second suite drives the real UI against a real nginx in Docker, see
 [tests/e2e](tests/e2e/README.md).
+
+### Trying it against a real nginx
+
+`dotnet run` drives the nginx of your own machine, if there is one. To try your changes against a real nginx without touching it, run
+the end-to-end image: Roastgate built from your working copy, with nginx installed **in the same container**
+(`ROASTGATE_HOST_EXEC=direct`, so `nginx -t` and `nginx -s reload` are the real commands) and a fake certbot.
+
+```bash
+docker build -t roastgate:test .                                  # from the repository root, rebuild after each change
+docker build -f tests/e2e/Dockerfile -t roastgate:e2e tests/e2e
+docker rm -f roastgate-dev
+docker run -d --name roastgate-dev \
+  -p 127.0.0.1:8282:8181 \
+  -p 127.0.0.1:8280:80 \
+  roastgate:e2e
+docker logs roastgate-dev                                         # prints the setup token
+```
+
+- <http://127.0.0.1:8282> is Roastgate. Keep the default paths during the setup: they exist in the container.
+- <http://127.0.0.1:8280> is what nginx serves, so you can check the effect of a proxy or a site you just created.
+- `docker exec roastgate-dev nginx -T` prints the whole configuration nginx loaded; `docker exec -it roastgate-dev bash` opens a shell.
+- The container starts empty every time. Add `-v roastgate-dev-data:/data` to the `docker run` to keep the account between runs.
+- The certbot inside is a stand-in that cannot reach Let's Encrypt: certificates go through the same commands and files, but are not real.
+- The ports differ from the end-to-end suite (`8199`), so both can run at the same time.
 
 The database schema is managed with EF Core migrations:
 
