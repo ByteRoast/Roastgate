@@ -1,0 +1,36 @@
+# Roastgate drives the nginx installed on the host.
+#   privileged + pid: host  lets it run `nginx` and `certbot` in the host namespaces (nsenter).
+#   the volumes below      let it read and write the nginx configuration and the certificates.
+# Read the security notes in README.md before exposing the port beyond 127.0.0.1.
+# The project and the volume have fixed names, so the account survives a rebuild whatever the folder you cloned into.
+# Update with `docker compose pull && docker compose up -d` (or `docker compose up -d --build` to build from source).
+# Never use `docker compose down -v`: it deletes the account and the backup history.
+name: roastgate
+
+services:
+  roastgate:
+    image: ghcr.io/byteroast/roastgate:dev
+    build: .
+    container_name: roastgate
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    ports:
+      - "127.0.0.1:8181:8181"
+    environment:
+      # Optional: fix the setup token instead of reading it from `docker logs roastgate` (16+ characters).
+      # ROASTGATE_SETUP_TOKEN: "change-me-to-a-long-random-value"
+      # Set to "true" when you reach Roastgate through HTTPS (marks the session cookie Secure).
+      # ROASTGATE_SECURE_COOKIES: "true"
+      # Set to "true" only behind your own reverse proxy, so the client IP is read from X-Forwarded-For.
+      # ROASTGATE_TRUST_FORWARDED_HEADERS: "true"
+      TZ: Europe/Paris
+    volumes:
+      - /etc/nginx:/etc/nginx
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+      - roastgate-data:/data
+
+volumes:
+  roastgate-data:
+    name: roastgate-data
