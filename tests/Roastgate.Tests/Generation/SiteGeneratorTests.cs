@@ -7,7 +7,6 @@ namespace Roastgate.Tests.Generation;
 public sealed class SiteGeneratorTests
 {
     private static readonly AppSettings Settings = new();
-
     private static readonly Version Modern = new(1, 27, 0);
 
     private static GenerationContext Context(string fileName = "app.example.com.conf", Version? nginx = null)
@@ -41,38 +40,38 @@ public sealed class SiteGeneratorTests
 
         Assert.Equal(
             """
-            map $http_upgrade $rg_upgrade_app_example_com {
-                default upgrade;
-                ''      close;
-            }
-
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name app.example.com;
-
-                add_header X-Content-Type-Options nosniff always;
-                add_header X-Frame-Options SAMEORIGIN always;
-                add_header Referrer-Policy strict-origin-when-cross-origin always;
-                if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
-                location ~ /\.(?!well-known) {
-                    deny all;
+                map $http_upgrade $rg_upgrade_app_example_com {
+                    default upgrade;
+                    ''      close;
                 }
 
-                location / {
-                    proxy_pass http://127.0.0.1:3000;
-                    proxy_http_version 1.1;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                    proxy_set_header X-Forwarded-Host $host;
-                    proxy_set_header Upgrade $http_upgrade;
-                    proxy_set_header Connection $rg_upgrade_app_example_com;
-                }
-            }
+                server {
+                    listen 80;
+                    listen [::]:80;
+                    server_name app.example.com;
 
-            """.ReplaceLineEndings("\n"),
+                    add_header X-Content-Type-Options nosniff always;
+                    add_header X-Frame-Options SAMEORIGIN always;
+                    add_header Referrer-Policy strict-origin-when-cross-origin always;
+                    if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
+                    location ~ /\.(?!well-known) {
+                        deny all;
+                    }
+
+                    location / {
+                        proxy_pass http://127.0.0.1:3000;
+                        proxy_http_version 1.1;
+                        proxy_set_header Host $host;
+                        proxy_set_header X-Real-IP $remote_addr;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                        proxy_set_header X-Forwarded-Proto $scheme;
+                        proxy_set_header X-Forwarded-Host $host;
+                        proxy_set_header Upgrade $http_upgrade;
+                        proxy_set_header Connection $rg_upgrade_app_example_com;
+                    }
+                }
+
+                """.ReplaceLineEndings("\n"),
             text);
     }
 
@@ -96,114 +95,120 @@ public sealed class SiteGeneratorTests
 
         Assert.Equal(
             """
-            map $http_upgrade $rg_upgrade_app_example_com {
-                default upgrade;
-                ''      close;
-            }
-
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name app.example.com www.example.com;
-
-                include /etc/nginx/whitelists/alice.conf;
-                include /etc/nginx/whitelists/bob.conf;
-                deny all;
-
-                location ^~ /.well-known/acme-challenge/ {
-                    allow all;
-                    root /var/www/certbot;
+                map $http_upgrade $rg_upgrade_app_example_com {
+                    default upgrade;
+                    ''      close;
                 }
 
-                location / {
-                    return 301 https://$host$request_uri;
-                }
-            }
+                server {
+                    listen 80;
+                    listen [::]:80;
+                    server_name app.example.com www.example.com;
 
-            server {
-                listen 443 ssl;
-                listen [::]:443 ssl;
-                http2 on;
-                server_name app.example.com www.example.com;
-
-                ssl_certificate /etc/letsencrypt/live/app/fullchain.pem;
-                ssl_certificate_key /etc/letsencrypt/live/app/privkey.pem;
-                ssl_protocols TLSv1.2 TLSv1.3;
-
-                include /etc/nginx/whitelists/alice.conf;
-                include /etc/nginx/whitelists/bob.conf;
-                deny all;
-
-                client_max_body_size 100m;
-                add_header X-Content-Type-Options nosniff always;
-                add_header X-Frame-Options SAMEORIGIN always;
-                add_header Referrer-Policy strict-origin-when-cross-origin always;
-                add_header Strict-Transport-Security "max-age=31536000" always;
-                if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
-                location ~ /\.(?!well-known) {
+                    include /etc/nginx/whitelists/alice.conf;
+                    include /etc/nginx/whitelists/bob.conf;
                     deny all;
+
+                    location ^~ /.well-known/acme-challenge/ {
+                        allow all;
+                        root /var/www/certbot;
+                    }
+
+                    location / {
+                        return 301 https://$host$request_uri;
+                    }
                 }
 
-                location ^~ /.well-known/acme-challenge/ {
-                    allow all;
-                    root /var/www/certbot;
+                server {
+                    listen 443 ssl;
+                    listen [::]:443 ssl;
+                    http2 on;
+                    server_name app.example.com www.example.com;
+
+                    ssl_certificate /etc/letsencrypt/live/app/fullchain.pem;
+                    ssl_certificate_key /etc/letsencrypt/live/app/privkey.pem;
+                    ssl_protocols TLSv1.2 TLSv1.3;
+
+                    include /etc/nginx/whitelists/alice.conf;
+                    include /etc/nginx/whitelists/bob.conf;
+                    deny all;
+
+                    client_max_body_size 100m;
+                    add_header X-Content-Type-Options nosniff always;
+                    add_header X-Frame-Options SAMEORIGIN always;
+                    add_header Referrer-Policy strict-origin-when-cross-origin always;
+                    add_header Strict-Transport-Security "max-age=31536000" always;
+                    if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
+                    location ~ /\.(?!well-known) {
+                        deny all;
+                    }
+
+                    location ^~ /.well-known/acme-challenge/ {
+                        allow all;
+                        root /var/www/certbot;
+                    }
+
+                    location / {
+                        proxy_pass https://backend:8443;
+                        proxy_http_version 1.1;
+                        proxy_ssl_server_name on;
+                        proxy_set_header Host $host;
+                        proxy_set_header X-Real-IP $remote_addr;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                        proxy_set_header X-Forwarded-Proto $scheme;
+                        proxy_set_header X-Forwarded-Host $host;
+                        proxy_set_header Upgrade $http_upgrade;
+                        proxy_set_header Connection $rg_upgrade_app_example_com;
+                        proxy_read_timeout 120s;
+                        proxy_send_timeout 120s;
+                        proxy_buffering off;
+                    }
                 }
 
-                location / {
-                    proxy_pass https://backend:8443;
-                    proxy_http_version 1.1;
-                    proxy_ssl_server_name on;
-                    proxy_set_header Host $host;
-                    proxy_set_header X-Real-IP $remote_addr;
-                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                    proxy_set_header X-Forwarded-Proto $scheme;
-                    proxy_set_header X-Forwarded-Host $host;
-                    proxy_set_header Upgrade $http_upgrade;
-                    proxy_set_header Connection $rg_upgrade_app_example_com;
-                    proxy_read_timeout 120s;
-                    proxy_send_timeout 120s;
-                    proxy_buffering off;
-                }
-            }
-
-            """.ReplaceLineEndings("\n"),
+                """.ReplaceLineEndings("\n"),
             text);
     }
 
     [Fact]
     public void A_single_page_application_served_as_a_static_site()
     {
-        string text = Generate(new SiteSpec { Kind = SiteKind.StaticSite, ServerNames = ["docs.example.com"], RootDirectory = "/var/www/docs", SpaFallback = true }, "docs.example.com");
+        string text =
+            Generate(
+                new SiteSpec
+                {
+                    Kind = SiteKind.StaticSite, ServerNames = ["docs.example.com"], RootDirectory = "/var/www/docs",
+                    SpaFallback = true
+                }, "docs.example.com");
 
         Assert.Equal(
             """
-            server {
-                listen 80;
-                listen [::]:80;
-                server_name docs.example.com;
+                server {
+                    listen 80;
+                    listen [::]:80;
+                    server_name docs.example.com;
 
-                add_header X-Content-Type-Options nosniff always;
-                add_header X-Frame-Options SAMEORIGIN always;
-                add_header Referrer-Policy strict-origin-when-cross-origin always;
-                if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
-                location ~ /\.(?!well-known) {
-                    deny all;
+                    add_header X-Content-Type-Options nosniff always;
+                    add_header X-Frame-Options SAMEORIGIN always;
+                    add_header Referrer-Policy strict-origin-when-cross-origin always;
+                    if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
+                    location ~ /\.(?!well-known) {
+                        deny all;
+                    }
+
+                    root /var/www/docs;
+                    index index.html index.htm;
+
+                    location / {
+                        try_files $uri $uri/ /index.html;
+                    }
+
+                    location ~* \.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ {
+                        expires 30d;
+                        try_files $uri =404;
+                    }
                 }
 
-                root /var/www/docs;
-                index index.html index.htm;
-
-                location / {
-                    try_files $uri $uri/ /index.html;
-                }
-
-                location ~* \.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ {
-                    expires 30d;
-                    try_files $uri =404;
-                }
-            }
-
-            """.ReplaceLineEndings("\n"),
+                """.ReplaceLineEndings("\n"),
             text);
     }
 
@@ -223,7 +228,8 @@ public sealed class SiteGeneratorTests
     [InlineData("1.18.0")]
     [InlineData("1.24.0")]
     [InlineData("1.25.0")]
-    public void Older_nginx_gets_http2_as_a_listen_parameter_because_the_directive_would_make_nginx_t_fail(string version)
+    public void Older_nginx_gets_http2_as_a_listen_parameter_because_the_directive_would_make_nginx_t_fail(
+        string version)
     {
         string text = Generate(HttpsProxy(), nginx: Version.Parse(version));
 
@@ -343,19 +349,101 @@ public sealed class SiteGeneratorTests
         });
 
         Assert.Equal(1, Count(text, "Strict-Transport-Security"));
+
         int hsts = text.IndexOf("Strict-Transport-Security", StringComparison.Ordinal);
         int httpsServer = text.IndexOf("listen 443 ssl;", StringComparison.Ordinal);
+
         Assert.True(hsts > httpsServer, "HSTS must be inside the HTTPS server block");
     }
 
     [Fact]
     public void The_acme_challenge_is_only_open_when_a_whitelist_would_otherwise_block_it()
     {
-        string withoutWhitelist = Generate(new SiteSpec { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000", ServeAcmeChallenge = true });
-        string withWhitelist = Generate(new SiteSpec { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000", ServeAcmeChallenge = true, Whitelists = ["alice.conf"] });
+        string withoutWhitelist = Generate(new SiteSpec
+            { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000", ServeAcmeChallenge = true });
+
+        string withWhitelist = Generate(new SiteSpec
+        {
+            ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000", ServeAcmeChallenge = true,
+            Whitelists = ["alice.conf"]
+        });
 
         Assert.DoesNotContain("allow all;", withoutWhitelist);
         Assert.Contains("allow all;", withWhitelist);
+    }
+
+    [Theory]
+    [InlineData(DeniedBehavior.NotFound, null, "return 404;")]
+    [InlineData(DeniedBehavior.CloseConnection, null, "return 444;")]
+    [InlineData(DeniedBehavior.Redirect, "https://example.com/?from=app", "return 302 https://example.com/?from=app;")]
+    public void Refused_visitors_are_sent_to_a_named_location_that_applies_the_behavior(DeniedBehavior behavior,
+        string? url, string directive)
+    {
+        string text = Generate(new SiteSpec
+        {
+            ServerNames = ["a.example.com"],
+            Upstream = "http://127.0.0.1:3000",
+            Whitelists = ["alice.conf"],
+            DeniedBehavior = behavior,
+            DeniedUrl = url,
+        });
+
+        // "allow all" is what keeps the inherited "deny all" from refusing the named location itself.
+        Assert.Contains(
+            $$"""
+                      include /etc/nginx/whitelists/alice.conf;
+                      deny all;
+
+                      error_page 403 = @rg_denied;
+
+                      location @rg_denied {
+                          allow all;
+                          {{directive}}
+                      }
+
+                  """.ReplaceLineEndings("\n"),
+            text);
+    }
+
+    [Fact]
+    public void A_forbidden_visitor_gets_the_plain_403_without_a_named_location()
+    {
+        string text = Generate(new SiteSpec
+            { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000", Whitelists = ["alice.conf"] });
+
+        Assert.Contains("deny all;", text);
+        Assert.DoesNotContain("error_page", text);
+        Assert.DoesNotContain("@rg_denied", text);
+    }
+
+    [Fact]
+    public void The_denied_behavior_needs_a_whitelist_to_be_written()
+    {
+        string text = Generate(new SiteSpec
+        {
+            ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000",
+            DeniedBehavior = DeniedBehavior.NotFound
+        });
+
+        Assert.DoesNotContain("error_page", text);
+        Assert.DoesNotContain("@rg_denied", text);
+    }
+
+    [Fact]
+    public void The_denied_behavior_also_applies_to_the_http_server_that_redirects_to_https()
+    {
+        string text = Generate(HttpsProxy() with
+        {
+            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.CloseConnection
+        });
+
+        Assert.Equal(2, Count(text, "error_page 403 = @rg_denied;"));
+        Assert.Equal(2, Count(text, "location @rg_denied {"));
+
+        int namedLocation = text.IndexOf("location @rg_denied {", StringComparison.Ordinal);
+        int redirect = text.IndexOf("return 301 https://", StringComparison.Ordinal);
+
+        Assert.True(namedLocation < redirect, "the HTTP server must refuse before it redirects");
     }
 
     [Fact]
@@ -378,9 +466,11 @@ public sealed class SiteGeneratorTests
     [InlineData("app.example.com.conf", "$rg_upgrade_app_example_com")]
     [InlineData("My-App_2.conf", "$rg_upgrade_my_app_2")]
     [InlineData("example.com", "$rg_upgrade_example_com")]
-    public void The_websocket_variable_is_named_after_the_file_so_two_proxies_never_clash(string fileName, string variable)
+    public void The_websocket_variable_is_named_after_the_file_so_two_proxies_never_clash(string fileName,
+        string variable)
     {
-        string text = Generate(new SiteSpec { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000" }, fileName);
+        string text = Generate(new SiteSpec { ServerNames = ["a.example.com"], Upstream = "http://127.0.0.1:3000" },
+            fileName);
 
         Assert.Contains($"map $http_upgrade {variable} {{", text);
         Assert.Contains($"proxy_set_header Connection {variable};", text);
@@ -457,15 +547,20 @@ public sealed class SiteGeneratorTests
     public void Every_combination_of_switches_gives_a_valid_spec_and_well_formed_nginx(SiteKind kind, int bits)
     {
         SiteSpec spec = FromBits(kind, bits);
+
         Assert.Empty(SiteSpecValidator.Validate(spec with { Hsts = spec.EnableTls && spec.Hsts }));
+
         spec = spec with { Hsts = spec.EnableTls && spec.Hsts };
 
         string text = Generate(spec);
 
         Assert.True(SiteSpecValidator.BracesBalanced(text), "braces must balance");
+
         int servers = spec.EnableTls ? 2 : 1;
+
         Assert.Equal(servers, Count(text, "server_name a.example.com b.example.com;"));
         Assert.Equal(servers, Count(text, "server {"));
+
         foreach (string line in text.Split('\n'))
         {
             Assert.True(line.TrimEnd() == line, $"trailing whitespace in \"{line}\"");
@@ -488,6 +583,7 @@ public sealed class SiteGeneratorTests
     {
         int count = 0;
         int index = 0;
+
         while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
         {
             count++;
