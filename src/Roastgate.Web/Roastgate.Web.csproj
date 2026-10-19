@@ -24,4 +24,12 @@
     <InternalsVisibleTo Include="Roastgate.Tests" />
   </ItemGroup>
 
+  <Target Name="CheckRazorImports" BeforeTargets="BeforeBuild">
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Linux')) Or $([MSBuild]::IsOSPlatform('OSX'))"
+          Command="bash &quot;$(MSBuildThisFileDirectory)../../scripts/check-razor-imports.sh&quot; &quot;$(MSBuildProjectDirectory)&quot;" />
+
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))"
+          Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)\..\..\scripts\check-razor-imports.ps1&quot; -Root &quot;$(MSBuildProjectDirectory)&quot;" />
+  </Target>
+
 </Project>
