@@ -34,6 +34,8 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
