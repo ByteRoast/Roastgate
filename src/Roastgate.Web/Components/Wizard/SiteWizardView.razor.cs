@@ -52,6 +52,10 @@ public partial class SiteWizardView
 
         public string MaxBodySize { get; set; } = string.Empty;
 
+        public DeniedBehavior DeniedBehavior { get; set; } = DeniedBehavior.Forbidden;
+
+        public string DeniedUrl { get; set; } = string.Empty;
+
         public bool SecurityHeaders { get; set; } = true;
 
         public bool BlockCommonExploits { get; set; } = true;
@@ -63,11 +67,9 @@ public partial class SiteWizardView
         public string ExtraLocationDirectives { get; set; } = string.Empty;
     }
 
-    [Parameter, EditorRequired]
-    public ConfigArea Area { get; set; }
+    [Parameter, EditorRequired] public ConfigArea Area { get; set; }
 
-    [Parameter]
-    public string? Name { get; set; }
+    [Parameter] public string? Name { get; set; }
 
     private readonly HashSet<string> _selectedWhitelists = new(StringComparer.Ordinal);
     private WizardForm _form = new();
@@ -96,7 +98,8 @@ public partial class SiteWizardView
 
     private string? FirstDomain => ParseNames(_form.ServerNames).FirstOrDefault();
 
-    private CertificateInfo? SelectedCertificate => _certificates.FirstOrDefault((CertificateInfo certificate) => certificate.FullChainPath == _form.CertificatePath);
+    private CertificateInfo? SelectedCertificate => _certificates.FirstOrDefault((CertificateInfo certificate) =>
+        certificate.FullChainPath == _form.CertificatePath);
 
     private List<string> UncoveredNames(CertificateInfo certificate)
     {
@@ -106,11 +109,13 @@ public partial class SiteWizardView
     private void SelectCertificate(string? name)
     {
         CertificateInfo? certificate = _certificates.FirstOrDefault((CertificateInfo item) => item.Name == name);
+
         _form.CertificatePath = certificate?.FullChainPath ?? string.Empty;
         _form.CertificateKeyPath = certificate?.PrivateKeyPath ?? string.Empty;
     }
 
-    private string EffectiveName => string.IsNullOrWhiteSpace(_form.Name) ? FirstDomain ?? string.Empty : _form.Name.Trim();
+    private string EffectiveName =>
+        string.IsNullOrWhiteSpace(_form.Name) ? FirstDomain ?? string.Empty : _form.Name.Trim();
 
     private string PreviewFileName => ConfigNames.Normalize(Area, EffectiveName) ?? "(no name yet)";
 
@@ -129,13 +134,17 @@ public partial class SiteWizardView
         _selectedWhitelists.Clear();
 
         ConfigListing whitelists = await Store.ListAsync(ConfigArea.Whitelists);
+
         _availableWhitelists = whitelists.Entries.Select((ConfigEntry entry) => entry.Name).ToList();
-        _certificates = (await Catalog.ListAsync()).Certificates.Select((CertificateEntry entry) => entry.Certificate).ToList();
+        _certificates = (await Catalog.ListAsync()).Certificates.Select((CertificateEntry entry) => entry.Certificate)
+            .ToList();
 
         SiteSpec spec = await Wizard.NewSpecAsync(Area);
+
         if (!_isNew)
         {
             WizardFile? existing = await Wizard.LoadAsync(Area, Name!);
+
             if (existing is null)
             {
                 _notFound = true;
@@ -144,6 +153,7 @@ public partial class SiteWizardView
 
             _fileName = existing.File.Name;
             _status = existing.Metadata.Status;
+
             if (existing.Metadata.Spec is { } stored)
             {
                 spec = stored;
@@ -152,6 +162,7 @@ public partial class SiteWizardView
             {
                 _importNotes = import.Notes;
                 _importBlockers = import.Blockers;
+
                 if (import.Spec is { } imported)
                 {
                     spec = imported;
@@ -160,6 +171,7 @@ public partial class SiteWizardView
         }
 
         _kind = spec.Kind;
+
         FromSpec(spec);
     }
 
@@ -185,13 +197,17 @@ public partial class SiteWizardView
             Http2 = spec.Http2,
             Hsts = spec.Hsts,
             MaxBodySize = spec.MaxBodySize ?? string.Empty,
+            DeniedBehavior = spec.DeniedBehavior,
+            DeniedUrl = spec.DeniedUrl ?? string.Empty,
             SecurityHeaders = spec.SecurityHeaders,
             BlockCommonExploits = spec.BlockCommonExploits,
             ServeAcmeChallenge = spec.ServeAcmeChallenge,
             ExtraServerDirectives = spec.ExtraServerDirectives ?? string.Empty,
             ExtraLocationDirectives = spec.ExtraLocationDirectives ?? string.Empty,
         };
+
         _selectedWhitelists.Clear();
+
         foreach (string whitelist in spec.Whitelists)
         {
             _selectedWhitelists.Add(whitelist);
@@ -223,9 +239,17 @@ public partial class SiteWizardView
             SecurityHeaders = _form.SecurityHeaders,
             BlockCommonExploits = _form.BlockCommonExploits,
             Whitelists = _selectedWhitelists.OrderBy((string item) => item, StringComparer.Ordinal).ToList(),
+            DeniedBehavior = _form.DeniedBehavior,
+            DeniedUrl = _form.DeniedBehavior == DeniedBehavior.Redirect && !string.IsNullOrWhiteSpace(_form.DeniedUrl)
+                ?  _form.DeniedUrl.Trim()
+                : null,
             ServeAcmeChallenge = _form.ServeAcmeChallenge,
-            ExtraServerDirectives = string.IsNullOrWhiteSpace(_form.ExtraServerDirectives) ? null : _form.ExtraServerDirectives,
-            ExtraLocationDirectives = string.IsNullOrWhiteSpace(_form.ExtraLocationDirectives) ? null : _form.ExtraLocationDirectives,
+            ExtraServerDirectives = string.IsNullOrWhiteSpace(_form.ExtraServerDirectives)
+                ? null
+                : _form.ExtraServerDirectives,
+            ExtraLocationDirectives = string.IsNullOrWhiteSpace(_form.ExtraLocationDirectives)
+                ? null
+                : _form.ExtraLocationDirectives,
         };
     }
 
@@ -262,6 +286,7 @@ public partial class SiteWizardView
         if (FirstDomain is { } domain)
         {
             string directory = "/etc/letsencrypt/live/" + domain.TrimStart('*', '.');
+
             _form.CertificatePath = directory + "/fullchain.pem";
             _form.CertificateKeyPath = directory + "/privkey.pem";
         }
@@ -275,6 +300,7 @@ public partial class SiteWizardView
             _previewedTab = 4;
             _result = null; // an old "nothing was saved" would be misleading once the form has been corrected
             _preview = await Wizard.PreviewAsync(Area, EffectiveName, ToSpec());
+
             StateHasChanged();
         }
         else if (_tab != 4)
@@ -286,7 +312,9 @@ public partial class SiteWizardView
     private async Task SaveAsync()
     {
         _showValidation = true;
+
         string name = EffectiveName;
+
         if (string.IsNullOrWhiteSpace(name))
         {
             _result = new ConfigResult(false, "Enter a domain name (it also names the file) or a file name.");
@@ -294,17 +322,22 @@ public partial class SiteWizardView
         }
 
         _isBusy = true;
+
         try
         {
             string actor = await User.GetNameAsync();
+
             ConfigResult result = await Wizard.SaveAsync(Area, name, ToSpec(), _reload, actor);
+
             _result = result;
+
             if (!result.Succeeded)
             {
                 return;
             }
 
             string? normalized = ConfigNames.Normalize(Area, name);
+
             if (normalized is null)
             {
                 return;
@@ -312,6 +345,7 @@ public partial class SiteWizardView
 
             _status = MetadataStatus.Intact;
             _fileName = normalized;
+
             if (_isNew)
             {
                 _isNew = false;
