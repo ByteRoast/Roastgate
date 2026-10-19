@@ -1,11 +1,13 @@
 # Builds the Docker image and publishes it to the GitHub Container Registry:
 #   push on dev                                  -> ghcr.io/byteroast/roastgate:dev
+#   tag v*                                       -> ghcr.io/byteroast/roastgate:<tag>
 #   pull request from dev merged into main       -> ghcr.io/byteroast/roastgate:latest
 name: docker
 
 on:
   push:
     branches: [dev]
+    tags: ['v*']
   pull_request:
     types: [closed]
     branches: [main]
@@ -28,10 +30,18 @@ jobs:
         with:
           # For a merged pull request, build exactly the commit that landed on main.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
-
-      - name: Choose the tag
-        id: tag
-        run: echo "name=${{ github.event_name == 'push' && 'dev' || 'latest' }}" >> "$GITHUB_OUTPUT"
+        
+      - name: Compute the image tags
+          id: meta
+          uses: docker/metadata-action@v6
+          with:
+            images: ${{ env.IMAGE }}
+            flavor: latest=false
+            tags: |
+              type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+              type=raw,value=latest,enable=${{ github.event_name == 'pull_request' }}
+              type=semver,pattern={{version}}
+              type=semver,pattern={{major}}.{{minor}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -52,9 +62,7 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ env.IMAGE }}:${{ steps.tag.outputs.name }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
