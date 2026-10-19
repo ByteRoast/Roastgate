@@ -213,6 +213,117 @@ public sealed class SiteImporterTests
         Assert.Contains(result.Blockers, (string blocker) => blocker.Contains("allow", StringComparison.Ordinal));
     }
 
+    private const string Whitelisted = "    include /etc/nginx/whitelists/office.conf;\n    deny all;\n";
+
+    [Theory]
+    [InlineData("return 404;", DeniedBehavior.NotFound, null)]
+    [InlineData("return 444;", DeniedBehavior.CloseConnection, null)]
+    [InlineData("return 302 https://example.com/?from=app;", DeniedBehavior.Redirect, "https://example.com/?from=app")]
+    public void The_named_location_for_refused_visitors_is_read(string directive, DeniedBehavior behavior, string? url)
+    {
+        SiteSpec spec = ImportOk(Wrap(Whitelisted + "    error_page 403 = @rg_denied;\n    location @rg_denied {\n        allow all;\n        " + directive + "\n    }\n" + ProxyLocation));
+
+        Assert.Equal(behavior, spec.DeniedBehavior);
+        Assert.Equal(url, spec.DeniedUrl);
+        Assert.Null(spec.ExtraServerDirectives);
+    }
+
+    [Fact]
+    public void A_whitelist_alone_reads_as_forbidden()
+    {
+        SiteSpec spec = ImportOk(Wrap(Whitelisted + ProxyLocation));
+
+        Assert.Equal(DeniedBehavior.Forbidden, spec.DeniedBehavior);
+        Assert.Null(spec.DeniedUrl);
+    }
+
+    [Fact]
+    public void The_named_location_without_a_whitelist_stays_a_free_directive()
+    {
+        SiteSpec spec = ImportOk(Wrap("    error_page 403 = @rg_denied;\n    location @rg_denied {\n        allow all;\n        return 404;\n    }\n" + ProxyLocation));
+
+        Assert.Equal(DeniedBehavior.Forbidden, spec.DeniedBehavior);
+        Assert.Contains("location @rg_denied", spec.ExtraServerDirectives);
+    }
+
+    [Theory]
+    [InlineData("    error_page 403 = @rg_denied;\n", "does not exist")]
+    [InlineData("    location @rg_denied { allow all; return 404; }\n", "never used")]
+    [InlineData("    error_page 403 = @rg_denied;\n    location @rg_denied { return 404; }\n", "must only contain")]
+    [InlineData("    error_page 403 = @rg_denied;\n    location @rg_denied { allow all; add_header X-A b; return 404; }\n", "must only contain")]
+    [InlineData("    error_page 403 = @rg_denied;\n    location @rg_denied { allow all; return 301 https://example.com/; }\n", "only writes")]
+    [InlineData("    error_page 403 = @rg_denied;\n    location @rg_denied { allow all; return 403; }\n", "only writes")]
+    public void A_named_location_the_wizard_did_not_write_is_refused(string body, string expected)
+    {
+        SiteImportResult result = Import(Wrap(Whitelisted + body + ProxyLocation));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Blockers, (string blocker) => blocker.Contains(expected, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Two_servers_that_refuse_differently_are_refused()
+    {
+        SiteImportResult result = Import("""
+            server {
+                listen 80;
+                server_name app.example.com;
+                include /etc/nginx/whitelists/office.conf;
+                deny all;
+                error_page 403 = @rg_denied;
+                location @rg_denied { allow all; return 404; }
+                return 301 https://$host$request_uri;
+            }
+
+            server {
+                listen 443 ssl;
+                server_name app.example.com;
+                ssl_certificate /c.pem;
+                ssl_certificate_key /k.pem;
+                include /etc/nginx/whitelists/office.conf;
+                deny all;
+                error_page 403 = @rg_denied;
+                location @rg_denied { allow all; return 444; }
+                location / {
+                    proxy_pass http://127.0.0.1:3000;
+                }
+            }
+            """);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Blockers, (string blocker) => blocker.Contains("the same way", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(DeniedBehavior.NotFound, null)]
+    [InlineData(DeniedBehavior.CloseConnection, null)]
+    [InlineData(DeniedBehavior.Redirect, "https://example.com/denied?from=app")]
+    public void A_refusal_behavior_round_trips_through_the_generator_over_https(DeniedBehavior behavior, string? url)
+    {
+        SiteSpec original = new()
+        {
+            ServerNames = ["app.example.com"],
+            Upstream = "http://127.0.0.1:3000",
+            Websockets = false,
+            EnableTls = true,
+            CertificatePath = "/c.pem",
+            CertificateKeyPath = "/k.pem",
+            ServeAcmeChallenge = true,
+            Whitelists = ["office.conf"],
+            DeniedBehavior = behavior,
+            DeniedUrl = url,
+        };
+        GenerationContext context = new(new ConfigLocations(Settings), Settings.AcmeWebroot, "app.example.com.conf", new Version(1, 27, 0));
+        string generated = SiteGenerator.Generate(original, context);
+
+        SiteSpec spec = ImportOk(generated);
+
+        Assert.Equal(behavior, spec.DeniedBehavior);
+        Assert.Equal(url, spec.DeniedUrl);
+        Assert.Null(spec.ExtraServerDirectives);
+        Assert.Equal(generated, SiteGenerator.Generate(spec, context));
+    }
+
     [Fact]
     public void A_static_site_with_a_single_page_fallback_is_read()
     {

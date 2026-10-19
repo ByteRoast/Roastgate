@@ -232,7 +232,8 @@ nginx refused leaves no backup behind, since it would only repeat the current fi
 
 Describe a reverse proxy or a static site in a form (essentials, HTTPS, access, advanced) and Roastgate writes the nginx
 config:
-WebSockets, HTTPS with an optional redirect, HTTP/2, HSTS, upload limit, timeouts, security headers, whitelists, the
+WebSockets, HTTPS with an optional redirect, HTTP/2, HSTS, upload limit, timeouts, security headers, whitelists (with
+what refused visitors get: a 403, a 404, a closed connection or a redirect), the
 Let's Encrypt
 challenge, and free directives for anything else. A preview tab shows exactly what will be written.
 
@@ -285,6 +286,9 @@ challenge and are not supported.
 - Paste many addresses at once, or add the address you are connecting from with one click.
 - Each whitelist shows **where it is used** (the `include` lines of your proxies and sites, relative or absolute paths,
   quoted or not, wildcard includes), and gives you the `include` and `deny all;` lines to copy.
+- By default, visitors outside the whitelists get nginx's 403. The wizard can instead answer them with a 404 (hides
+  that the site exists), close the connection without a reply (444), or redirect them to another address (302). This
+  also applies to the site's other 403s, such as blocked dotfiles.
 - A whitelist that is still included **cannot be deleted**. `nginx -t` remains the last safety net for includes in files
   Roastgate does not read (such as `nginx.conf`).
 - A file that holds anything other than `allow` lines (a `deny`, a comment in the middle...) is never rewritten by the

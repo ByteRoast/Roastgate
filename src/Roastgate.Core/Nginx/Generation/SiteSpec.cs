@@ -9,6 +9,22 @@ public enum SiteKind
     StaticSite,
 }
 
+/// <summary>What a visitor whose address is in none of the site's whitelists gets.</summary>
+public enum DeniedBehavior
+{
+    /// <summary>403 Forbidden, nginx's own answer to <c>deny</c>.</summary>
+    Forbidden,
+
+    /// <summary>404 Not Found, which hides that the site exists.</summary>
+    NotFound,
+
+    /// <summary>Closes the connection without sending anything (444, specific to nginx).</summary>
+    CloseConnection,
+
+    /// <summary>Redirects (302) to <see cref="SiteSpec.DeniedUrl"/>.</summary>
+    Redirect,
+}
+
 /// <summary>
 /// Everything the wizard asks for. It is validated by <see cref="SiteSpecValidator"/> before anything reaches nginx,
 /// and stored (as JSON, in a comment) in the generated file so that the wizard can reopen it later.
@@ -71,8 +87,14 @@ public sealed record SiteSpec
     /// <summary>Refuse TRACE and TRACK, and dotfiles other than /.well-known.</summary>
     public bool BlockCommonExploits { get; init; } = true;
 
-    /// <summary>Names of whitelists (for example alice.conf). Anyone not listed gets a 403.</summary>
+    /// <summary>Names of whitelists (for example alice.conf). Anyone not listed is refused, as <see cref="DeniedBehavior"/> says.</summary>
     public IReadOnlyList<string> Whitelists { get; init; } = [];
+
+    /// <summary>How visitors outside the whitelists are refused. Only used when there is at least one whitelist.</summary>
+    public DeniedBehavior DeniedBehavior { get; init; } = DeniedBehavior.Forbidden;
+
+    /// <summary>Where <see cref="DeniedBehavior.Redirect"/> sends refused visitors, for example https://example.com/.</summary>
+    public string? DeniedUrl { get; init; }
 
     /// <summary>Let the Let's Encrypt HTTP challenge through (the webroot comes from the settings), even behind a whitelist.</summary>
     public bool ServeAcmeChallenge { get; init; }
