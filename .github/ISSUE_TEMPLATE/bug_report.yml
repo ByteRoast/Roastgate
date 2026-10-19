@@ -1,0 +1,87 @@
+name: Bug report
+description: Something does not work as described in the README.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please remove any secret (passwords, tokens, private
+        domains or IP addresses) from what you paste here. For a security issue, use the private report linked
+        from the issue menu instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Roastgate version
+      description: The image tag you run (`latest`, `dev`, `0.1.0`...) and, if you know it, its digest.
+      placeholder: ghcr.io/byteroast/roastgate:0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation
+      options:
+        - Provided docker-compose.yml
+        - Provided docker-compose.dev.yml
+        - Built from sources
+        - dotnet run (development)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: Distribution, architecture and nginx version (`nginx -v`).
+      placeholder: Debian 13, amd64, nginx 1.26.3
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser (for UI or passkey issues)
+      options:
+        - Not relevant
+        - Firefox
+        - Chrome / Chromium
+        - Edge
+        - Safari
+        - Other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of `docker compose logs roastgate` around the problem, and of `nginx -t` if relevant.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and did not find this problem.
+          required: true
+        - label: I removed every secret from this report.
+          required: true
