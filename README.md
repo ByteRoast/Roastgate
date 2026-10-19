@@ -33,6 +33,7 @@ docker logs roastgate        # prints the setup token
 ```
 
 Or with PowerShell (`pwsh`):
+Or with PowerShell (`pwsh`):
 
 ```powershell
 New-Item -ItemType Directory roastgate | Set-Location
@@ -50,8 +51,7 @@ The compose file pulls `ghcr.io/byteroast/roastgate:latest`. The image is publis
 | `0.1`, `1.2`…             | the latest stable release of that minor version (pre-releases such as alphas don't move it) |
 | `dev`                     | every push to the `dev` branch (unstable)                                                   |
 
-To stay on one version, replace `latest` with a release tag in `docker-compose.yml`. While the package is private, sign
-in first with `docker login ghcr.io` (a token with `read:packages`).
+To stay on one version, replace `latest` with a release tag in `docker-compose.yml`.
 
 To build the image from the sources instead, clone the repository and build it there:
 
