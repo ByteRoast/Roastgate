@@ -10,9 +10,9 @@ using Roastgate.Core;
 using Roastgate.Core.Data;
 using Roastgate.Core.Security;
 using Roastgate.Core.Setup;
+using Roastgate.Web;
 using Roastgate.Web.Authentication;
 using Roastgate.Web.Cli;
-using Roastgate.Web.Components;
 using Roastgate.Web.Middleware;
 using Roastgate.Web.Services;
 
@@ -122,7 +122,7 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/error", createScopeForErrors: true);
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseStatusCodePagesWithReExecute("/error/not-found", createScopeForStatusCodePages: true);
 
 // TLS is terminated by the host nginx (or a tunnel) in front of Roastgate, so there is no HTTPS redirection here.
 app.UseMiddleware<LowercaseRouteMiddleware>();

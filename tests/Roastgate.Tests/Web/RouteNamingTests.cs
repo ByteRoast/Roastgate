@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
-using Roastgate.Web.Components;
+using Roastgate.Web;
 
 namespace Roastgate.Tests.Web;
 
