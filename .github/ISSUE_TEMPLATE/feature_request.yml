@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest something Roastgate could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The need
+      description: What you are trying to do today, and why it is hard or impossible with Roastgate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The proposal
+      description: How you would like it to work. An example of the nginx configuration it should produce helps a lot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways you considered, or how you work around it now.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and did not find this request.
+          required: true
