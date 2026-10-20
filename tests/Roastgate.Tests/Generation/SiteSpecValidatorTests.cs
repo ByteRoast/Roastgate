@@ -23,7 +23,8 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void A_minimal_static_site_is_valid()
     {
-        SiteSpec spec = new() { Kind = SiteKind.StaticSite, ServerNames = ["docs.example.com"], RootDirectory = "/var/www/docs" };
+        SiteSpec spec = new()
+            { Kind = SiteKind.StaticSite, ServerNames = ["docs.example.com"], RootDirectory = "/var/www/docs" };
 
         Assert.Empty(SiteSpecValidator.Validate(spec));
     }
@@ -91,7 +92,8 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void Too_many_server_names_are_refused()
     {
-        string[] names = Enumerable.Range(0, SiteSpecValidator.MaximumServerNames + 1).Select((int index) => $"h{index}.example.com").ToArray();
+        string[] names = Enumerable.Range(0, SiteSpecValidator.MaximumServerNames + 1)
+            .Select((int index) => $"h{index}.example.com").ToArray();
 
         Assert.True(HasProblem(Proxy() with { ServerNames = names }, nameof(SiteSpec.ServerNames)));
     }
@@ -99,7 +101,8 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void A_server_name_listed_twice_is_refused_whatever_its_case()
     {
-        Assert.True(HasProblem(Proxy() with { ServerNames = ["a.example.com", "A.EXAMPLE.COM"] }, nameof(SiteSpec.ServerNames)));
+        Assert.True(HasProblem(Proxy() with { ServerNames = ["a.example.com", "A.EXAMPLE.COM"] },
+            nameof(SiteSpec.ServerNames)));
     }
 
     // ---- Upstream --------------------------------------------------------------------
@@ -157,7 +160,8 @@ public sealed class SiteSpecValidatorTests
     [InlineData(3601, false)]
     public void The_proxy_timeout_is_bounded(int seconds, bool valid)
     {
-        Assert.Equal(valid, !HasProblem(Proxy() with { ProxyTimeoutSeconds = seconds }, nameof(SiteSpec.ProxyTimeoutSeconds)));
+        Assert.Equal(valid,
+            !HasProblem(Proxy() with { ProxyTimeoutSeconds = seconds }, nameof(SiteSpec.ProxyTimeoutSeconds)));
     }
 
     // ---- Static site -----------------------------------------------------------------
@@ -196,7 +200,10 @@ public sealed class SiteSpecValidatorTests
     [InlineData("/etc/ssl/my cert.pem")]
     public void Certificate_paths_cannot_smuggle_directives(string path)
     {
-        SiteSpec spec = Proxy() with { EnableTls = true, CertificatePath = path, CertificateKeyPath = "/etc/ssl/key.pem" };
+        SiteSpec spec = Proxy() with
+        {
+            EnableTls = true, CertificatePath = path, CertificateKeyPath = "/etc/ssl/key.pem"
+        };
 
         Assert.True(HasProblem(spec, nameof(SiteSpec.CertificatePath)), path);
     }
@@ -204,7 +211,11 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void The_http_and_https_ports_must_differ()
     {
-        SiteSpec spec = Proxy() with { EnableTls = true, CertificatePath = "/c.pem", CertificateKeyPath = "/k.pem", HttpPort = 8080, HttpsPort = 8080 };
+        SiteSpec spec = Proxy() with
+        {
+            EnableTls = true, CertificatePath = "/c.pem", CertificateKeyPath = "/k.pem", HttpPort = 8080,
+            HttpsPort = 8080
+        };
 
         Assert.True(HasProblem(spec, nameof(SiteSpec.HttpsPort)));
     }
@@ -267,8 +278,12 @@ public sealed class SiteSpecValidatorTests
     [InlineData("add_header X-Note 'it''s { fine';")]
     public void Free_directives_with_balanced_braces_are_accepted(string text)
     {
-        Assert.False(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)), text);
-        Assert.False(HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)), text);
+        Assert.False(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)),
+            text);
+
+        Assert.False(
+            HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)),
+            text);
     }
 
     [Theory]
@@ -280,15 +295,117 @@ public sealed class SiteSpecValidatorTests
     [InlineData("a }\n{ b")]
     public void Free_directives_that_could_leave_their_block_are_refused(string text)
     {
-        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)), text);
-        Assert.True(HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)), text);
+        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)),
+            text);
+
+        Assert.True(
+            HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)),
+            text);
     }
 
     [Fact]
     public void Free_directives_cannot_contain_control_characters_or_be_huge()
     {
-        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = "a;\0b;" }, nameof(SiteSpec.ExtraServerDirectives)));
-        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = new string('a', SiteSpecValidator.MaximumExtraLength + 1) }, nameof(SiteSpec.ExtraServerDirectives)));
+        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = "a;\0b;" },
+            nameof(SiteSpec.ExtraServerDirectives)));
+
+        Assert.True(HasProblem(
+            Proxy() with { ExtraServerDirectives = new string('a', SiteSpecValidator.MaximumExtraLength + 1) },
+            nameof(SiteSpec.ExtraServerDirectives)));
+    }
+
+    // ---- Denied visitors --------------------------------------------------------------
+
+    [Theory]
+    [InlineData(DeniedBehavior.NotFound)]
+    [InlineData(DeniedBehavior.CloseConnection)]
+    public void A_denied_behavior_with_a_whitelist_is_valid(DeniedBehavior behavior)
+    {
+        Assert.Empty(
+            SiteSpecValidator.Validate(Proxy() with { Whitelists = ["alice.conf"], DeniedBehavior = behavior }));
+    }
+
+    [Theory]
+    [InlineData(DeniedBehavior.NotFound)]
+    [InlineData(DeniedBehavior.CloseConnection)]
+    [InlineData(DeniedBehavior.Redirect)]
+    public void A_denied_behavior_without_a_whitelist_is_refused(DeniedBehavior behavior)
+    {
+        SiteSpec spec = Proxy() with { DeniedBehavior = behavior, DeniedUrl = "https://example.com/" };
+
+        Assert.True(HasProblem(spec, nameof(SiteSpec.DeniedBehavior)));
+    }
+
+    [Fact]
+    public void Forbidden_needs_nothing_more_even_without_a_whitelist()
+    {
+        Assert.Empty(SiteSpecValidator.Validate(Proxy() with
+        {
+            DeniedBehavior = DeniedBehavior.Forbidden, DeniedUrl = "not a url"
+        }));
+    }
+
+    [Theory]
+    [InlineData("https://example.com")]
+    [InlineData("http://example.com/")]
+    [InlineData("https://example.com:8443/denied.html")]
+    [InlineData("https://example.com/?from=app&reason=ip")]
+    [InlineData("https://[2001:db8::1]/")]
+    public void Valid_redirect_addresses_are_accepted(string url)
+    {
+        SiteSpec spec = Proxy() with
+        {
+            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+        };
+
+        Assert.Empty(SiteSpecValidator.Validate(spec));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("example.com")]
+    [InlineData("ftp://example.com/")]
+    [InlineData("https://example.com/ a")]
+    [InlineData("https://example.com/; return 200")]
+    [InlineData("https://example.com/$request_uri")]
+    [InlineData("https://example.com/{a}")]
+    [InlineData("https://example.com/\"a\"")]
+    [InlineData("https://example.com/#top")]
+    [InlineData("https://example.com:0/")]
+    [InlineData("https://example.com:70000/")]
+    public void Invalid_redirect_addresses_are_refused_on_the_url_field(string? url)
+    {
+        SiteSpec spec = Proxy() with
+        {
+            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+        };
+
+        Assert.True(HasProblem(spec, nameof(SiteSpec.DeniedUrl)), url);
+    }
+
+    [Fact]
+    public void A_redirect_address_cannot_be_huge()
+    {
+        string url = "https://example.com/" + new string('a', SiteSpecValidator.MaximumRedirectUrlLength);
+        SiteSpec spec = Proxy() with
+        {
+            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+        };
+
+        Assert.True(HasProblem(spec, nameof(SiteSpec.DeniedUrl)));
+    }
+
+    [Fact]
+    public void The_redirect_address_is_ignored_by_the_other_behaviors()
+    {
+        SiteSpec spec = Proxy() with
+        {
+            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.NotFound, DeniedUrl = "not a url"
+        };
+
+        Assert.Empty(SiteSpecValidator.Validate(spec));
     }
 
     [Theory]

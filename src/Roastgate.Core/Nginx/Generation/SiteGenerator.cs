@@ -6,7 +6,11 @@ namespace Roastgate.Core.Nginx.Generation;
 /// <param name="AcmeWebroot">The Let's Encrypt challenge directory from the settings.</param>
 /// <param name="FileName">The config file name, used to give the websocket map variable a name that is unique across files.</param>
 /// <param name="NginxVersion">The version running on the host, when known. Directives that changed between versions depend on it.</param>
-public sealed record GenerationContext(ConfigLocations Locations, string AcmeWebroot, string FileName, Version? NginxVersion = null)
+public sealed record GenerationContext(
+    ConfigLocations Locations,
+    string AcmeWebroot,
+    string FileName,
+    Version? NginxVersion = null)
 {
     /// <summary>
     /// nginx 1.25.1 replaced the <c>http2</c> parameter of <c>listen</c> by a separate <c>http2 on;</c> directive, which older versions
@@ -21,6 +25,7 @@ public static class SiteGenerator
     public static string Generate(SiteSpec spec, GenerationContext context)
     {
         NginxWriter writer = new();
+
         string upgradeVariable = "$rg_upgrade_" + VariableSuffix(context.FileName);
 
         if (spec.Kind == SiteKind.ReverseProxy && spec.Websockets)
@@ -33,7 +38,9 @@ public static class SiteGenerator
         }
 
         bool redirectToHttps = spec.EnableTls && spec.ForceHttps;
+
         WriteServer(writer, spec, context, tls: false, redirect: redirectToHttps, upgradeVariable);
+
         if (spec.EnableTls)
         {
             writer.Blank();
@@ -43,12 +50,17 @@ public static class SiteGenerator
         return writer.ToString();
     }
 
-    private static void WriteServer(NginxWriter writer, SiteSpec spec, GenerationContext context, bool tls, bool redirect, string upgradeVariable)
+    private static void WriteServer(NginxWriter writer, SiteSpec spec, GenerationContext context, bool tls,
+        bool redirect, string upgradeVariable)
     {
         int port = tls ? spec.HttpsPort : spec.HttpPort;
+
         writer.Open("server");
+
         string parameters = tls ? (spec.Http2 && !context.UsesHttp2Directive ? " ssl http2" : " ssl") : string.Empty;
+
         writer.Line($"listen {port}{parameters};");
+
         if (spec.Ipv6)
         {
             writer.Line($"listen [::]:{port}{parameters};");
@@ -60,6 +72,7 @@ public static class SiteGenerator
         }
 
         writer.Line($"server_name {string.Join(' ', spec.ServerNames)};");
+
         if (tls)
         {
             writer.Blank();
@@ -69,6 +82,7 @@ public static class SiteGenerator
         }
 
         WriteAccess(writer, spec, context);
+
         if (!redirect)
         {
             WriteLimitsAndHeaders(writer, spec, tls);
@@ -78,6 +92,7 @@ public static class SiteGenerator
         {
             writer.Blank();
             writer.Open("location ^~ /.well-known/acme-challenge/");
+
             if (spec.Whitelists.Count > 0)
             {
                 writer.Line("allow all;");
@@ -90,6 +105,7 @@ public static class SiteGenerator
         if (redirect)
         {
             string authority = spec.HttpsPort == 443 ? "$host" : $"$host:{spec.HttpsPort}";
+
             writer.Blank();
             writer.Open("location /");
             writer.Line($"return 301 https://{authority}$request_uri;");
@@ -104,6 +120,7 @@ public static class SiteGenerator
             }
 
             writer.Blank();
+
             if (spec.Kind == SiteKind.ReverseProxy)
             {
                 WriteProxyLocation(writer, spec, upgradeVariable);
@@ -125,17 +142,41 @@ public static class SiteGenerator
         }
 
         writer.Blank();
+
         foreach (string whitelist in spec.Whitelists)
         {
             writer.Line($"include {context.Locations.WhitelistIncludePath(whitelist)};");
         }
 
         writer.Line("deny all;");
+
+        string? deniedReturn = spec.DeniedBehavior switch
+        {
+            DeniedBehavior.Redirect => $"return 302 {spec.DeniedUrl};",
+            DeniedBehavior.NotFound => "return 404;",
+            DeniedBehavior.CloseConnection => "return 444;",
+            // The case Forbidden is already handled and do not require another block
+            _ => null,
+        };
+
+        if (deniedReturn is null)
+        {
+            return;
+        }
+
+        writer.Blank();
+        writer.Line("error_page 403 = @rg_denied;");
+        writer.Blank();
+        writer.Open("location @rg_denied");
+        writer.Line("allow all;");
+        writer.Line(deniedReturn);
+        writer.Close();
     }
 
     private static void WriteLimitsAndHeaders(NginxWriter writer, SiteSpec spec, bool tls)
     {
         bool hasLimit = !string.IsNullOrWhiteSpace(spec.MaxBodySize);
+
         if (hasLimit || spec.SecurityHeaders || (tls && spec.Hsts) || spec.BlockCommonExploits)
         {
             writer.Blank();
@@ -172,6 +213,7 @@ public static class SiteGenerator
         writer.Open("location /");
         writer.Line($"proxy_pass {spec.Upstream};");
         writer.Line("proxy_http_version 1.1;");
+
         if (spec.Upstream.StartsWith("https://", StringComparison.Ordinal))
         {
             writer.Line("proxy_ssl_server_name on;");
@@ -182,6 +224,7 @@ public static class SiteGenerator
         writer.Line("proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;");
         writer.Line("proxy_set_header X-Forwarded-Proto $scheme;");
         writer.Line("proxy_set_header X-Forwarded-Host $host;");
+
         if (spec.Websockets)
         {
             writer.Line("proxy_set_header Upgrade $http_upgrade;");
@@ -209,6 +252,7 @@ public static class SiteGenerator
         writer.Blank();
         writer.Open("location /");
         writer.Line(spec.SpaFallback ? "try_files $uri $uri/ /index.html;" : "try_files $uri $uri/ =404;");
+
         if (!string.IsNullOrWhiteSpace(spec.ExtraLocationDirectives))
         {
             writer.Lines(spec.ExtraLocationDirectives);
@@ -230,8 +274,12 @@ public static class SiteGenerator
     /// <summary>A variable name suffix that is unique per config file (nginx refuses two maps that define the same variable).</summary>
     internal static string VariableSuffix(string fileName)
     {
-        string name = fileName.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal) ? fileName[..^ConfigNames.ConfigSuffix.Length] : fileName;
+        string name = fileName.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal)
+            ? fileName[..^ConfigNames.ConfigSuffix.Length]
+            : fileName;
+
         StringBuilder builder = new();
+
         foreach (char character in name.ToLowerInvariant())
         {
             builder.Append(char.IsAsciiLetterOrDigit(character) ? character : '_');
@@ -249,7 +297,8 @@ public static class SiteGenerator
         {
             // Never two blank lines in a row, and never one straight after an opening brace.
             string text = _builder.ToString();
-            if (text.Length == 0 || text.EndsWith("\n\n", StringComparison.Ordinal) || text.EndsWith("{\n", StringComparison.Ordinal))
+            if (text.Length == 0 || text.EndsWith("\n\n", StringComparison.Ordinal) ||
+                text.EndsWith("{\n", StringComparison.Ordinal))
             {
                 return;
             }
@@ -268,6 +317,7 @@ public static class SiteGenerator
             foreach (string line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
             {
                 string trimmed = line.TrimEnd();
+
                 if (trimmed.Length > 0)
                 {
                     _builder.Append(' ', _depth * 4).Append(trimmed.Replace("\t", "    ")).Append('\n');
@@ -278,12 +328,14 @@ public static class SiteGenerator
         public void Open(string header)
         {
             Line(header + " {");
+
             _depth++;
         }
 
         public void Close()
         {
             _depth--;
+
             Line("}");
         }
 

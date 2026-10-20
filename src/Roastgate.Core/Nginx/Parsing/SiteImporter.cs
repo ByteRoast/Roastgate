@@ -34,10 +34,17 @@ public static partial class SiteImporter
         Canonical("add_header Referrer-Policy strict-origin-when-cross-origin always;"),
     ];
 
-    private static readonly string HstsCanonical = Canonical("add_header Strict-Transport-Security \"max-age=31536000\" always;");
-    private static readonly string TraceCanonical = Canonical("if ($request_method ~* \"^(TRACE|TRACK)$\") { return 405; }");
+    private static readonly string HstsCanonical =
+        Canonical("add_header Strict-Transport-Security \"max-age=31536000\" always;");
+
+    private static readonly string TraceCanonical =
+        Canonical("if ($request_method ~* \"^(TRACE|TRACK)$\") { return 405; }");
+
     private static readonly string DotfilesCanonical = Canonical("location ~ /\\.(?!well-known) { deny all; }");
-    private static readonly string CacheCanonical = Canonical("location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ { expires 30d; try_files $uri =404; }");
+
+    private static readonly string CacheCanonical =
+        Canonical(
+            "location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ { expires 30d; try_files $uri =404; }");
 
     [GeneratedRegex(@"^(?<number>\d{1,5})(?<unit>s|m)?\z")]
     private static partial Regex DurationPattern();
@@ -45,6 +52,7 @@ public static partial class SiteImporter
     public static SiteImportResult Import(string content, ConfigLocations locations, string acmeWebroot)
     {
         NginxParseResult parsed = NginxParser.Parse(content);
+
         if (!parsed.Succeeded)
         {
             return Refuse($"The file cannot be read as nginx configuration ({parsed.Error}).");
@@ -53,6 +61,7 @@ public static partial class SiteImporter
         List<string> blockers = [];
         List<string> notes = [];
         List<NginxStatement> servers = [];
+
         foreach (NginxStatement statement in parsed.Statements)
         {
             if (statement.Name == "server" && statement.IsBlock && statement.Arguments.Count == 0)
@@ -61,7 +70,8 @@ public static partial class SiteImporter
             }
             else
             {
-                blockers.Add($"Line {statement.Line}: \"{statement.Name}\" outside a server block would be lost (the wizard only writes server blocks and its own WebSocket map).");
+                blockers.Add(
+                    $"Line {statement.Line}: \"{statement.Name}\" outside a server block would be lost (the wizard only writes server blocks and its own WebSocket map).");
             }
         }
 
@@ -79,6 +89,7 @@ public static partial class SiteImporter
 
         Context context = new(locations, acmeWebroot.TrimEnd('/'), blockers);
         List<ServerReading> readings = servers.Select((NginxStatement server) => ReadServer(server, context)).ToList();
+
         if (blockers.Count > 0)
         {
             return new SiteImportResult(null, notes, blockers);
@@ -86,25 +97,33 @@ public static partial class SiteImporter
 
         ServerReading main;
         ServerReading? redirect = null;
+
         if (readings.Count == 1)
         {
             main = readings[0];
+
             if (main.Tls)
             {
-                blockers.Add("This file only has an HTTPS server. The wizard always writes an HTTP server next to it (a redirect), so importing would add one.");
+                blockers.Add(
+                    "This file only has an HTTPS server. The wizard always writes an HTTP server next to it (a redirect), so importing would add one.");
             }
         }
         else
         {
             ServerReading[] tls = readings.Where((ServerReading reading) => reading.Tls).ToArray();
+
             if (tls.Length != 1)
             {
-                blockers.Add("With two server blocks, exactly one must be the HTTPS server and the other the plain HTTP one.");
+                blockers.Add(
+                    "With two server blocks, exactly one must be the HTTPS server and the other the plain HTTP one.");
+
                 return new SiteImportResult(null, notes, blockers);
             }
 
             main = tls[0];
+
             redirect = readings.Single((ServerReading reading) => !reading.Tls);
+
             CheckRedirect(redirect, main, blockers);
         }
 
@@ -114,6 +133,7 @@ public static partial class SiteImporter
         }
 
         SiteSpec spec = BuildSpec(main, redirect, blockers, notes);
+
         if (blockers.Count > 0)
         {
             return new SiteImportResult(null, notes, blockers);
@@ -175,19 +195,26 @@ public static partial class SiteImporter
         public NginxStatement? MainLocation { get; set; }
 
         public List<NginxStatement> Rest { get; } = [];
+
+        public DeniedBehavior DeniedBehavior { get; set; } = DeniedBehavior.Forbidden;
+
+        public string? DeniedUrl { get; set; }
     }
 
     private static ServerReading ReadServer(NginxStatement server, Context context)
     {
         ServerReading reading = new();
         List<NginxStatement> remaining = server.Children!.ToList();
+
         ReadListens(remaining, reading, context);
         ReadNames(remaining, reading, context);
         ReadTls(remaining, reading, context);
         ReadAccess(remaining, reading, context);
         ReadLimitsAndHeaders(remaining, reading);
         ReadLocations(remaining, reading, context);
+
         reading.Rest.AddRange(remaining);
+
         return reading;
     }
 
@@ -196,9 +223,12 @@ public static partial class SiteImporter
         bool anySsl = false;
         bool anyPlain = false;
         int? v6Port = null;
-        foreach (NginxStatement listen in remaining.Where((NginxStatement statement) => statement.Name == "listen").ToList())
+
+        foreach (NginxStatement listen in remaining.Where((NginxStatement statement) => statement.Name == "listen")
+                     .ToList())
         {
             remaining.Remove(listen);
+
             if (listen.Arguments.Count == 0)
             {
                 continue;
@@ -207,13 +237,16 @@ public static partial class SiteImporter
             string address = listen.Arguments[0];
             bool v6 = address.StartsWith("[::]:", StringComparison.Ordinal);
             string portText = v6 ? address[5..] : address;
+
             if (!int.TryParse(portText, out int port) || port is < 1 or > 65535)
             {
-                context.Blockers.Add($"Line {listen.Line}: \"listen {address}\" binds a specific address or socket, which the wizard does not write.");
+                context.Blockers.Add(
+                    $"Line {listen.Line}: \"listen {address}\" binds a specific address or socket, which the wizard does not write.");
                 continue;
             }
 
             bool ssl = false;
+
             foreach (string parameter in listen.Arguments.Skip(1))
             {
                 if (parameter == "ssl")
@@ -226,15 +259,18 @@ public static partial class SiteImporter
                 }
                 else if (!(v6 && parameter == "ipv6only=on"))
                 {
-                    context.Blockers.Add($"Line {listen.Line}: the listen parameter \"{parameter}\" is not something the wizard writes.");
+                    context.Blockers.Add(
+                        $"Line {listen.Line}: the listen parameter \"{parameter}\" is not something the wizard writes.");
                 }
             }
 
             anySsl |= ssl;
             anyPlain |= !ssl;
+
             if (v6)
             {
                 reading.Ipv6 = true;
+
                 v6Port = port;
             }
             else if (reading.Port is { } known && known != port)
@@ -266,14 +302,17 @@ public static partial class SiteImporter
 
     private static void ReadNames(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        foreach (NginxStatement statement in remaining.Where((NginxStatement item) => item.Name == "server_name").ToList())
+        foreach (NginxStatement statement in remaining.Where((NginxStatement item) => item.Name == "server_name")
+                     .ToList())
         {
             remaining.Remove(statement);
+
             foreach (string name in statement.Arguments)
             {
                 if (name.StartsWith('~') || name.Contains('$'))
                 {
-                    context.Blockers.Add($"Line {statement.Line}: the server name \"{name}\" is a pattern or a variable, which the wizard does not handle.");
+                    context.Blockers.Add(
+                        $"Line {statement.Line}: the server name \"{name}\" is a pattern or a variable, which the wizard does not handle.");
                 }
                 else if (!reading.Names.Contains(name, StringComparer.OrdinalIgnoreCase))
                 {
@@ -285,14 +324,18 @@ public static partial class SiteImporter
 
     private static void ReadTls(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        NginxStatement? http2 = remaining.FirstOrDefault((NginxStatement item) => item.Name == "http2" && item.Arguments.Count == 1);
+        NginxStatement? http2 =
+            remaining.FirstOrDefault((NginxStatement item) => item.Name == "http2" && item.Arguments.Count == 1);
+
         if (http2 is not null)
         {
             remaining.Remove(http2);
             reading.Http2 = http2.Arguments[0] == "on";
         }
 
-        NginxStatement? certificate = remaining.FirstOrDefault((NginxStatement item) => item.Name == "ssl_certificate" && item.Arguments.Count == 1);
+        NginxStatement? certificate = remaining.FirstOrDefault((NginxStatement item) =>
+            item.Name == "ssl_certificate" && item.Arguments.Count == 1);
+
         if (certificate is not null)
         {
             remaining.Remove(certificate);
@@ -300,14 +343,17 @@ public static partial class SiteImporter
             reading.Tls = true;
         }
 
-        NginxStatement? key = remaining.FirstOrDefault((NginxStatement item) => item.Name == "ssl_certificate_key" && item.Arguments.Count == 1);
+        NginxStatement? key = remaining.FirstOrDefault((NginxStatement item) =>
+            item.Name == "ssl_certificate_key" && item.Arguments.Count == 1);
+
         if (key is not null)
         {
             remaining.Remove(key);
             reading.CertificateKey = key.Arguments[0];
         }
 
-        foreach (NginxStatement protocols in remaining.Where((NginxStatement item) => item.Name == "ssl_protocols").ToList())
+        foreach (NginxStatement protocols in remaining.Where((NginxStatement item) => item.Name == "ssl_protocols")
+                     .ToList())
         {
             if (protocols.Arguments.SequenceEqual(["TLSv1.2", "TLSv1.3"]))
             {
@@ -315,7 +361,8 @@ public static partial class SiteImporter
             }
             else
             {
-                context.Blockers.Add($"Line {protocols.Line}: ssl_protocols differs from \"TLSv1.2 TLSv1.3\", which the wizard always writes (nginx refuses the directive twice).");
+                context.Blockers.Add(
+                    $"Line {protocols.Line}: ssl_protocols differs from \"TLSv1.2 TLSv1.3\", which the wizard always writes (nginx refuses the directive twice).");
             }
         }
     }
@@ -323,10 +370,15 @@ public static partial class SiteImporter
     private static void ReadAccess(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
         string prefix = context.Locations.WhitelistIncludePath(string.Empty);
+
         List<NginxStatement> includes = remaining
-            .Where((NginxStatement item) => item.Name == "include" && item.Arguments.Count == 1 && WhitelistName(item.Arguments[0], prefix) is not null)
+            .Where((NginxStatement item) => item.Name == "include" && item.Arguments.Count == 1 &&
+                                            WhitelistName(item.Arguments[0], prefix) is not null)
             .ToList();
-        NginxStatement? deny = remaining.FirstOrDefault((NginxStatement item) => item.Name == "deny" && item.Arguments.SequenceEqual(["all"]));
+
+        NginxStatement? deny = remaining.FirstOrDefault((NginxStatement item) =>
+            item.Name == "deny" && item.Arguments.SequenceEqual(["all"]));
+
         if (includes.Count == 0 || deny is null)
         {
             return;
@@ -339,11 +391,78 @@ public static partial class SiteImporter
         }
 
         remaining.Remove(deny);
+
         NginxStatement? other = remaining.FirstOrDefault((NginxStatement item) => item.Name is "allow" or "deny");
+
         if (other is not null)
         {
-            context.Blockers.Add($"Line {other.Line}: \"{other.Name}\" next to a whitelist would end up after \"deny all\" and stop working, so the order of the rules would change.");
+            context.Blockers.Add(
+                $"Line {other.Line}: \"{other.Name}\" next to a whitelist would end up after \"deny all\" and stop working, so the order of the rules would change.");
         }
+
+        NginxStatement? forbiddenErrorSection =
+            remaining.FirstOrDefault((NginxStatement item) =>
+                item.Name == "error_page" && item.Arguments.SequenceEqual(["403", "=", "@rg_denied"]));
+
+        NginxStatement? rgDeniedLocation =
+            remaining.FirstOrDefault((NginxStatement item) =>
+                item.Name == "location" && item.Arguments.SequenceEqual(["@rg_denied"]) && item.IsBlock);
+
+        if (forbiddenErrorSection is null && rgDeniedLocation is null)
+        {
+            return;
+        }
+
+        if (forbiddenErrorSection is null)
+        {
+            context.Blockers.Add(
+                $"Line {rgDeniedLocation!.Line}: \"location @rg_denied\" is never used: there is no \"error_page 403 = @rg_denied;\" next to it.");
+            return;
+        }
+
+        if (rgDeniedLocation is null)
+        {
+            context.Blockers.Add(
+                $"Line {forbiddenErrorSection.Line}: \"error_page 403 = @rg_denied;\" points to a \"location @rg_denied\" block that does not exist.");
+            return;
+        }
+
+        IReadOnlyList<NginxStatement> children = rgDeniedLocation.Children!;
+
+        bool shapeMatches = children.Count == 2 && children[0].Canonical == "allow all;" &&
+                            children[1].Name == "return";
+
+        if (!shapeMatches)
+        {
+            context.Blockers.Add(
+                $"Line {rgDeniedLocation.Line}: \"location @rg_denied\" must only contain \"allow all;\" and one \"return\", as the wizard writes it.");
+            return;
+        }
+
+        IReadOnlyList<string> returned = children[1].Arguments;
+
+        if (returned.SequenceEqual(["404"]))
+        {
+            reading.DeniedBehavior = DeniedBehavior.NotFound;
+        }
+        else if (returned.SequenceEqual(["444"]))
+        {
+            reading.DeniedBehavior = DeniedBehavior.CloseConnection;
+        }
+        else if (returned.Count == 2 && returned[0] == "302")
+        {
+            reading.DeniedBehavior = DeniedBehavior.Redirect;
+            reading.DeniedUrl = returned[1];
+        }
+        else
+        {
+            context.Blockers.Add(
+                $"Line {children[1].Line}: the wizard only writes \"return 404;\", \"return 444;\" or \"return 302 <url>;\" here.");
+            return;
+        }
+
+        remaining.Remove(forbiddenErrorSection);
+        remaining.Remove(rgDeniedLocation);
     }
 
     private static string? WhitelistName(string path, string prefix)
@@ -354,12 +473,15 @@ public static partial class SiteImporter
         }
 
         string name = path[prefix.Length..];
+
         return ConfigNames.Normalize(ConfigArea.Whitelists, name) == name ? name : null;
     }
 
     private static void ReadLimitsAndHeaders(List<NginxStatement> remaining, ServerReading reading)
     {
-        NginxStatement? limit = remaining.FirstOrDefault((NginxStatement item) => item.Name == "client_max_body_size" && item.Arguments.Count == 1);
+        NginxStatement? limit = remaining.FirstOrDefault((NginxStatement item) =>
+            item.Name == "client_max_body_size" && item.Arguments.Count == 1);
+
         if (limit is not null)
         {
             remaining.Remove(limit);
@@ -367,16 +489,20 @@ public static partial class SiteImporter
         }
 
         List<NginxStatement> securityHeaders = SecurityHeaderCanonicals
-            .Select((string canonical) => remaining.FirstOrDefault((NginxStatement item) => item.Canonical == canonical))
+            .Select((string canonical) =>
+                remaining.FirstOrDefault((NginxStatement item) => item.Canonical == canonical))
             .OfType<NginxStatement>()
             .ToList();
+
         if (securityHeaders.Count == SecurityHeaderCanonicals.Length)
         {
             reading.SecurityHeaders = true;
+
             securityHeaders.ForEach((NginxStatement item) => remaining.Remove(item));
         }
 
         NginxStatement? hsts = remaining.FirstOrDefault((NginxStatement item) => item.Canonical == HstsCanonical);
+
         if (hsts is not null)
         {
             reading.Hsts = true;
@@ -384,10 +510,13 @@ public static partial class SiteImporter
         }
 
         NginxStatement? trace = remaining.FirstOrDefault((NginxStatement item) => item.Canonical == TraceCanonical);
-        NginxStatement? dotfiles = remaining.FirstOrDefault((NginxStatement item) => item.Canonical == DotfilesCanonical);
+        NginxStatement? dotfiles =
+            remaining.FirstOrDefault((NginxStatement item) => item.Canonical == DotfilesCanonical);
+
         if (trace is not null && dotfiles is not null)
         {
             reading.BlockExploits = true;
+
             remaining.Remove(trace);
             remaining.Remove(dotfiles);
         }
@@ -395,31 +524,42 @@ public static partial class SiteImporter
 
     private static void ReadLocations(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        NginxStatement? acme = remaining.FirstOrDefault((NginxStatement item) => IsAcmeLocation(item, context.AcmeWebroot));
+        NginxStatement? acme =
+            remaining.FirstOrDefault((NginxStatement item) => IsAcmeLocation(item, context.AcmeWebroot));
+
         if (acme is not null)
         {
             reading.AcmeChallenge = true;
+
             remaining.Remove(acme);
         }
 
         NginxStatement? cache = remaining.FirstOrDefault((NginxStatement item) => item.Canonical == CacheCanonical);
+
         if (cache is not null)
         {
             reading.CacheAssets = true;
             remaining.Remove(cache);
         }
 
-        NginxStatement? main = remaining.FirstOrDefault((NginxStatement item) => item.Name == "location" && item.IsBlock && item.Arguments.SequenceEqual(["/"]));
+        NginxStatement? main = remaining.FirstOrDefault((NginxStatement item) =>
+            item.Name == "location" && item.IsBlock && item.Arguments.SequenceEqual(["/"]));
+
         if (main is not null)
         {
             reading.MainLocation = main;
+
             remaining.Remove(main);
         }
 
-        NginxStatement? root = remaining.FirstOrDefault((NginxStatement item) => item.Name == "root" && item.Arguments.Count == 1);
-        if (root is not null && main is not null && main.Children!.Any((NginxStatement item) => item.Name == "try_files"))
+        NginxStatement? root =
+            remaining.FirstOrDefault((NginxStatement item) => item.Name == "root" && item.Arguments.Count == 1);
+
+        if (root is not null && main is not null &&
+            main.Children!.Any((NginxStatement item) => item.Name == "try_files"))
         {
             reading.Root = root.Arguments[0];
+
             remaining.Remove(root);
         }
     }
@@ -432,27 +572,41 @@ public static partial class SiteImporter
         }
 
         IReadOnlyList<NginxStatement> children = statement.Children ?? [];
-        bool rootMatches = children.Any((NginxStatement item) => item.Name == "root" && item.Arguments.Count == 1 && item.Arguments[0].TrimEnd('/') == webroot);
-        return rootMatches && children.All((NginxStatement item) => item.Name == "root" || item.Canonical == "allow all;");
+
+        bool rootMatches = children.Any((NginxStatement item) =>
+            item.Name == "root" && item.Arguments.Count == 1 && item.Arguments[0].TrimEnd('/') == webroot);
+
+        return rootMatches &&
+               children.All((NginxStatement item) => item.Name == "root" || item.Canonical == "allow all;");
     }
 
     /// <summary>The HTTP server of a pair must do nothing but redirect (the wizard writes the same server again from its settings).</summary>
     private static void CheckRedirect(ServerReading redirect, ServerReading main, List<string> blockers)
     {
         if (!redirect.Names.OrderBy((string name) => name, StringComparer.OrdinalIgnoreCase)
-                .SequenceEqual(main.Names.OrderBy((string name) => name, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+                .SequenceEqual(main.Names.OrderBy((string name) => name, StringComparer.OrdinalIgnoreCase),
+                    StringComparer.OrdinalIgnoreCase))
         {
             blockers.Add("The HTTP and the HTTPS server blocks do not have the same server names.");
         }
 
+        if (redirect.DeniedBehavior != main.DeniedBehavior || redirect.DeniedUrl != main.DeniedUrl)
+        {
+            blockers.Add(
+                "The HTTP and the HTTPS server blocks do not refuse visitors outside the whitelists the same way.");
+        }
+
         string authority = main.Port == 443 ? "$host" : $"$host:{main.Port}";
         string expected = $"https://{authority}$request_uri";
+
         List<NginxStatement> rest = redirect.Rest.ToList();
+
         if (redirect.MainLocation is { } location)
         {
             if (rest.Count > 0 || location.Children!.Count != 1)
             {
-                blockers.Add("The HTTP server block does more than redirect to HTTPS, which the wizard cannot reproduce.");
+                blockers.Add(
+                    "The HTTP server block does more than redirect to HTTPS, which the wizard cannot reproduce.");
                 return;
             }
 
@@ -460,20 +614,25 @@ public static partial class SiteImporter
         }
 
         bool isRedirect = rest.Count == 1
-            && rest[0].Name == "return"
-            && rest[0].Arguments.Count == 2
-            && rest[0].Arguments[0] == "301"
-            && rest[0].Arguments[1] == expected;
+                          && rest[0].Name == "return"
+                          && rest[0].Arguments.Count == 2
+                          && rest[0].Arguments[0] == "301"
+                          && rest[0].Arguments[1] == expected;
+
         if (!isRedirect || redirect.Root is not null)
         {
-            blockers.Add($"The HTTP server block must only contain \"return 301 {expected};\" (the wizard writes exactly that), possibly with the Let's Encrypt challenge location.");
+            blockers.Add(
+                $"The HTTP server block must only contain \"return 301 {expected};\" (the wizard writes exactly that), possibly with the Let's Encrypt challenge location.");
         }
     }
 
-    private static SiteSpec BuildSpec(ServerReading main, ServerReading? redirect, List<string> blockers, List<string> notes)
+    private static SiteSpec BuildSpec(ServerReading main, ServerReading? redirect, List<string> blockers,
+        List<string> notes)
     {
         bool proxy = main.MainLocation?.Children?.Any((NginxStatement item) => item.Name == "proxy_pass") ?? false;
+
         List<NginxStatement> locationRest = main.MainLocation?.Children?.ToList() ?? [];
+
         string upstream = string.Empty;
         bool websockets = false;
         int? timeout = null;
@@ -481,7 +640,8 @@ public static partial class SiteImporter
 
         if (main.MainLocation is null)
         {
-            blockers.Add("There is no \"location /\" block: the wizard builds its site around one that proxies or serves files.");
+            blockers.Add(
+                "There is no \"location /\" block: the wizard builds its site around one that proxies or serves files.");
         }
         else if (proxy)
         {
@@ -499,6 +659,7 @@ public static partial class SiteImporter
 
         string? extraServer = JoinText(main.Rest);
         string? extraLocation = JoinText(locationRest);
+
         return new SiteSpec
         {
             Kind = proxy ? SiteKind.ReverseProxy : SiteKind.StaticSite,
@@ -523,6 +684,8 @@ public static partial class SiteImporter
             SecurityHeaders = main.SecurityHeaders,
             BlockCommonExploits = main.BlockExploits,
             Whitelists = main.Whitelists.OrderBy((string name) => name, StringComparer.Ordinal).ToList(),
+            DeniedBehavior = main.DeniedBehavior,
+            DeniedUrl = main.DeniedUrl,
             ServeAcmeChallenge = main.AcmeChallenge || (redirect?.AcmeChallenge ?? false),
             ExtraServerDirectives = extraServer,
             ExtraLocationDirectives = extraLocation,
@@ -532,17 +695,23 @@ public static partial class SiteImporter
     private static string? JoinText(IEnumerable<NginxStatement> statements)
     {
         string text = string.Join('\n', statements.Select((NginxStatement statement) => statement.Text));
+
         return text.Length == 0 ? null : text;
     }
 
-    private static void ReadProxyLocation(List<NginxStatement> rest, List<string> blockers, List<string> notes, out string upstream, out bool websockets, out int? timeout)
+    private static void ReadProxyLocation(List<NginxStatement> rest, List<string> blockers, List<string> notes,
+        out string upstream, out bool websockets, out int? timeout)
     {
         NginxStatement pass = rest.First((NginxStatement item) => item.Name == "proxy_pass");
+
         upstream = pass.Arguments.Count == 1 ? pass.Arguments[0] : string.Empty;
+
         rest.Remove(pass);
+
         List<string> missing = [];
 
         NginxStatement? version = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_http_version");
+
         if (version is null)
         {
             missing.Add("proxy_http_version 1.1");
@@ -556,7 +725,9 @@ public static partial class SiteImporter
             blockers.Add($"Line {version.Line}: proxy_http_version is not 1.1, which the wizard always writes.");
         }
 
-        NginxStatement? sni = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_ssl_server_name" && item.Arguments.SequenceEqual(["on"]));
+        NginxStatement? sni = rest.FirstOrDefault((NginxStatement item) =>
+            item.Name == "proxy_ssl_server_name" && item.Arguments.SequenceEqual(["on"]));
+
         if (sni is not null && upstream.StartsWith("https://", StringComparison.Ordinal))
         {
             rest.Remove(sni);
@@ -569,8 +740,11 @@ public static partial class SiteImporter
         foreach (KeyValuePair<string, string> header in DefaultProxyHeaders)
         {
             List<NginxStatement> sameName = rest
-                .Where((NginxStatement item) => item.Name == "proxy_set_header" && item.Arguments.Count == 2 && string.Equals(item.Arguments[0], header.Key, StringComparison.OrdinalIgnoreCase))
+                .Where((NginxStatement item) => item.Name == "proxy_set_header" && item.Arguments.Count == 2 &&
+                                                string.Equals(item.Arguments[0], header.Key,
+                                                    StringComparison.OrdinalIgnoreCase))
                 .ToList();
+
             if (sameName.Count == 0)
             {
                 missing.Add($"proxy_set_header {header.Key}");
@@ -584,46 +758,64 @@ public static partial class SiteImporter
                 }
                 else
                 {
-                    blockers.Add($"Line {statement.Line}: \"proxy_set_header {header.Key} {statement.Arguments[1]}\" differs from what the wizard always writes ({header.Value}).");
+                    blockers.Add(
+                        $"Line {statement.Line}: \"proxy_set_header {header.Key} {statement.Arguments[1]}\" differs from what the wizard always writes ({header.Value}).");
                 }
             }
         }
 
-        NginxStatement? upgrade = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_set_header" && item.Arguments.Count == 2 && item.Arguments[0].Equals("Upgrade", StringComparison.OrdinalIgnoreCase));
-        NginxStatement? connection = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_set_header" && item.Arguments.Count == 2 && item.Arguments[0].Equals("Connection", StringComparison.OrdinalIgnoreCase));
+        NginxStatement? upgrade = rest.FirstOrDefault((NginxStatement item) =>
+            item.Name == "proxy_set_header" && item.Arguments.Count == 2 &&
+            item.Arguments[0].Equals("Upgrade", StringComparison.OrdinalIgnoreCase));
+
+        NginxStatement? connection = rest.FirstOrDefault((NginxStatement item) =>
+            item.Name == "proxy_set_header" && item.Arguments.Count == 2 &&
+            item.Arguments[0].Equals("Connection", StringComparison.OrdinalIgnoreCase));
+
         websockets = false;
+
         if (upgrade is not null && upgrade.Arguments[1] == "$http_upgrade" && connection is not null
             && (connection.Arguments[1] == "upgrade" || connection.Arguments[1].StartsWith('$')))
         {
             websockets = true;
+
             rest.Remove(upgrade);
             rest.Remove(connection);
         }
         else if (connection is not null && connection.Arguments[1] != "upgrade")
         {
-            blockers.Add($"Line {connection.Line}: \"proxy_set_header Connection {connection.Arguments[1]}\" cannot be turned into the wizard's WebSocket switch.");
+            blockers.Add(
+                $"Line {connection.Line}: \"proxy_set_header Connection {connection.Arguments[1]}\" cannot be turned into the wizard's WebSocket switch.");
         }
 
         timeout = null;
-        NginxStatement? read = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_read_timeout" && item.Arguments.Count == 1);
-        NginxStatement? send = rest.FirstOrDefault((NginxStatement item) => item.Name == "proxy_send_timeout" && item.Arguments.Count == 1);
+
+        NginxStatement? read = rest.FirstOrDefault((NginxStatement item) =>
+            item.Name == "proxy_read_timeout" && item.Arguments.Count == 1);
+
+        NginxStatement? send = rest.FirstOrDefault((NginxStatement item) =>
+            item.Name == "proxy_send_timeout" && item.Arguments.Count == 1);
+
         if (read is not null && send is not null
-            && Seconds(read.Arguments[0]) is { } seconds && Seconds(send.Arguments[0]) == seconds)
+                             && Seconds(read.Arguments[0]) is { } seconds && Seconds(send.Arguments[0]) == seconds)
         {
             timeout = seconds;
+
             rest.Remove(read);
             rest.Remove(send);
         }
 
         if (missing.Count > 0)
         {
-            notes.Add("The wizard always writes " + string.Join(", ", missing) + ", which this file did not have. Check that your application is fine with it.");
+            notes.Add("The wizard always writes " + string.Join(", ", missing) +
+                      ", which this file did not have. Check that your application is fine with it.");
         }
     }
 
     private static int? Seconds(string value)
     {
         Match match = DurationPattern().Match(value);
+
         if (!match.Success)
         {
             return null;
@@ -631,13 +823,17 @@ public static partial class SiteImporter
 
         int number = int.Parse(match.Groups["number"].Value);
         int seconds = match.Groups["unit"].Value == "m" ? number * 60 : number;
+
         return seconds is >= 1 and <= 3600 ? seconds : null;
     }
 
-    private static bool ReadStaticLocation(ServerReading main, List<NginxStatement> rest, List<string> blockers, out bool spa)
+    private static bool ReadStaticLocation(ServerReading main, List<NginxStatement> rest, List<string> blockers,
+        out bool spa)
     {
         spa = false;
+
         NginxStatement? tryFiles = rest.FirstOrDefault((NginxStatement item) => item.Name == "try_files");
+
         if (tryFiles is null || main.Root is null)
         {
             return false;
@@ -653,12 +849,16 @@ public static partial class SiteImporter
         }
         else
         {
-            blockers.Add($"Line {tryFiles.Line}: try_files is neither \"$uri $uri/ =404\" nor the single page application form \"$uri $uri/ /index.html\".");
+            blockers.Add(
+                $"Line {tryFiles.Line}: try_files is neither \"$uri $uri/ =404\" nor the single page application form \"$uri $uri/ /index.html\".");
+
             return true;
         }
 
         rest.Remove(tryFiles);
+
         NginxStatement? index = main.Rest.FirstOrDefault((NginxStatement item) => item.Name == "index");
+
         if (index is not null)
         {
             if (index.Arguments.SequenceEqual(["index.html", "index.htm"]))
@@ -667,7 +867,8 @@ public static partial class SiteImporter
             }
             else
             {
-                blockers.Add($"Line {index.Line}: the index files differ from \"index.html index.htm\", which the wizard always writes.");
+                blockers.Add(
+                    $"Line {index.Line}: the index files differ from \"index.html index.htm\", which the wizard always writes.");
             }
         }
 
