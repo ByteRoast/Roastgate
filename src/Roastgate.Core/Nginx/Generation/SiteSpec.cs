@@ -58,6 +58,11 @@ public sealed record SiteSpec
     public bool SpaFallback { get; init; }
 
     public bool CacheStaticAssets { get; init; } = true;
+    
+    /// <summary>
+    /// The fancyindex directory listing, or null to serve the site without it. Needs the module to be loaded in nginx.
+    /// </summary>
+    public FancyIndexOptions? FancyIndex { get; init; }
 
     // ---- HTTPS ----
 
