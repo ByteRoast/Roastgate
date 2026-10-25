@@ -672,6 +672,61 @@ public sealed class SiteGeneratorTests
         Assert.DoesNotContain("fancyindex", text);
     }
 
+    [Fact]
+    public void Lets_the_header_and_footer_through_the_exploit_protection_when_they_are_in_a_dot_directory()
+    {
+        SiteSpec spec = FileServer(new FancyIndexOptions
+            {
+                Header = "/.nginxy/header.html",
+                Footer = "/.nginxy/footer.html",
+            }) with
+            {
+                BlockCommonExploits = true
+            };
+
+        string text = Generate(spec);
+
+        Assert.Equal(1, Count(text, "location ^~ /.nginxy/ {"));
+        Assert.Contains("try_files $uri =404;", text);
+    }
+
+    [Fact]
+    public void Adds_no_exception_for_a_directory_without_a_dot()
+    {
+        SiteSpec spec = FileServer(
+                new FancyIndexOptions
+                {
+                    Header = "/assets/header.html"
+                }
+            ) with
+            {
+                BlockCommonExploits = true
+            };
+
+        string text = Generate(spec);
+
+        Assert.DoesNotContain("location ^~", text);
+    }
+
+    [Fact]
+    public void Adds_no_exception_when_the_exploit_protection_is_off()
+    {
+        SiteSpec spec = FileServer(
+                new FancyIndexOptions
+                {
+                    Header = "/.nginxy/header.html"
+                }
+            )
+            with
+            {
+                BlockCommonExploits = false
+            };
+
+        string text = Generate(spec);
+
+        Assert.DoesNotContain("location ^~", text);
+    }
+
     private static int Count(string text, string value)
     {
         int count = 0;

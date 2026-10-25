@@ -251,6 +251,9 @@ public static class SiteGenerator
         writer.Line($"root {spec.RootDirectory};");
         writer.Line("index index.html index.htm;");
         writer.Blank();
+
+        WriteDotDirectoryExceptions(writer, spec);
+
         writer.Open("location /");
         writer.Line(spec.SpaFallback ? "try_files $uri $uri/ /index.html;" : "try_files $uri $uri/ =404;");
 
@@ -274,6 +277,31 @@ public static class SiteGenerator
             writer.Line("expires 30d;");
             writer.Line("try_files $uri =404;");
             writer.Close();
+        }
+    }
+
+    private static void WriteDotDirectoryExceptions(NginxWriter writer, SiteSpec spec)
+    {
+        if (spec.FancyIndex is not { } options || !spec.BlockCommonExploits)
+        {
+            return;
+        }
+
+        string?[] paths = [options.Header, options.Footer, options.CssHref];
+
+        IEnumerable<string> directories = paths
+            .OfType<string>()
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path[..path.LastIndexOf('/')])
+            .Where(path => path.Split('/').Any(segment => segment.StartsWith('.')))
+            .Distinct();
+
+        foreach (string directory in directories)
+        {
+            writer.Open($"location ^~ {directory}/");
+            writer.Line("try_files $uri =404;");
+            writer.Close();
+            writer.Blank();
         }
     }
 
