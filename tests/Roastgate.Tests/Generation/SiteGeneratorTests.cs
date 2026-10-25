@@ -579,6 +579,99 @@ public sealed class SiteGeneratorTests
         }
     }
 
+    private static SiteSpec FileServer(FancyIndexOptions? options)
+    {
+        return new SiteSpec
+        {
+            Kind = SiteKind.StaticSite,
+            ServerNames = ["files.example.com"],
+            RootDirectory = "/srv/files",
+            BlockCommonExploits = false,
+            FancyIndex = options,
+        };
+    }
+
+    [Fact]
+    public void Writes_the_fancyindex_directives_in_the_main_location()
+    {
+        string text = Generate(FileServer(new FancyIndexOptions
+            {
+                ExactSize = false,
+                LocalTime = true,
+                Header = "/.nginxy/header.html",
+                Footer = "/.nginxy/footer.html",
+                CssHref = "/.nginxy/style.css",
+                Ignore = ["radarr", "uploads"],
+                TimeFormat = "%d-%b-%Y %H:%M",
+            }) with
+            {
+                ExtraLocationDirectives = "add_header Cache-Control no-store;"
+            });
+
+        Assert.Contains("fancyindex on;", text);
+        Assert.Contains("fancyindex_exact_size off;", text);
+        Assert.Contains("fancyindex_localtime on;", text);
+        Assert.Contains("fancyindex_show_path on;", text);
+        Assert.Contains("fancyindex_directories_first on;", text);
+        Assert.Contains("fancyindex_case_sensitive on;", text);
+        Assert.Contains("fancyindex_show_dotfiles off;", text);
+        Assert.Contains("fancyindex_hide_symlinks off;", text);
+        Assert.Contains("fancyindex_hide_parent_dir off;", text);
+        Assert.Contains("fancyindex_time_format \"%d-%b-%Y %H:%M\";", text);
+        Assert.Contains("fancyindex_header \"/.nginxy/header.html\";", text);
+        Assert.Contains("fancyindex_footer \"/.nginxy/footer.html\";", text);
+        Assert.Contains("fancyindex_css_href \"/.nginxy/style.css\";", text);
+        Assert.Contains("fancyindex_ignore radarr uploads;", text);
+
+        // Inside "location /", after try_files and before the free directives.
+        int tryFiles = text.IndexOf("try_files $uri $uri/ =404;", StringComparison.Ordinal);
+        int fancyIndex = text.IndexOf("fancyindex on;", StringComparison.Ordinal);
+        int extra = text.IndexOf("add_header Cache-Control no-store;", StringComparison.Ordinal);
+
+        Assert.True(tryFiles >= 0 && tryFiles < fancyIndex && fancyIndex < extra);
+    }
+
+    [Theory]
+    [InlineData(FancyIndexSort.Name, "name")]
+    [InlineData(FancyIndexSort.NameDescending, "name_desc")]
+    [InlineData(FancyIndexSort.Size, "size")]
+    [InlineData(FancyIndexSort.SizeDescending, "size_desc")]
+    [InlineData(FancyIndexSort.Date, "date")]
+    [InlineData(FancyIndexSort.DateDescending, "date_desc")]
+    public void Writes_the_sort_order_the_way_the_module_expects_it(FancyIndexSort sort, string expected)
+    {
+        string text = Generate(
+            FileServer(
+                new FancyIndexOptions
+                {
+                    DefaultSort = sort
+                }
+            )
+        );
+
+        Assert.Contains($"fancyindex_default_sort {expected};", text);
+    }
+
+    [Fact]
+    public void Leaves_out_the_header_footer_and_ignore_lines_when_there_is_nothing_to_write()
+    {
+        string text = Generate(FileServer(new FancyIndexOptions()));
+
+        Assert.Contains("fancyindex on;", text);
+        Assert.DoesNotContain("fancyindex_header", text);
+        Assert.DoesNotContain("fancyindex_footer", text);
+        Assert.DoesNotContain("fancyindex_css_href", text);
+        Assert.DoesNotContain("fancyindex_ignore", text);
+    }
+
+    [Fact]
+    public void Writes_nothing_about_fancyindex_without_options()
+    {
+        string text = Generate(FileServer(null));
+
+        Assert.DoesNotContain("fancyindex", text);
+    }
+
     private static int Count(string text, string value)
     {
         int count = 0;

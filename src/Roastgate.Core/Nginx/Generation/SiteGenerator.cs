@@ -1,4 +1,5 @@
 using System.Text;
+using Roastgate.Core.Extensions;
 
 namespace Roastgate.Core.Nginx.Generation;
 
@@ -253,6 +254,11 @@ public static class SiteGenerator
         writer.Open("location /");
         writer.Line(spec.SpaFallback ? "try_files $uri $uri/ /index.html;" : "try_files $uri $uri/ =404;");
 
+        if (spec.FancyIndex is { } fancyIndex)
+        {
+            WriteFancyIndex(writer, fancyIndex);
+        }
+
         if (!string.IsNullOrWhiteSpace(spec.ExtraLocationDirectives))
         {
             writer.Lines(spec.ExtraLocationDirectives);
@@ -286,6 +292,46 @@ public static class SiteGenerator
         }
 
         return builder.ToString();
+    }
+
+    private static void WriteFancyIndex(NginxWriter writer, FancyIndexOptions options)
+    {
+        writer.Line("fancyindex on;");
+        writer.Line($"fancyindex_exact_size {BooleanToOnOff(options.ExactSize)};");
+        writer.Line($"fancyindex_localtime {BooleanToOnOff(options.LocalTime)};");
+        writer.Line($"fancyindex_show_path {BooleanToOnOff(options.ShowPath)};");
+        writer.Line($"fancyindex_directories_first {BooleanToOnOff(options.DirectoriesFirst)};");
+        writer.Line($"fancyindex_case_sensitive {BooleanToOnOff(options.CaseSensitive)};");
+        writer.Line($"fancyindex_show_dotfiles {BooleanToOnOff(options.ShowDotFiles)};");
+        writer.Line($"fancyindex_hide_symlinks {BooleanToOnOff(options.HideSymlinks)};");
+        writer.Line($"fancyindex_hide_parent_dir {BooleanToOnOff(options.HideParentDir)};");
+        writer.Line($"fancyindex_default_sort {options.DefaultSort.GetDescription()};");
+        writer.Line($"fancyindex_time_format \"{options.TimeFormat}\";");
+
+        if (!string.IsNullOrWhiteSpace(options.Header))
+        {
+            writer.Line($"fancyindex_header \"{options.Header}\";");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.Footer))
+        {
+            writer.Line($"fancyindex_footer \"{options.Footer}\";");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.CssHref))
+        {
+            writer.Line($"fancyindex_css_href \"{options.CssHref}\";");
+        }
+
+        if (options.Ignore.Count > 0)
+        {
+            writer.Line($"fancyindex_ignore {string.Join(' ', options.Ignore)};");
+        }
+    }
+
+    private static string BooleanToOnOff(bool value)
+    {
+        return value ? "on" : "off";
     }
 
     private sealed class NginxWriter
