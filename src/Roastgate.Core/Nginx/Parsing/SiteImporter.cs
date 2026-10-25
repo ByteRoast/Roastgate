@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Roastgate.Core.Extensions;
 using Roastgate.Core.Nginx.Generation;
 
 namespace Roastgate.Core.Nginx.Parsing;
@@ -34,17 +35,21 @@ public static partial class SiteImporter
         Canonical("add_header Referrer-Policy strict-origin-when-cross-origin always;"),
     ];
 
-    private static readonly string HstsCanonical =
-        Canonical("add_header Strict-Transport-Security \"max-age=31536000\" always;");
+    private static readonly string HstsCanonical = Canonical(
+        "add_header Strict-Transport-Security \"max-age=31536000\" always;"
+    );
 
-    private static readonly string TraceCanonical =
-        Canonical("if ($request_method ~* \"^(TRACE|TRACK)$\") { return 405; }");
+    private static readonly string TraceCanonical = Canonical(
+        "if ($request_method ~* \"^(TRACE|TRACK)$\") { return 405; }"
+    );
 
-    private static readonly string DotfilesCanonical = Canonical("location ~ /\\.(?!well-known) { deny all; }");
+    private static readonly string DotfilesCanonical = Canonical(
+        "location ~ /\\.(?!well-known) { deny all; }"
+    );
 
-    private static readonly string CacheCanonical =
-        Canonical(
-            "location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ { expires 30d; try_files $uri =404; }");
+    private static readonly string CacheCanonical = Canonical(
+        "location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$ { expires 30d; try_files $uri =404; }"
+    );
 
     [GeneratedRegex(@"^(?<number>\d{1,5})(?<unit>s|m)?\z")]
     private static partial Regex DurationPattern();
@@ -71,7 +76,8 @@ public static partial class SiteImporter
             else
             {
                 blockers.Add(
-                    $"Line {statement.Line}: \"{statement.Name}\" outside a server block would be lost (the wizard only writes server blocks and its own WebSocket map).");
+                    $"Line {statement.Line}: \"{statement.Name}\" outside a server block would be lost (the wizard only writes server blocks and its own WebSocket map)."
+                );
             }
         }
 
@@ -79,7 +85,8 @@ public static partial class SiteImporter
         {
             blockers.Add(servers.Count == 0
                 ? "There is no server block in this file."
-                : "This file has more than two server blocks. The wizard handles one site: an HTTP server, plus an HTTPS server when TLS is on.");
+                : "This file has more than two server blocks. The wizard handles one site: an HTTP server, plus an HTTPS server when TLS is on."
+            );
         }
 
         if (blockers.Count > 0)
@@ -105,7 +112,8 @@ public static partial class SiteImporter
             if (main.Tls)
             {
                 blockers.Add(
-                    "This file only has an HTTPS server. The wizard always writes an HTTP server next to it (a redirect), so importing would add one.");
+                    "This file only has an HTTPS server. The wizard always writes an HTTP server next to it (a redirect), so importing would add one."
+                );
             }
         }
         else
@@ -115,7 +123,8 @@ public static partial class SiteImporter
             if (tls.Length != 1)
             {
                 blockers.Add(
-                    "With two server blocks, exactly one must be the HTTPS server and the other the plain HTTP one.");
+                    "With two server blocks, exactly one must be the HTTPS server and the other the plain HTTP one."
+                );
 
                 return new SiteImportResult(null, notes, blockers);
             }
@@ -224,8 +233,9 @@ public static partial class SiteImporter
         bool anyPlain = false;
         int? v6Port = null;
 
-        foreach (NginxStatement listen in remaining.Where((NginxStatement statement) => statement.Name == "listen")
-                     .ToList())
+        foreach (
+            NginxStatement listen in remaining.Where((NginxStatement statement) => statement.Name == "listen").ToList()
+        )
         {
             remaining.Remove(listen);
 
@@ -241,7 +251,8 @@ public static partial class SiteImporter
             if (!int.TryParse(portText, out int port) || port is < 1 or > 65535)
             {
                 context.Blockers.Add(
-                    $"Line {listen.Line}: \"listen {address}\" binds a specific address or socket, which the wizard does not write.");
+                    $"Line {listen.Line}: \"listen {address}\" binds a specific address or socket, which the wizard does not write."
+                );
                 continue;
             }
 
@@ -302,8 +313,9 @@ public static partial class SiteImporter
 
     private static void ReadNames(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        foreach (NginxStatement statement in remaining.Where((NginxStatement item) => item.Name == "server_name")
-                     .ToList())
+        foreach (
+            NginxStatement statement in remaining.Where((NginxStatement item) => item.Name == "server_name").ToList()
+        )
         {
             remaining.Remove(statement);
 
@@ -312,7 +324,8 @@ public static partial class SiteImporter
                 if (name.StartsWith('~') || name.Contains('$'))
                 {
                     context.Blockers.Add(
-                        $"Line {statement.Line}: the server name \"{name}\" is a pattern or a variable, which the wizard does not handle.");
+                        $"Line {statement.Line}: the server name \"{name}\" is a pattern or a variable, which the wizard does not handle."
+                    );
                 }
                 else if (!reading.Names.Contains(name, StringComparer.OrdinalIgnoreCase))
                 {
@@ -324,8 +337,8 @@ public static partial class SiteImporter
 
     private static void ReadTls(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        NginxStatement? http2 =
-            remaining.FirstOrDefault((NginxStatement item) => item.Name == "http2" && item.Arguments.Count == 1);
+        NginxStatement? http2 = remaining
+            .FirstOrDefault((NginxStatement item) => item.Name == "http2" && item.Arguments.Count == 1);
 
         if (http2 is not null)
         {
@@ -333,8 +346,8 @@ public static partial class SiteImporter
             reading.Http2 = http2.Arguments[0] == "on";
         }
 
-        NginxStatement? certificate = remaining.FirstOrDefault((NginxStatement item) =>
-            item.Name == "ssl_certificate" && item.Arguments.Count == 1);
+        NginxStatement? certificate = remaining
+            .FirstOrDefault((NginxStatement item) => item.Name == "ssl_certificate" && item.Arguments.Count == 1);
 
         if (certificate is not null)
         {
@@ -343,8 +356,8 @@ public static partial class SiteImporter
             reading.Tls = true;
         }
 
-        NginxStatement? key = remaining.FirstOrDefault((NginxStatement item) =>
-            item.Name == "ssl_certificate_key" && item.Arguments.Count == 1);
+        NginxStatement? key = remaining
+            .FirstOrDefault((NginxStatement item) => item.Name == "ssl_certificate_key" && item.Arguments.Count == 1);
 
         if (key is not null)
         {
@@ -352,8 +365,9 @@ public static partial class SiteImporter
             reading.CertificateKey = key.Arguments[0];
         }
 
-        foreach (NginxStatement protocols in remaining.Where((NginxStatement item) => item.Name == "ssl_protocols")
-                     .ToList())
+        foreach (
+            NginxStatement protocols in remaining.Where((NginxStatement item) => item.Name == "ssl_protocols").ToList()
+        )
         {
             if (protocols.Arguments.SequenceEqual(["TLSv1.2", "TLSv1.3"]))
             {
@@ -362,7 +376,8 @@ public static partial class SiteImporter
             else
             {
                 context.Blockers.Add(
-                    $"Line {protocols.Line}: ssl_protocols differs from \"TLSv1.2 TLSv1.3\", which the wizard always writes (nginx refuses the directive twice).");
+                    $"Line {protocols.Line}: ssl_protocols differs from \"TLSv1.2 TLSv1.3\", which the wizard always writes (nginx refuses the directive twice)."
+                );
             }
         }
     }
@@ -397,7 +412,8 @@ public static partial class SiteImporter
         if (other is not null)
         {
             context.Blockers.Add(
-                $"Line {other.Line}: \"{other.Name}\" next to a whitelist would end up after \"deny all\" and stop working, so the order of the rules would change.");
+                $"Line {other.Line}: \"{other.Name}\" next to a whitelist would end up after \"deny all\" and stop working, so the order of the rules would change."
+            );
         }
 
         NginxStatement? forbiddenErrorSection =
@@ -416,14 +432,18 @@ public static partial class SiteImporter
         if (forbiddenErrorSection is null)
         {
             context.Blockers.Add(
-                $"Line {rgDeniedLocation!.Line}: \"location @rg_denied\" is never used: there is no \"error_page 403 = @rg_denied;\" next to it.");
+                $"Line {rgDeniedLocation!.Line}: \"location @rg_denied\" is never used: there is no \"error_page 403 = @rg_denied;\" next to it."
+            );
+
             return;
         }
 
         if (rgDeniedLocation is null)
         {
             context.Blockers.Add(
-                $"Line {forbiddenErrorSection.Line}: \"error_page 403 = @rg_denied;\" points to a \"location @rg_denied\" block that does not exist.");
+                $"Line {forbiddenErrorSection.Line}: \"error_page 403 = @rg_denied;\" points to a \"location @rg_denied\" block that does not exist."
+            );
+
             return;
         }
 
@@ -435,7 +455,9 @@ public static partial class SiteImporter
         if (!shapeMatches)
         {
             context.Blockers.Add(
-                $"Line {rgDeniedLocation.Line}: \"location @rg_denied\" must only contain \"allow all;\" and one \"return\", as the wizard writes it.");
+                $"Line {rgDeniedLocation.Line}: \"location @rg_denied\" must only contain \"allow all;\" and one \"return\", as the wizard writes it."
+            );
+
             return;
         }
 
@@ -457,7 +479,9 @@ public static partial class SiteImporter
         else
         {
             context.Blockers.Add(
-                $"Line {children[1].Line}: the wizard only writes \"return 404;\", \"return 444;\" or \"return 302 <url>;\" here.");
+                $"Line {children[1].Line}: the wizard only writes \"return 404;\", \"return 444;\" or \"return 302 <url>;\" here."
+            );
+
             return;
         }
 
@@ -479,8 +503,8 @@ public static partial class SiteImporter
 
     private static void ReadLimitsAndHeaders(List<NginxStatement> remaining, ServerReading reading)
     {
-        NginxStatement? limit = remaining.FirstOrDefault((NginxStatement item) =>
-            item.Name == "client_max_body_size" && item.Arguments.Count == 1);
+        NginxStatement? limit = remaining
+            .FirstOrDefault((NginxStatement item) => item.Name == "client_max_body_size" && item.Arguments.Count == 1);
 
         if (limit is not null)
         {
@@ -510,8 +534,8 @@ public static partial class SiteImporter
         }
 
         NginxStatement? trace = remaining.FirstOrDefault((NginxStatement item) => item.Canonical == TraceCanonical);
-        NginxStatement? dotfiles =
-            remaining.FirstOrDefault((NginxStatement item) => item.Canonical == DotfilesCanonical);
+        NginxStatement? dotfiles = remaining
+            .FirstOrDefault((NginxStatement item) => item.Canonical == DotfilesCanonical);
 
         if (trace is not null && dotfiles is not null)
         {
@@ -524,8 +548,8 @@ public static partial class SiteImporter
 
     private static void ReadLocations(List<NginxStatement> remaining, ServerReading reading, Context context)
     {
-        NginxStatement? acme =
-            remaining.FirstOrDefault((NginxStatement item) => IsAcmeLocation(item, context.AcmeWebroot));
+        NginxStatement? acme = remaining
+            .FirstOrDefault((NginxStatement item) => IsAcmeLocation(item, context.AcmeWebroot));
 
         if (acme is not null)
         {
@@ -622,12 +646,17 @@ public static partial class SiteImporter
         if (!isRedirect || redirect.Root is not null)
         {
             blockers.Add(
-                $"The HTTP server block must only contain \"return 301 {expected};\" (the wizard writes exactly that), possibly with the Let's Encrypt challenge location.");
+                $"The HTTP server block must only contain \"return 301 {expected};\" (the wizard writes exactly that), possibly with the Let's Encrypt challenge location."
+            );
         }
     }
 
-    private static SiteSpec BuildSpec(ServerReading main, ServerReading? redirect, List<string> blockers,
-        List<string> notes)
+    private static SiteSpec BuildSpec(
+        ServerReading main,
+        ServerReading? redirect,
+        List<string> blockers,
+        List<string> notes
+    )
     {
         bool proxy = main.MainLocation?.Children?.Any((NginxStatement item) => item.Name == "proxy_pass") ?? false;
 
@@ -656,6 +685,10 @@ public static partial class SiteImporter
         {
             blockers.Add("The static site has no \"root\" directive at server level.");
         }
+
+        FancyIndexOptions? fancyIndexOptions = proxy ? null : ReadFancyIndex(locationRest, blockers, notes);
+
+        RemoveDotDirectoryExceptions(main, fancyIndexOptions);
 
         string? extraServer = JoinText(main.Rest);
         string? extraLocation = JoinText(locationRest);
@@ -689,6 +722,7 @@ public static partial class SiteImporter
             ServeAcmeChallenge = main.AcmeChallenge || (redirect?.AcmeChallenge ?? false),
             ExtraServerDirectives = extraServer,
             ExtraLocationDirectives = extraLocation,
+            FancyIndex = fancyIndexOptions,
         };
     }
 
@@ -699,8 +733,14 @@ public static partial class SiteImporter
         return text.Length == 0 ? null : text;
     }
 
-    private static void ReadProxyLocation(List<NginxStatement> rest, List<string> blockers, List<string> notes,
-        out string upstream, out bool websockets, out int? timeout)
+    private static void ReadProxyLocation(
+        List<NginxStatement> rest,
+        List<string> blockers,
+        List<string> notes,
+        out string upstream,
+        out bool websockets,
+        out int? timeout
+    )
     {
         NginxStatement pass = rest.First((NginxStatement item) => item.Name == "proxy_pass");
 
@@ -759,7 +799,8 @@ public static partial class SiteImporter
                 else
                 {
                     blockers.Add(
-                        $"Line {statement.Line}: \"proxy_set_header {header.Key} {statement.Arguments[1]}\" differs from what the wizard always writes ({header.Value}).");
+                        $"Line {statement.Line}: \"proxy_set_header {header.Key} {statement.Arguments[1]}\" differs from what the wizard always writes ({header.Value})."
+                    );
                 }
             }
         }
@@ -785,7 +826,8 @@ public static partial class SiteImporter
         else if (connection is not null && connection.Arguments[1] != "upgrade")
         {
             blockers.Add(
-                $"Line {connection.Line}: \"proxy_set_header Connection {connection.Arguments[1]}\" cannot be turned into the wizard's WebSocket switch.");
+                $"Line {connection.Line}: \"proxy_set_header Connection {connection.Arguments[1]}\" cannot be turned into the wizard's WebSocket switch."
+            );
         }
 
         timeout = null;
@@ -796,8 +838,10 @@ public static partial class SiteImporter
         NginxStatement? send = rest.FirstOrDefault((NginxStatement item) =>
             item.Name == "proxy_send_timeout" && item.Arguments.Count == 1);
 
-        if (read is not null && send is not null
-                             && Seconds(read.Arguments[0]) is { } seconds && Seconds(send.Arguments[0]) == seconds)
+        if (
+            read is not null && send is not null
+                             && Seconds(read.Arguments[0]) is { } seconds && Seconds(send.Arguments[0]) == seconds
+        )
         {
             timeout = seconds;
 
@@ -807,8 +851,10 @@ public static partial class SiteImporter
 
         if (missing.Count > 0)
         {
-            notes.Add("The wizard always writes " + string.Join(", ", missing) +
-                      ", which this file did not have. Check that your application is fine with it.");
+            notes.Add(
+                "The wizard always writes " + string.Join(", ", missing) +
+                ", which this file did not have. Check that your application is fine with it."
+            );
         }
     }
 
@@ -827,8 +873,12 @@ public static partial class SiteImporter
         return seconds is >= 1 and <= 3600 ? seconds : null;
     }
 
-    private static bool ReadStaticLocation(ServerReading main, List<NginxStatement> rest, List<string> blockers,
-        out bool spa)
+    private static bool ReadStaticLocation(
+        ServerReading main,
+        List<NginxStatement> rest,
+        List<string> blockers,
+        out bool spa
+    )
     {
         spa = false;
 
@@ -850,7 +900,8 @@ public static partial class SiteImporter
         else
         {
             blockers.Add(
-                $"Line {tryFiles.Line}: try_files is neither \"$uri $uri/ =404\" nor the single page application form \"$uri $uri/ /index.html\".");
+                $"Line {tryFiles.Line}: try_files is neither \"$uri $uri/ =404\" nor the single page application form \"$uri $uri/ /index.html\"."
+            );
 
             return true;
         }
@@ -868,10 +919,198 @@ public static partial class SiteImporter
             else
             {
                 blockers.Add(
-                    $"Line {index.Line}: the index files differ from \"index.html index.htm\", which the wizard always writes.");
+                    $"Line {index.Line}: the index files differ from \"index.html index.htm\", which the wizard always writes."
+                );
             }
         }
 
         return true;
+    }
+
+    private static FancyIndexOptions? ReadFancyIndex(
+        List<NginxStatement> rest,
+        List<string> blockers,
+        List<string> notes
+    )
+    {
+        NginxStatement? enable = rest
+            .FirstOrDefault((NginxStatement item) => item.Name == "fancyindex" && item.Arguments.SequenceEqual(["on"]));
+
+        if (enable is null)
+        {
+            return null;
+        }
+
+        rest.Remove(enable);
+
+        FancyIndexOptions defaults = new();
+        List<string> missing = [];
+
+        // The wizard writes these directives whatever their value, so each one the file lacks is reported.
+        bool Switch(string name, bool fallback)
+        {
+            bool? value = ReadSwitch(rest, name, blockers);
+
+            if (value is null)
+            {
+                missing.Add(name);
+            }
+
+            return value ?? fallback;
+        }
+
+        FancyIndexSort? sort = ReadSort(rest, blockers);
+
+        if (sort is null)
+        {
+            missing.Add("fancyindex_default_sort");
+        }
+
+        string? timeFormat = ReadText(rest, "fancyindex_time_format", blockers);
+
+        if (timeFormat is null)
+        {
+            missing.Add("fancyindex_time_format");
+        }
+
+        FancyIndexOptions options = new()
+        {
+            DefaultSort = sort ?? defaults.DefaultSort,
+            CaseSensitive = Switch("fancyindex_case_sensitive", defaults.CaseSensitive),
+            DirectoriesFirst = Switch("fancyindex_directories_first", defaults.DirectoriesFirst),
+            CssHref = ReadText(rest, "fancyindex_css_href", blockers),
+            ExactSize = Switch("fancyindex_exact_size", defaults.ExactSize),
+            Footer = ReadText(rest, "fancyindex_footer", blockers),
+            Header = ReadText(rest, "fancyindex_header", blockers),
+            ShowPath = Switch("fancyindex_show_path", defaults.ShowPath),
+            ShowDotFiles = Switch("fancyindex_show_dotfiles", defaults.ShowDotFiles),
+            Ignore = ReadList(rest, "fancyindex_ignore"),
+            HideSymlinks = Switch("fancyindex_hide_symlinks", defaults.HideSymlinks),
+            HideParentDir = Switch("fancyindex_hide_parent_dir", defaults.HideParentDir),
+            LocalTime = Switch("fancyindex_localtime", defaults.LocalTime),
+            TimeFormat = timeFormat ?? defaults.TimeFormat,
+        };
+
+        if (missing.Count > 0)
+        {
+            notes.Add("The wizard always writes " + string.Join(", ", missing) +
+                      ", which this file did not have. It uses the module's default for each.");
+        }
+
+        return options;
+    }
+
+    private static bool? ReadSwitch(List<NginxStatement> rest, string name, List<string> blockers)
+    {
+        NginxStatement? statement = rest.FirstOrDefault((NginxStatement item) => item.Name == name);
+
+        if (statement == null)
+        {
+            return null;
+        }
+
+        rest.Remove(statement);
+
+        if (statement.Arguments.SequenceEqual(["on"]))
+        {
+            return true;
+        }
+
+        if (statement.Arguments.SequenceEqual(["off"]))
+        {
+            return false;
+        }
+
+        blockers.Add($"Line {statement.Line}: {name} must be \"on\" or \"off\".");
+
+        return null;
+    }
+
+    private static FancyIndexSort? ReadSort(List<NginxStatement> rest, List<string> blockers)
+    {
+        NginxStatement? statement =
+            rest.FirstOrDefault((NginxStatement item) => item.Name == "fancyindex_default_sort");
+
+        if (statement is null)
+        {
+            return null;
+        }
+
+        rest.Remove(statement);
+
+        if (statement.Arguments.Count != 1)
+        {
+            blockers.Add(
+                $"Line {statement.Line}: fancyindex_default_sort must be one of name, name_desc, size, size_desc, date, date_desc.");
+
+            return null;
+        }
+
+        FancyIndexSort? sort = statement.Arguments[0].FromDescription<FancyIndexSort>();
+
+        if (sort is null)
+        {
+            blockers.Add(
+                $"Line {statement.Line}: fancyindex_default_sort must be one of name, name_desc, size, size_desc, date, date_desc.");
+        }
+
+        return sort;
+    }
+
+    private static string? ReadText(List<NginxStatement> rest, string name, List<string> blockers)
+    {
+        NginxStatement? statement = rest.FirstOrDefault((NginxStatement item) => item.Name == name);
+
+        if (statement is null)
+        {
+            return null;
+        }
+
+        rest.Remove(statement);
+
+        if (statement.Arguments.Count != 1)
+        {
+            blockers.Add(
+                $"Line {statement.Line}: {name} takes exactly one argument here; the wizard does not write the optional \"local\" or \"subrequest\" parameter."
+            );
+
+            return null;
+        }
+
+        return statement.Arguments[0];
+    }
+
+    private static IReadOnlyList<string> ReadList(List<NginxStatement> rest, string name)
+    {
+        NginxStatement? statement = rest.FirstOrDefault((NginxStatement item) => item.Name == name);
+
+        if (statement is null)
+        {
+            return [];
+        }
+
+        rest.Remove(statement);
+
+        return statement.Arguments;
+    }
+
+    private static void RemoveDotDirectoryExceptions(ServerReading main, FancyIndexOptions? options)
+    {
+        if (options is null || !main.BlockExploits)
+        {
+            return;
+        }
+
+        foreach (string directory in SiteGenerator.DotDirectories(options))
+        {
+            string expected = Canonical($"location ^~ {directory}/ {{ try_files $uri =404; }}");
+
+            NginxStatement? block = main.Rest.FirstOrDefault((NginxStatement item) => item.Canonical == expected);
+
+            if (block is not null)
+            {
+                main.Rest.Remove(block);
+            }
+        }
     }
 }

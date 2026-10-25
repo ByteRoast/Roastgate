@@ -287,14 +287,7 @@ public static class SiteGenerator
             return;
         }
 
-        string?[] paths = [options.Header, options.Footer, options.CssHref];
-
-        IEnumerable<string> directories = paths
-            .OfType<string>()
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Select(path => path[..path.LastIndexOf('/')])
-            .Where(path => path.Split('/').Any(segment => segment.StartsWith('.')))
-            .Distinct();
+        IEnumerable<string> directories = DotDirectories(options);
 
         foreach (string directory in directories)
         {
@@ -360,6 +353,20 @@ public static class SiteGenerator
     private static string BooleanToOnOff(bool value)
     {
         return value ? "on" : "off";
+    }
+
+    internal static IReadOnlyList<string> DotDirectories(FancyIndexOptions options)
+    {
+        string?[] paths = [options.Header, options.Footer, options.CssHref];
+
+        return paths
+            .OfType<string>()
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(path => path.Contains('/'))
+            .Select(path => path[..path.LastIndexOf('/')])
+            .Where(path => path.Split('/').Any(segment => segment.StartsWith('.')))
+            .Distinct()
+            .ToList();
     }
 
     private sealed class NginxWriter
