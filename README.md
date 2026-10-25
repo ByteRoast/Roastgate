@@ -14,6 +14,9 @@ Built with [.NET 10](https://github.com/dotnet/core) and [MudBlazor](https://git
 
 ## Installation
 
+The full guide is in the [documentation](https://byteroast.fr/docs/roastgate/).  
+The essentials are below.
+
 ### Requirements
 
 - A Linux server with **nginx installed on the host** (Roastgate drives it, it does not ship one). Debian and Ubuntu
@@ -32,7 +35,6 @@ docker compose up -d
 docker logs roastgate        # prints the setup token
 ```
 
-Or with PowerShell (`pwsh`):
 Or with PowerShell (`pwsh`):
 
 ```powershell
@@ -79,13 +81,11 @@ To pick the setup token yourself, uncomment `ROASTGATE_SETUP_TOKEN` in the compo
 
 Open <http://127.0.0.1:8181> (from your own machine, `ssh -L 8181:127.0.0.1:8181 user@server` gives you that address).
 The first
-visit goes to `/setup`:
+visit goes to `/setup`, where you enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`), create the **administrator**
+account, choose the **paths and options**, and review the **host diagnostics**. Each step is detailed in the
+[first start guide](https://byteroast.fr/docs/roastgate/first-start).
 
-1. Enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`).
-2. Create the **administrator** account (the only account).
-3. Choose the **paths and options** (nginx directory, whitelists directory, ACME webroot, certbot mode).
-4. Review the **host diagnostics** (host access, nginx, `nginx -t`, directories, certbot).
-5. Finish: you are signed in automatically, and `/setup` no longer exists.
+To create your first reverse proxy or site, see the [documentation](https://byteroast.fr/docs/roastgate/reverse-proxies-and-sites).
 
 ### Development image
 
@@ -154,161 +154,33 @@ Your nginx files stay where they are: Roastgate never moves them.
 | `sites-available/`       | hosted sites        | symlink in `sites-enabled/`  |
 | `whitelists/<name>.conf` | `allow <ip>;` lines | included from your configs   |
 
-Every change follows the same cycle: backup, write, `nginx -t`, automatic rollback if invalid, reload if valid.
+Every change follows the same cycle: backup, write, `nginx -t`, automatic rollback if invalid, reload if valid. Writes
+are atomic (temporary file, then rename) and keep the original file permissions.
 
-- Edit any file in a Monaco editor with nginx syntax highlighting; the file name is part of the URL as a query string
-  (`/reverse-proxies/edit?name=app.conf`), so every route stays lowercase and hyphenated.
-- Enable or disable a proxy or a site with one switch. Roastgate only touches symlinks that point at the site itself,
-  and
-  understands both relative and absolute links (the Debian default site uses an absolute one).
-- Every overwrite and deletion keeps a backup in the database (the 30 most recent per file).
-- If `nginx -t` already fails for a reason unrelated to your change, the change is undone and you are told so.
-- Writes are atomic (temporary file, then rename) and keep the original file permissions.
+## Features
 
-### Importing a hand-written config
-
-Open a file that the wizard did not create in the wizard (the "import into the wizard" link of the raw editor, or
-`/reverse-proxies/wizard?name=app.conf`) and its
-settings are **read from the file**: names, ports, upstream, certificate, whitelists, upload limit, WebSocket headers,
-timeouts, redirect.
-Everything the form has no field for (other locations, `gzip`, `proxy_buffering`...) is kept as free directives in the
-Advanced tab, so
-nothing is lost. Saving regenerates the file (a backup is kept), so check the Preview tab first.
-
-A file is **refused, with the reason**, when the wizard could not reproduce it faithfully: a top-level `upstream` or
-`map`, a `listen` bound to an
-address, `default_server`, a regex `server_name`, a different `proxy_set_header Host`, an HTTP server that does more
-than redirect, more than two server
-blocks. Those stay editable as raw text. Comments between directives are not kept, and the wizard lists the defaults it
-adds (for example the
-`X-Forwarded-*` headers) when your file did not have them.
-
-### Two-factor authentication
-
-In **Settings**, scan the QR code with any authenticator app
-([Google Authenticator](https://support.google.com/accounts/answer/1066447), [Aegis](https://github.com/beemdevelopment/Aegis), [1Password](https://1password.com), [Bitwarden](https://bitwarden.com)...)
-and confirm with a code. You get ten **recovery codes**, shown once (each signs you in once; they are stored hashed).
-Sign-in then has two steps, and the second step only appears after a correct password.
-
-- Codes follow RFC 6238 (SHA-1, 30 s, 6 digits). One step of clock drift is tolerated; a code that was used cannot be
-  used again (the check is atomic in the database).
-- Five wrong codes end the attempt, and a client address is locked out after five failures, whatever the password.
-- Lost the phone, the codes and the passkeys? From the host: `docker exec roastgate roastgate disable-2fa`. It turns
-  two-factor off,
-  removes every passkey and ends every session, so the password alone signs you in again.
-
-### Passkeys
-
-In **Settings**, add a passkey (fingerprint, face, device PIN or a security key) with a name and your current password.
-A passkey
-signs you in **on its own**, without the password, and also works **as the second step** after the password, in place of
-a code.
-
-- Once a passkey exists, a correct password alone is **no longer enough** to sign in.
-- A passkey only works on the **address it was created on** (`127.0.0.1`, or the domain of your HTTPS server block).
-  Browsers only
-  allow passkeys on `localhost`/`127.0.0.1` or over HTTPS, so a plain `http://` domain will not work.
-- The list shows when each passkey was created and last used. Removing one asks for the password and ends every open
-  session.
-- Wrong answers are throttled like passwords, and every addition, removal and sign-in is written to the audit log.
-
-### Settings
-
-The **Settings** page edits the paths and options chosen at setup (validated the same way), checks the host with the
-values you typed
-before you rely on them, and changes the password (current password required, with a throttle against guessing).
-
-### Backups and restore
-
-Every overwrite and every deletion keeps the previous content (the 30 most recent per file). The **Backups** page (also
-reachable
-from the "history" link of each file) lists them, compares any version with the current file line by line (what
-restoring would add
-and remove), and restores it. A restore goes through the same backup, `nginx -t`, rollback and reload cycle as a save. A
-change that
-nginx refused leaves no backup behind, since it would only repeat the current file.
-
-### Creation wizard
-
-Describe a reverse proxy or a static site in a form (essentials, HTTPS, access, advanced) and Roastgate writes the nginx
-config:
-WebSockets, HTTPS with an optional redirect, HTTP/2, HSTS, upload limit, timeouts, security headers, whitelists (with
-what refused visitors get: a 403, a 404, a closed connection or a redirect), the
-Let's Encrypt
-challenge, and free directives for anything else. A preview tab shows exactly what will be written.
-
-- **Safe by construction.** Every value is validated against a strict pattern before it reaches the file (domains, URLs,
-  paths, sizes),
-  and the free directive boxes must keep their braces balanced so they cannot leave their block.
-- **Aware of your nginx.** HTTP/2 is written as `http2 on;` from nginx 1.25.1 and as `listen ... ssl http2;` before (the
-  first form
-  makes older versions fail). IPv6 listeners can be turned off for hosts without IPv6.
-- **Reopenable.** The settings are stored in a comment at the top of the generated file, with a hash of the body.
-  Reopening the file
-  restores the form. If you edited the file by hand, the wizard tells you and asks before it would replace your changes;
-  files
-  the wizard did not create are never replaced silently.
-- The proxy destination path must end with a slash (`http://backend/app/`): without it nginx glues the path to the
-  request.
-
-### Certificates (Let's Encrypt)
-
-Get, list, renew and delete certificates from the **Certificates** page.
-
-- **Two ways to run certbot**, chosen at setup: the **embedded** one (shipped in the image, it works on the
-  `/etc/letsencrypt` you mount,
-  and Roastgate renews twice a day by itself), or the one **installed on the host** (driven through `nsenter`, renewed
-  by the host's
-  own timer). Never both renewing at once: the setup diagnostics warn you if certbot also exists on the host.
-- **Certificates are read from the files** certbot maintains, not from its text output: names, domains, issuer, expiry,
-  staging or not,
-  and which of your configs use each one.
-- **Renewal reloads nginx** only when a certificate really changed (the file is compared before and after), so nginx
-  never keeps
-  serving an old one. A failed reload is reported, not hidden.
-- **Dry run first**: validates your domains against Let's Encrypt's staging server and issues nothing.
-- A certificate that a config still uses **cannot be deleted**. Every value passed to certbot is validated, and it never
-  goes through a shell.
-- The wizard lists your certificates and fills in the paths, and warns when the chosen certificate does not cover the
-  domains.
-
-For a validation to work, nginx must answer on port 80 for the domain and serve the ACME webroot under
-`/.well-known/acme-challenge/`:
-tick "Let the Let's Encrypt validation through" in the wizard (it keeps working behind a whitelist). Wildcard
-certificates need a DNS
-challenge and are not supported.
-
-### Whitelists
-
-- A list editor (address and comment per line) with live validation of IPv4, IPv6 and CIDR ranges. Validation is strict:
-  `1.2`, `0x7f.0.0.1` or `10.0.0.5/24` (host bits set, which nginx silently ignores) are flagged instead of being passed
-  on.
-- Paste many addresses at once, or add the address you are connecting from with one click.
-- Each whitelist shows **where it is used** (the `include` lines of your proxies and sites, relative or absolute paths,
-  quoted or not, wildcard includes), and gives you the `include` and `deny all;` lines to copy.
-- By default, visitors outside the whitelists get nginx's 403. The wizard can instead answer them with a 404 (hides
-  that the site exists), close the connection without a reply (444), or redirect them to another address (302). This
-  also applies to the site's other 403s, such as blocked dotfiles.
-- A whitelist that is still included **cannot be deleted**. `nginx -t` remains the last safety net for includes in files
-  Roastgate does not read (such as `nginx.conf`).
-- A file that holds anything other than `allow` lines (a `deny`, a comment in the middle...) is never rewritten by the
-  list
-  editor: Roastgate opens it as raw text instead, so nothing you wrote is lost.
-
-Remember that nginx evaluates `return` before `allow` and `deny`: a `location` that only does `return 200;` ignores the
-whitelist.
+- **Reverse proxies and sites**: enable or disable with one switch, edit in a Monaco editor with nginx syntax
+  highlighting, or import a hand-written config into the wizard.
+  [Read more](https://byteroast.fr/docs/roastgate/reverse-proxies-and-sites)
+- **Creation wizard**: describe a proxy or a static site in a form (WebSockets, HTTPS, HTTP/2, HSTS, upload limit,
+  security headers, whitelists...) and preview exactly what will be written. Every value is validated, and the form
+  can be reopened from the generated file.
+- **Whitelists**: strict IPv4, IPv6 and CIDR validation, and the list of configs that use each one. Visitors outside a
+  whitelist get a 403 by default; the wizard can answer a 404, close the connection (444) or redirect (302) instead.
+  [Read more](https://byteroast.fr/docs/roastgate/whitelists)
+- **Certificates**: get, renew and delete Let's Encrypt certificates, with the embedded certbot or the one of the host,
+  and a dry run before issuing. [Read more](https://byteroast.fr/docs/roastgate/certificates)
+- **Backups and restore**: the 30 most recent versions of each file are kept, can be compared line by line and
+  restored. [Read more](https://byteroast.fr/docs/roastgate/backups-and-audit-log)
+- **Account security**: two-factor authentication (TOTP), passkeys, and rate-limited sign-in.
+  [Read more](https://byteroast.fr/docs/roastgate/account-security)
+- **Settings**: the paths and options chosen at setup, and the password. [Read more](https://byteroast.fr/docs/roastgate/settings-and-configuration)
 
 ## Configuration
 
-Environment variables, all optional:
+The container is configured with optional environment variables (`ROASTGATE_SETUP_TOKEN`, `ROASTGATE_SECURE_COOKIES`,
+`ROASTGATE_TRUST_FORWARDED_HEADERS`...). See the [full list](https://byteroast.fr/docs/roastgate/settings-and-configuration#environment-variables).
 
-| Variable                            | Default              | Purpose                                                                                  |
-|-------------------------------------|----------------------|------------------------------------------------------------------------------------------|
-| `ROASTGATE_DATA_DIR`                | `/data`              | where `roastgate.db` lives (mount a volume here)                                         |
-| `ROASTGATE_HOST_EXEC`               | `nsenter`            | `nsenter` runs commands in the host namespaces, `direct` runs them locally (development) |
-| `ROASTGATE_SETUP_TOKEN`             | random at each start | fixed setup token, 16+ characters                                                        |
-| `ROASTGATE_SECURE_COOKIES`          | `false`              | mark the session cookie `Secure` (enable behind HTTPS)                                   |
-| `ROASTGATE_TRUST_FORWARDED_HEADERS` | `false`              | trust `X-Forwarded-For` / `-Proto` (enable only behind your own reverse proxy)           |
 
 ## Security notes
 
@@ -323,15 +195,11 @@ in practice, root on the host. Treat it accordingly:
   with the password,
   and open browser tabs are rechecked every 30 seconds). `roastgate reset-password` does the same, so it is also the
   answer to a stolen session.
-- Every sign-in, failure and (soon) config change is written to the audit log.
+- Every sign-in, failure and config change is written to the audit log.
 - The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored
   unencrypted, so keep `/data` readable by root only.
-- **Two-factor authentication** (TOTP, any authenticator app) is available in the settings: a code is asked after the
-  password, a code can be used only once, and
-  wrong codes are throttled separately from passwords. Turning it on or off ends every other session.
-- **Passkeys** sign you in without a password, or replace the code as the second step. Once one exists the password
-  alone is refused,
-  and removing one ends every session.
+- Turn on [two-factor authentication and passkeys](https://byteroast.fr/docs/roastgate/account-security) in the settings.
+
 
 ## Development
 
