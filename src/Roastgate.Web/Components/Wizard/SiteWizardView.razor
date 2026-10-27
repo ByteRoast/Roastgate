@@ -209,6 +209,117 @@
                                Color="Color.Primary"
                                Label="Cache static assets for 30 days"/>
                 </div>
+                
+                <MudSwitch T="bool"
+                           @bind-Value="_form.FancyIndexEnabled"
+                           Color="Color.Primary"
+                           Class="mt-4"
+                           Disabled="@(FancyIndexModuleMissing && !_form.FancyIndexEnabled)"
+                           Label="Browsable directory listing (fancyindex)"/>
+                    
+                @if (FancyIndexModuleMissing)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        The fancyindex module is not loaded in nginx. Install <code>libnginx-mod-http-fancyindex</code>,
+                        reload nginx, then reopen this page.
+                    </MudAlert>
+                }
+                else if (!_modules.Known)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                        Roastgate could not list nginx's modules. Make sure fancyindex is installed: nginx will tell you when you save if it is not.
+                    </MudAlert>
+                }
+                    
+                @if (_form.FancyIndexEnabled)
+                {
+                    <MudSelect T="FancyIndexSort"
+                               @bind-Value="_form.FancyIndexSort"
+                               Label="Default sort"
+                               Variant="Variant.Outlined"
+                               Class="mt-4">
+                        <MudSelectItem Value="FancyIndexSort.Name">Name</MudSelectItem>
+                        <MudSelectItem Value="FancyIndexSort.NameDescending">Name Descending</MudSelectItem>
+                        <MudSelectItem Value="FancyIndexSort.Size">Size</MudSelectItem>
+                        <MudSelectItem Value="FancyIndexSort.SizeDescending">Size Descending</MudSelectItem>
+                        <MudSelectItem Value="FancyIndexSort.Date">Date</MudSelectItem>
+                        <MudSelectItem Value="FancyIndexSort.DateDescending">Date Descending</MudSelectItem>
+                    </MudSelect>
+
+                    <div class="rg-switch-grid mt-4">
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexCaseSensitive" Color="Color.Primary" Label="Case-sensitive sort"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexDirectoriesFirst" Color="Color.Primary" Label="Directories first"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexExactSize" Color="Color.Primary" Label="Exact file sizes"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexLocalTime" Color="Color.Primary" Label="Local time"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexShowPath" Color="Color.Primary" Label="Show the path above the listing"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexShowDotFiles" Color="Color.Primary" Label="Show dotfiles"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexHideSymlinks" Color="Color.Primary" Label="Hide symlinks"/>
+                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexHideParentDir" Color="Color.Primary" Label="Hide the parent directory link"/>
+                    </div>
+                    
+                    @foreach (string field in new[] { "FancyIndex.ShowPath", "FancyIndex.ShowDotFiles" })
+                    {
+                        @if (ErrorFor(field, "x") is { } message)
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@message</MudAlert>
+                        }
+                    }
+
+                    <MudTextField T="string"
+                                  @bind-Value="_form.FancyIndexHeader"
+                                  Label="Header file (URL path)"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4"
+                                  Immediate="true"
+                                  Placeholder="/.nginxy/header.html"
+                                  Error="@(ErrorFor("FancyIndex.Header", _form.FancyIndexHeader) is not null)"
+                                  ErrorText="@ErrorFor("FancyIndex.Header", _form.FancyIndexHeader)"
+                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."/>
+                    
+                    <MudTextField T="string"
+                                  @bind-Value="_form.FancyIndexFooter"
+                                  Label="Footer file (URL path)"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4"
+                                  Immediate="true"
+                                  Placeholder="/.nginxy/footer.html"
+                                  Error="@(ErrorFor("FancyIndex.Footer", _form.FancyIndexFooter) is not null)"
+                                  ErrorText="@ErrorFor("FancyIndex.Footer", _form.FancyIndexFooter)"
+                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."/>
+                    
+                    <MudTextField T="string"
+                                  @bind-Value="_form.FancyIndexCssHref"
+                                  Label="CSS file (URL path)"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4"
+                                  Immediate="true"
+                                  Placeholder="/.nginxy/style.css"
+                                  Error="@(ErrorFor("FancyIndex.CssHref", _form.FancyIndexCssHref) is not null)"
+                                  ErrorText="@ErrorFor("FancyIndex.CssHref", _form.FancyIndexCssHref)"
+                                  HelperText="The file itself must be served by the site."/>
+                    
+                    <MudTextField T="string"
+                                  @bind-Value="_form.FancyIndexIgnore"
+                                  Label="Ignored names"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4 rg-resizable"
+                                  Immediate="true"
+                                  Lines="3"
+                                  Placeholder="lost+found"
+                                  Error="@(ErrorFor("FancyIndex.Ignore", _form.FancyIndexIgnore) is not null)"
+                                  ErrorText="@ErrorFor("FancyIndex.Ignore", _form.FancyIndexIgnore)"
+                                  HelperText="One name per line. Files and folders with these names are hidden."/>
+                    
+                    <MudTextField T="string"
+                                  @bind-Value="_form.FancyIndexTimeFormat"
+                                  Label="Time Format"
+                                  Variant="Variant.Outlined"
+                                  Class="mt-4"
+                                  Immediate="true"
+                                  Placeholder="%Y-%b-%d %H:%M"
+                                  Error="@(ErrorFor("FancyIndex.TimeFormat", _form.FancyIndexTimeFormat) is not null)"
+                                  ErrorText="@ErrorFor("FancyIndex.TimeFormat", _form.FancyIndexTimeFormat)"/>
+                }
             }
 
             <MudTextField T="string"
