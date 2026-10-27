@@ -1,30 +1,5 @@
 namespace Roastgate.Core.Nginx.Generation;
 
-public enum SiteKind
-{
-    /// <summary>Forwards requests to another server (an application, a container).</summary>
-    ReverseProxy,
-
-    /// <summary>Serves files from a directory.</summary>
-    StaticSite,
-}
-
-/// <summary>What a visitor whose address is in none of the site's whitelists gets.</summary>
-public enum DeniedBehavior
-{
-    /// <summary>403 Forbidden, nginx's own answer to <c>deny</c>.</summary>
-    Forbidden,
-
-    /// <summary>404 Not Found, which hides that the site exists.</summary>
-    NotFound,
-
-    /// <summary>Closes the connection without sending anything (444, specific to nginx).</summary>
-    CloseConnection,
-
-    /// <summary>Redirects (302) to <see cref="SiteSpec.DeniedUrl"/>.</summary>
-    Redirect,
-}
-
 /// <summary>
 /// Everything the wizard asks for. It is validated by <see cref="SiteSpecValidator"/> before anything reaches nginx,
 /// and stored (as JSON, in a comment) in the generated file so that the wizard can reopen it later.
@@ -110,6 +85,3 @@ public sealed record SiteSpec
     /// <summary>Free nginx directives added inside the main location block. Braces must balance.</summary>
     public string? ExtraLocationDirectives { get; init; }
 }
-
-/// <param name="Field">The <see cref="SiteSpec"/> property the message is about.</param>
-public sealed record SpecProblem(string Field, string Message);

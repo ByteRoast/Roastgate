@@ -2,8 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace Roastgate.Core.Hosting;
 
-public sealed record NginxProbeResult(bool Available, string? Version, string Output);
-
 /// <summary>
 /// Checks that nginx can be reached on the host, and reports its version and the modules it has loaded.
 /// </summary>
@@ -40,7 +38,8 @@ public sealed partial class NginxProbe(IHostExec hostExec)
 
     /// <summary>
     /// Lists the dynamic modules nginx has loaded, from the <c>load_module</c> lines of <c>nginx -T</c>.
-    /// Unknown when the command fails: a configuration that nginx refuses (for example because a module is missing) gives no answer.
+    /// Unknown when the command fails: a configuration that nginx refuses (for example because a module is missing)
+    /// gives no answer.
     /// </summary>
     public async Task<NginxModules> ProbeModulesAsync(CancellationToken cancellationToken = default)
     {
