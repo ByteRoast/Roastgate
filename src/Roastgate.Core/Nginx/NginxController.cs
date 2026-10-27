@@ -2,8 +2,6 @@ using Roastgate.Core.Hosting;
 
 namespace Roastgate.Core.Nginx;
 
-public sealed record NginxResult(bool Succeeded, string Output);
-
 public interface INginxController
 {
     /// <summary>Runs <c>nginx -t</c> on the host.</summary>
@@ -30,6 +28,7 @@ public sealed class NginxController(IHostExec hostExec) : INginxController
     private async Task<NginxResult> RunAsync(string[] arguments, CancellationToken cancellationToken)
     {
         HostCommandResult result = await hostExec.RunAsync("nginx", arguments, Timeout, cancellationToken);
+
         return new NginxResult(result.Succeeded, result.CombinedOutput);
     }
 }
