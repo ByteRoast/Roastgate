@@ -5,11 +5,6 @@ using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Certificates;
 
-public interface ICertificateCatalog
-{
-    Task<CertificateListing> ListAsync(CancellationToken cancellationToken = default);
-}
-
 /// <summary>
 /// Reads the certificates straight from the files certbot maintains (<c>live/&lt;name&gt;/fullchain.pem</c>)
 /// instead of parsing the text certbot prints, which changes between versions. Works the same for the embedded

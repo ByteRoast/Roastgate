@@ -6,29 +6,6 @@ using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Certificates;
 
-public interface ICertificateService
-{
-    Task<CertificateOperation> IssueAsync(
-        IssueRequest request,
-        string actor,
-        CancellationToken cancellationToken = default
-    );
-
-    /// <summary>
-    /// Renews what is due (or everything with <paramref name="force"/>) and reloads nginx when a certificate
-    /// actually changed.
-    /// </summary>
-    Task<CertificateOperation> RenewAsync(
-        string? name,
-        bool force,
-        string actor,
-        CancellationToken cancellationToken = default
-    );
-
-    /// <summary>Refused while a config still points at the certificate.</summary>
-    Task<CertificateOperation> DeleteAsync(string name, string actor, CancellationToken cancellationToken = default);
-}
-
 /// <summary>
 /// Drives certbot, the embedded one (run inside the container, on the shared <c>/etc/letsencrypt</c>) or the one on the host.
 /// Arguments are built here from validated values only, and never go through a shell.

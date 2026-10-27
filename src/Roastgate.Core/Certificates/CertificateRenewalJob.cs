@@ -4,14 +4,6 @@ using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Certificates;
 
-public interface ICertificateRenewalJob
-{
-    /// <summary>One renewal pass. Does nothing unless certificates are managed by the embedded certbot.</summary>
-    Task RunOnceAsync(CancellationToken cancellationToken = default);
-
-    Task<RenewalStatus> GetStatusAsync(CancellationToken cancellationToken = default);
-}
-
 /// <summary>
 /// What the background timer runs twice a day. Only the embedded certbot is renewed here: with the host's certbot,
 /// its own timer does the job, and two renewers at once is exactly what the setup diagnostics warn about.
