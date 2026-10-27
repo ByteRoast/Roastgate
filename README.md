@@ -165,6 +165,14 @@ are atomic (temporary file, then rename) and keep the original file permissions.
 - **Creation wizard**: describe a proxy or a static site in a form (WebSockets, HTTPS, HTTP/2, HSTS, upload limit,
   security headers, whitelists...) and preview exactly what will be written. Every value is validated, and the form
   can be reopened from the generated file.
+- **Detected nginx modules**: Roastgate reads the modules your nginx loads (`nginx -T`) and offers their options only
+  when they are available. For now this covers
+  [fancyindex](https://github.com/aperezdc/ngx-fancyindex), which turns a static site into a browsable directory
+  listing (sort order, sizes, dates, hidden names, custom header, footer and CSS). The option is greyed out, with the
+  package to install, when the module is not loaded. When nginx cannot be asked, the option stays available and
+  `nginx -t` has the last word at save time.
+  Roastgate only writes the directives: the header, footer and CSS files must be served by the site itself, and the
+  header and footer also need nginx's `http_addition_module`.
 - **Whitelists**: strict IPv4, IPv6 and CIDR validation, and the list of configs that use each one. Visitors outside a
   whitelist get a 403 by default; the wizard can answer a 404, close the connection (444) or redirect (302) instead.
   [Read more](https://byteroast.fr/docs/roastgate/whitelists)

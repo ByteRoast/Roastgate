@@ -387,6 +387,198 @@ public sealed class SiteImporterTests
         Assert.Equal(generated, SiteGenerator.Generate(spec, context));
     }
 
+    [Fact]
+    public void A_file_server_generated_by_the_wizard_round_trips()
+    {
+        SiteSpec original = new()
+        {
+            Kind = SiteKind.StaticSite,
+            ServerNames = ["files.example.com"],
+            RootDirectory = "/srv/files",
+            BlockCommonExploits = true,
+            FancyIndex = new FancyIndexOptions
+            {
+                DefaultSort = FancyIndexSort.DateDescending,
+                ExactSize = false,
+                LocalTime = true,
+                Header = "/.nginxy/header.html",
+                Footer = "/.nginxy/footer.html",
+                Ignore = ["radarr", "uploads"],
+                TimeFormat = "%d-%b-%Y %H:%M",
+            },
+        };
+        
+        GenerationContext context = new(
+            new ConfigLocations(Settings),
+            Settings.AcmeWebroot,
+            "files.example.com",
+            new Version(1, 27, 0)
+        );
+        
+        string generated = SiteGenerator.Generate(original, context);
+
+        SiteSpec spec = ImportOk(generated);
+
+        FancyIndexOptions options = Assert.IsType<FancyIndexOptions>(spec.FancyIndex);
+        
+        Assert.Equal(FancyIndexSort.DateDescending, options.DefaultSort);
+        Assert.Equal("/.nginxy/header.html", options.Header);
+        Assert.Equal(["radarr", "uploads"], options.Ignore);
+        Assert.Null(spec.ExtraServerDirectives);
+        Assert.Null(spec.ExtraLocationDirectives);
+        Assert.Equal(generated, SiteGenerator.Generate(spec, context));
+    }
+
+    private const string ExploitProtection = """
+            if ($request_method ~* "^(TRACE|TRACK)$") { return 405; }
+            location ~ /\.(?!well-known) { deny all; }
+
+        """;
+
+    private static string FileServer(string fancyIndexLines, string serverLines = "")
+    {
+        return Wrap($"    root /srv/files;\n{serverLines}    location / {{\n        try_files $uri $uri/ =404;\n        fancyindex on;\n{fancyIndexLines}    }}\n");
+    }
+
+    [Fact]
+    public void Fancyindex_directives_are_read_into_the_options()
+    {
+        SiteSpec spec = ImportOk(FileServer("""
+                    fancyindex_exact_size off;
+                    fancyindex_localtime on;
+                    fancyindex_default_sort size_desc;
+                    fancyindex_time_format "%d-%b-%Y %H:%M";
+                    fancyindex_header "/h.html";
+                    fancyindex_ignore radarr uploads;
+
+            """));
+
+        FancyIndexOptions options = Assert.IsType<FancyIndexOptions>(spec.FancyIndex);
+        Assert.False(options.ExactSize);
+        Assert.True(options.LocalTime);
+        Assert.Equal(FancyIndexSort.SizeDescending, options.DefaultSort);
+        Assert.Equal("%d-%b-%Y %H:%M", options.TimeFormat);
+        Assert.Equal("/h.html", options.Header);
+        Assert.Equal(["radarr", "uploads"], options.Ignore);
+        Assert.Null(spec.ExtraLocationDirectives);
+    }
+
+    [Fact]
+    public void A_file_without_the_case_sensitivity_directive_is_not_reported_and_keeps_the_default()
+    {
+        SiteImportResult result = Import(FileServer("        fancyindex_exact_size off;\n"));
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Spec!.FancyIndex!.CaseSensitive);
+        Assert.DoesNotContain(result.Notes, (string item) => item.Contains("fancyindex_case_sensitive", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_case_sensitivity_directive_is_read_when_it_is_off()
+    {
+        SiteSpec spec = ImportOk(FileServer("        fancyindex_case_sensitive off;\n"));
+
+        Assert.False(spec.FancyIndex!.CaseSensitive);
+    }
+
+    [Fact]
+    public void Missing_fancyindex_directives_are_reported_as_a_note()
+    {
+        SiteImportResult result = Import(FileServer("        fancyindex_exact_size off;\n"));
+
+        Assert.True(result.Succeeded);
+        string note = Assert.Single(result.Notes, (string item) => item.Contains("fancyindex_", StringComparison.Ordinal));
+        Assert.Contains("fancyindex_localtime", note);
+        Assert.Contains("fancyindex_default_sort", note);
+        Assert.Contains("fancyindex_time_format", note);
+        Assert.DoesNotContain("fancyindex_exact_size", note);
+    }
+
+    [Fact]
+    public void A_file_with_every_fancyindex_directive_produces_no_note()
+    {
+        SiteImportResult result = Import(FileServer("""
+                    fancyindex_exact_size on;
+                    fancyindex_localtime off;
+                    fancyindex_show_path on;
+                    fancyindex_directories_first on;
+                    fancyindex_case_sensitive on;
+                    fancyindex_show_dotfiles off;
+                    fancyindex_hide_symlinks off;
+                    fancyindex_hide_parent_dir off;
+                    fancyindex_default_sort name;
+                    fancyindex_time_format "%Y-%b-%d %H:%M";
+
+            """));
+
+        Assert.True(result.Succeeded);
+        Assert.DoesNotContain(result.Notes, (string item) => item.Contains("fancyindex_", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void An_unknown_fancyindex_directive_stays_a_free_directive()
+    {
+        SiteSpec spec = ImportOk(FileServer("        fancyindex_name_length 255;\n"));
+
+        Assert.NotNull(spec.FancyIndex);
+        Assert.Equal("fancyindex_name_length 255;", spec.ExtraLocationDirectives);
+    }
+
+    [Fact]
+    public void Fancyindex_directives_without_fancyindex_on_are_left_alone()
+    {
+        SiteImportResult result = Import(Wrap("    root /srv/files;\n    location / {\n        try_files $uri $uri/ =404;\n        fancyindex_exact_size off;\n    }\n"));
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Spec!.FancyIndex);
+        Assert.Equal("fancyindex_exact_size off;", result.Spec.ExtraLocationDirectives);
+    }
+
+    [Theory]
+    [InlineData("fancyindex_default_sort foo;")]
+    [InlineData("fancyindex_default_sort;")]
+    [InlineData("fancyindex_default_sort name size;")]
+    [InlineData("fancyindex_exact_size maybe;")]
+    [InlineData("fancyindex_header /h.html local;")]
+    [InlineData("fancyindex_time_format;")]
+    public void A_fancyindex_value_the_wizard_cannot_write_is_refused(string line)
+    {
+        SiteImportResult result = Import(FileServer($"        {line}\n"));
+
+        Assert.False(result.Succeeded);
+        Assert.NotEmpty(result.Blockers);
+    }
+
+    [Fact]
+    public void A_header_without_a_directory_does_not_crash_the_import()
+    {
+        SiteSpec spec = ImportOk(FileServer("        fancyindex_header \"header.html\";\n", ExploitProtection));
+
+        Assert.Equal("header.html", spec.FancyIndex!.Header);
+        Assert.True(spec.BlockCommonExploits);
+    }
+
+    [Fact]
+    public void The_asset_location_the_wizard_writes_is_not_kept_twice()
+    {
+        SiteSpec spec = ImportOk(FileServer(
+            "        fancyindex_header \"/.nginxy/header.html\";\n",
+            ExploitProtection + "    location ^~ /.nginxy/ { try_files $uri =404; }\n"));
+
+        Assert.Equal("/.nginxy/header.html", spec.FancyIndex!.Header);
+        Assert.Null(spec.ExtraServerDirectives);
+    }
+
+    [Fact]
+    public void An_asset_location_the_wizard_would_not_write_stays_a_free_directive()
+    {
+        SiteSpec spec = ImportOk(FileServer(
+            "        fancyindex_header \"/.nginxy/header.html\";\n",
+            ExploitProtection + "    location ^~ /.nginxy/ { return 403; }\n"));
+
+        Assert.Contains("return 403;", spec.ExtraServerDirectives);
+    }
+
     [Theory]
     [InlineData("upstream backend { server 127.0.0.1:3000; }\n")]
     [InlineData("map $a $b { default 1; }\n")]

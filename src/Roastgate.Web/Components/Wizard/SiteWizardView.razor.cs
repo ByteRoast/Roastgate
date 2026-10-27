@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Roastgate.Core.Certificates;
+using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
+using Roastgate.Core.Nginx.Modules;
 using Roastgate.Web.Services;
 
 namespace Roastgate.Web.Components.Wizard;
@@ -65,6 +67,36 @@ public partial class SiteWizardView
         public string ExtraServerDirectives { get; set; } = string.Empty;
 
         public string ExtraLocationDirectives { get; set; } = string.Empty;
+
+        public bool FancyIndexEnabled { get; set; }
+
+        public FancyIndexSort FancyIndexSort { get; set; }
+
+        public bool FancyIndexCaseSensitive { get; set; } = true;
+
+        public bool FancyIndexDirectoriesFirst { get; set; } = true;
+
+        public bool FancyIndexExactSize { get; set; } = true;
+
+        public bool FancyIndexLocalTime { get; set; }
+
+        public bool FancyIndexShowPath { get; set; } = true;
+
+        public bool FancyIndexShowDotFiles { get; set; }
+
+        public bool FancyIndexHideSymlinks { get; set; }
+
+        public bool FancyIndexHideParentDir { get; set; }
+
+        public string FancyIndexTimeFormat { get; set; } = "%Y-%b-%d %H:%M";
+
+        public string FancyIndexHeader { get; set; } = string.Empty;
+
+        public string FancyIndexFooter { get; set; } = string.Empty;
+
+        public string FancyIndexCssHref { get; set; } = string.Empty;
+
+        public string FancyIndexIgnore { get; set; } = string.Empty;
     }
 
     [Parameter, EditorRequired] public ConfigArea Area { get; set; }
@@ -81,6 +113,7 @@ public partial class SiteWizardView
     private MetadataStatus _status = MetadataStatus.None;
     private WizardPreview? _preview;
     private ConfigResult? _result;
+    private NginxModules _modules = NginxModules.Unknown;
     private string _fileName = string.Empty;
     private string? _loadedName;
     private bool _loaded;
@@ -100,6 +133,8 @@ public partial class SiteWizardView
 
     private CertificateInfo? SelectedCertificate => _certificates.FirstOrDefault((CertificateInfo certificate) =>
         certificate.FullChainPath == _form.CertificatePath);
+
+    private bool FancyIndexModuleMissing => _modules.Known && !KnownModule.FancyIndex.IsLoaded(_modules);
 
     private List<string> UncoveredNames(CertificateInfo certificate)
     {
@@ -138,6 +173,8 @@ public partial class SiteWizardView
         _availableWhitelists = whitelists.Entries.Select((ConfigEntry entry) => entry.Name).ToList();
         _certificates = (await Catalog.ListAsync()).Certificates.Select((CertificateEntry entry) => entry.Certificate)
             .ToList();
+
+        _modules = await Wizard.GetModulesAsync();
 
         SiteSpec spec = await Wizard.NewSpecAsync(Area);
 
@@ -206,6 +243,25 @@ public partial class SiteWizardView
             ExtraLocationDirectives = spec.ExtraLocationDirectives ?? string.Empty,
         };
 
+        if (spec.FancyIndex is { } options)
+        {
+            _form.FancyIndexEnabled = true;
+            _form.FancyIndexSort = options.DefaultSort;
+            _form.FancyIndexCaseSensitive = options.CaseSensitive;
+            _form.FancyIndexDirectoriesFirst = options.DirectoriesFirst;
+            _form.FancyIndexExactSize = options.ExactSize;
+            _form.FancyIndexLocalTime = options.LocalTime;
+            _form.FancyIndexShowPath = options.ShowPath;
+            _form.FancyIndexShowDotFiles = options.ShowDotFiles;
+            _form.FancyIndexHideSymlinks = options.HideSymlinks;
+            _form.FancyIndexHideParentDir = options.HideParentDir;
+            _form.FancyIndexTimeFormat = options.TimeFormat;
+            _form.FancyIndexHeader = options.Header ?? string.Empty;
+            _form.FancyIndexFooter = options.Footer ?? string.Empty;
+            _form.FancyIndexCssHref = options.CssHref ?? string.Empty;
+            _form.FancyIndexIgnore = string.Join('\n', options.Ignore);
+        }
+
         _selectedWhitelists.Clear();
 
         foreach (string whitelist in spec.Whitelists)
@@ -241,7 +297,7 @@ public partial class SiteWizardView
             Whitelists = _selectedWhitelists.OrderBy((string item) => item, StringComparer.Ordinal).ToList(),
             DeniedBehavior = _form.DeniedBehavior,
             DeniedUrl = _form.DeniedBehavior == DeniedBehavior.Redirect && !string.IsNullOrWhiteSpace(_form.DeniedUrl)
-                ?  _form.DeniedUrl.Trim()
+                ? _form.DeniedUrl.Trim()
                 : null,
             ServeAcmeChallenge = _form.ServeAcmeChallenge,
             ExtraServerDirectives = string.IsNullOrWhiteSpace(_form.ExtraServerDirectives)
@@ -250,6 +306,33 @@ public partial class SiteWizardView
             ExtraLocationDirectives = string.IsNullOrWhiteSpace(_form.ExtraLocationDirectives)
                 ? null
                 : _form.ExtraLocationDirectives,
+            FancyIndex = _form.FancyIndexEnabled && _kind == SiteKind.StaticSite
+                ? new FancyIndexOptions
+                {
+                    DefaultSort = _form.FancyIndexSort,
+                    CaseSensitive = _form.FancyIndexCaseSensitive,
+                    DirectoriesFirst = _form.FancyIndexDirectoriesFirst,
+                    ExactSize = _form.FancyIndexExactSize,
+                    LocalTime = _form.FancyIndexLocalTime,
+                    ShowPath = _form.FancyIndexShowPath,
+                    ShowDotFiles = _form.FancyIndexShowDotFiles,
+                    HideSymlinks = _form.FancyIndexHideSymlinks,
+                    HideParentDir = _form.FancyIndexHideParentDir,
+                    TimeFormat = string.IsNullOrWhiteSpace(_form.FancyIndexTimeFormat)
+                        ? "%Y-%b-%d %H:%M"
+                        : _form.FancyIndexTimeFormat,
+                    Header = string.IsNullOrWhiteSpace(_form.FancyIndexHeader)
+                        ? null
+                        : _form.FancyIndexHeader,
+                    Footer = string.IsNullOrWhiteSpace(_form.FancyIndexFooter)
+                        ? null
+                        : _form.FancyIndexFooter,
+                    CssHref = string.IsNullOrWhiteSpace(_form.FancyIndexCssHref)
+                        ? null
+                        : _form.FancyIndexCssHref,
+                    Ignore = ParseNames(_form.FancyIndexIgnore),
+                }
+                : null,
         };
     }
 

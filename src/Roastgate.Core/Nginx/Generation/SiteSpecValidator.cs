@@ -12,6 +12,9 @@ public static partial class SiteSpecValidator
     public const int MaximumServerNames = 20;
     public const int MaximumExtraLength = 4000;
     public const int MaximumRedirectUrlLength = 2000;
+    public const int MaximumIgnoredNames = 50;
+    public const int MaximumIgnoredNameLength = 100;
+    public const int MaximumTimeFormatLength = 64;
 
     [GeneratedRegex(
         @"^(_|(\*\.)?[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)\z")]
@@ -31,6 +34,14 @@ public static partial class SiteSpecValidator
 
     [GeneratedRegex(@"^(0|[1-9]\d{0,5}[kKmMgG]?)\z")]
     private static partial Regex SizePattern();
+
+    // fancyindex_ignore reads its values as regular expressions: only plain file name characters are let through.
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+\z")]
+    private static partial Regex IgnoredNamePattern();
+
+    // The specifiers are the ones fancyindex_time_format supports; anything else after a % would be refused by nginx.
+    [GeneratedRegex(@"^(%[aAbBdeFHIklmMpPrRSTuwyY]|[A-Za-z0-9 :/.,_-])+\z")]
+    private static partial Regex TimeFormatPattern();
 
     public static IReadOnlyList<SpecProblem> Validate(SiteSpec spec)
     {
@@ -55,6 +66,11 @@ public static partial class SiteSpecValidator
                 "The root directory must be an absolute path (letters, digits, dots, hyphens, underscores and slashes)."));
         }
 
+        if (spec.FancyIndex is { } fancyIndex)
+        {
+            ValidateFancyIndex(spec, fancyIndex, problems);
+        }
+
         if (spec.EnableTls)
         {
             ValidateTls(spec, problems);
@@ -66,8 +82,10 @@ public static partial class SiteSpecValidator
 
         if (!string.IsNullOrWhiteSpace(spec.MaxBodySize) && !SizePattern().IsMatch(spec.MaxBodySize))
         {
-            problems.Add(new SpecProblem(nameof(SiteSpec.MaxBodySize),
-                "The maximum upload size must look like 100m, 512k or 2g (0 disables the limit)."));
+            problems.Add(
+                new SpecProblem(nameof(SiteSpec.MaxBodySize),
+                    "The maximum upload size must look like 100m, 512k or 2g (0 disables the limit).")
+            );
         }
 
         foreach (string whitelist in spec.Whitelists)
@@ -197,6 +215,134 @@ public static partial class SiteSpecValidator
             problems.Add(new SpecProblem(nameof(SiteSpec.DeniedUrl),
                 "The port of the address must be between 1 and 65535."));
         }
+    }
+
+    private static void ValidateFancyIndex(SiteSpec spec, FancyIndexOptions options, List<SpecProblem> problems)
+    {
+        if (spec.Kind != SiteKind.StaticSite)
+        {
+            problems.Add(
+                new SpecProblem(
+                    nameof(SiteSpec.FancyIndex),
+                    "The file listing is only available for static sites."
+                )
+            );
+
+            return;
+        }
+
+        ValidateFancyIndexPath(
+            nameof(FancyIndexOptions.Header),
+            "header",
+            "/.nginxy/header.html",
+            options.Header,
+            problems
+        );
+
+        ValidateFancyIndexPath(
+            nameof(FancyIndexOptions.Footer),
+            "footer",
+            "/.nginxy/footer.html",
+            options.Footer,
+            problems
+        );
+
+        ValidateFancyIndexPath(
+            nameof(FancyIndexOptions.CssHref),
+            "style sheet",
+            "/.nginxy/style.css",
+            options.CssHref,
+            problems
+        );
+
+        if (!options.ShowPath && string.IsNullOrWhiteSpace(options.Header))
+        {
+            problems.Add(
+                new SpecProblem(
+                    FancyIndexField(nameof(FancyIndexOptions.ShowPath)),
+                    "The path above the listing can only be hidden when a custom header is set."
+                )
+            );
+        }
+
+        if (options.ShowDotFiles && spec.BlockCommonExploits)
+        {
+            problems.Add(
+                new SpecProblem(
+                    FancyIndexField(nameof(FancyIndexOptions.ShowDotFiles)),
+                    "Hidden files cannot be listed while the exploit protection is on: it refuses every path that starts with a dot."
+                )
+            );
+        }
+
+        if (
+            string.IsNullOrWhiteSpace(options.TimeFormat)
+            || options.TimeFormat.Length > MaximumTimeFormatLength
+            || !TimeFormatPattern().IsMatch(options.TimeFormat)
+        )
+        {
+            problems.Add(
+                new SpecProblem(
+                    FancyIndexField(nameof(FancyIndexOptions.TimeFormat)),
+                    $"The time format must be at most {MaximumTimeFormatLength} characters of letters, digits, spaces, : - / . , and the specifiers %a %A %b %B %d %e %F %H %I %k %l %m %M %p %P %r %R %S %T %u %w %y %Y.")
+            );
+        }
+
+        ValidateIgnoredNames(options.Ignore, problems);
+    }
+
+    private static void ValidateFancyIndexPath(
+        string property,
+        string label,
+        string example,
+        string? path,
+        List<SpecProblem> problems
+    )
+    {
+        if (string.IsNullOrWhiteSpace(path) || IsAbsolutePath(path))
+        {
+            return;
+        }
+
+        problems.Add(
+            new SpecProblem(FancyIndexField(property),
+                $"The {label} must be an absolute URL path such as {example} (letters, digits, dots, hyphens, underscores and slashes)."
+            )
+        );
+    }
+
+    private static void ValidateIgnoredNames(IReadOnlyList<string> names, List<SpecProblem> problems)
+    {
+        string field = FancyIndexField(nameof(FancyIndexOptions.Ignore));
+
+        if (names.Count > MaximumIgnoredNames)
+        {
+            problems.Add(
+                new SpecProblem(
+                    field,
+                    $"At most {MaximumIgnoredNames} hidden names are allowed."
+                )
+            );
+        }
+
+        foreach (string name in names)
+        {
+            if (name.Length > MaximumIgnoredNameLength || !IgnoredNamePattern().IsMatch(name))
+            {
+                problems.Add(
+                    new SpecProblem(
+                        field,
+                        $"\"{name}\" cannot be hidden: use letters, digits, dots, hyphens and underscores only, at most {MaximumIgnoredNameLength} characters."
+                    )
+                );
+            }
+        }
+    }
+
+    /// <summary>The field name of a fancyindex option, for example FancyIndex.Header.</summary>
+    private static string FancyIndexField(string property)
+    {
+        return $"{nameof(SiteSpec.FancyIndex)}.{property}";
     }
 
     private static void ValidateTls(SiteSpec spec, List<SpecProblem> problems)
