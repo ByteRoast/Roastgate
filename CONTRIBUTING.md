@@ -45,6 +45,12 @@ The build enforces most of the rules, so a green `dotnet build` already covers t
   add a namespace to the `_Imports.razor` of the folder that needs it, not to the root one.
 - UTF-8, LF line endings, 4-space indentation (2 for JSON, YAML and project files).
 
+The build does not enforce these, but please follow them:
+
+- **One top-level type per file, named after the type** (`FancyIndexSort.cs` holds `FancyIndexSort`). Enums, records and
+  other models get their own file. The one exception is an interface that has a single implementation: it stays in the
+  file of that implementation (`ISiteWizardService` in `SiteWizardService.cs`). Nested types stay where they are.
+
 Beyond that, write code that looks like the code around it.
 
 ## Tests
