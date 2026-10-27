@@ -322,7 +322,14 @@ public static class SiteGenerator
         writer.Line($"fancyindex_localtime {BooleanToOnOff(options.LocalTime)};");
         writer.Line($"fancyindex_show_path {BooleanToOnOff(options.ShowPath)};");
         writer.Line($"fancyindex_directories_first {BooleanToOnOff(options.DirectoriesFirst)};");
-        writer.Line($"fancyindex_case_sensitive {BooleanToOnOff(options.CaseSensitive)};");
+
+        // Only written when turned off: the directive is missing from older builds of the module (0.5.2 in Debian and
+        // Ubuntu), where sorting is always case-sensitive, and nginx refuses a file that names an unknown directive.
+        if (!options.CaseSensitive)
+        {
+            writer.Line("fancyindex_case_sensitive off;");
+        }
+
         writer.Line($"fancyindex_show_dotfiles {BooleanToOnOff(options.ShowDotFiles)};");
         writer.Line($"fancyindex_hide_symlinks {BooleanToOnOff(options.HideSymlinks)};");
         writer.Line($"fancyindex_hide_parent_dir {BooleanToOnOff(options.HideParentDir)};");

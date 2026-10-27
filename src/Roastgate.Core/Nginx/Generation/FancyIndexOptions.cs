@@ -33,7 +33,10 @@ public sealed record FancyIndexOptions
     /// <summary>How entries are ordered when the visitor has not chosen (<c>fancyindex_default_sort</c>).</summary>
     public FancyIndexSort DefaultSort { get; init; } = FancyIndexSort.Name;
 
-    /// <summary>Sort names with case taken into account (<c>fancyindex_case_sensitive</c>).</summary>
+    /// <summary>
+    /// Sort names with case taken into account (<c>fancyindex_case_sensitive</c>). Older builds of the module do not have
+    /// the directive and always sort that way, so it is only written when this is off.
+    /// </summary>
     public bool CaseSensitive { get; init; } = true;
 
     /// <summary>List directories before files (<c>fancyindex_directories_first</c>).</summary>

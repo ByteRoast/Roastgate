@@ -464,6 +464,24 @@ public sealed class SiteImporterTests
     }
 
     [Fact]
+    public void A_file_without_the_case_sensitivity_directive_is_not_reported_and_keeps_the_default()
+    {
+        SiteImportResult result = Import(FileServer("        fancyindex_exact_size off;\n"));
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Spec!.FancyIndex!.CaseSensitive);
+        Assert.DoesNotContain(result.Notes, (string item) => item.Contains("fancyindex_case_sensitive", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_case_sensitivity_directive_is_read_when_it_is_off()
+    {
+        SiteSpec spec = ImportOk(FileServer("        fancyindex_case_sensitive off;\n"));
+
+        Assert.False(spec.FancyIndex!.CaseSensitive);
+    }
+
+    [Fact]
     public void Missing_fancyindex_directives_are_reported_as_a_note()
     {
         SiteImportResult result = Import(FileServer("        fancyindex_exact_size off;\n"));

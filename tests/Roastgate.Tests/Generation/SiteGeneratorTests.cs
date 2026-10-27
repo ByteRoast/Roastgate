@@ -613,7 +613,7 @@ public sealed class SiteGeneratorTests
         Assert.Contains("fancyindex_localtime on;", text);
         Assert.Contains("fancyindex_show_path on;", text);
         Assert.Contains("fancyindex_directories_first on;", text);
-        Assert.Contains("fancyindex_case_sensitive on;", text);
+        Assert.DoesNotContain("fancyindex_case_sensitive", text);
         Assert.Contains("fancyindex_show_dotfiles off;", text);
         Assert.Contains("fancyindex_hide_symlinks off;", text);
         Assert.Contains("fancyindex_hide_parent_dir off;", text);
@@ -650,6 +650,14 @@ public sealed class SiteGeneratorTests
         );
 
         Assert.Contains($"fancyindex_default_sort {expected};", text);
+    }
+
+    [Fact]
+    public void Writes_the_case_sensitivity_only_when_it_is_turned_off()
+    {
+        string text = Generate(FileServer(new FancyIndexOptions { CaseSensitive = false }));
+
+        Assert.Contains("fancyindex_case_sensitive off;", text);
     }
 
     [Fact]

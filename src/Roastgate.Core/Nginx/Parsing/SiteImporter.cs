@@ -976,7 +976,8 @@ public static partial class SiteImporter
         FancyIndexOptions options = new()
         {
             DefaultSort = sort ?? defaults.DefaultSort,
-            CaseSensitive = Switch("fancyindex_case_sensitive", defaults.CaseSensitive),
+            // The wizard only writes this one when it is off, so its absence is not worth a note.
+            CaseSensitive = ReadSwitch(rest, "fancyindex_case_sensitive", blockers) ?? defaults.CaseSensitive,
             DirectoriesFirst = Switch("fancyindex_directories_first", defaults.DirectoriesFirst),
             CssHref = ReadText(rest, "fancyindex_css_href", blockers),
             ExactSize = Switch("fancyindex_exact_size", defaults.ExactSize),
