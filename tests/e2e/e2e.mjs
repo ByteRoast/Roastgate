@@ -315,6 +315,30 @@ await page.getByLabel('Enable static.example.com').click();
 await page.waitForTimeout(1500);
 check('the wizard site, once enabled, is served by nginx', httpGet(8091, 'static.example.com').includes('200 OK'), httpGet(8091, 'static.example.com').slice(0, 120));
 
+// A directory listing through the fancyindex module, which the test image installs.
+sh("sh -c 'mkdir -p /var/www/files && echo listed > /var/www/files/listed-file.txt'");
+await page.goto(`${base}/sites/wizard`);
+await waitField('Root directory');
+await page.getByLabel('Domain names').fill('files.example.com');
+await page.getByLabel('Root directory').fill('/var/www/files');
+await page.getByLabel('Browsable directory listing (fancyindex)').click();
+await page.getByRole('combobox', { name: 'Default sort' }).waitFor({ timeout: 10000 });
+await tab('Advanced').click();
+await page.getByLabel('HTTP port').fill('8097');
+await button('Save').click();
+await expectSaved();
+const filesSite = sh('cat /etc/nginx/sites-available/files.example.com');
+check('the wizard writes the fancyindex directives', filesSite.includes('fancyindex on;') && filesSite.includes('fancyindex_default_sort name;'), filesSite.slice(0, 400));
+await page.goto(`${base}/sites`);
+await waitText('files.example.com');
+await page.getByLabel('Enable files.example.com').click();
+await page.waitForTimeout(1500);
+const listing = httpGet(8097, 'files.example.com');
+check('nginx lists the directory through fancyindex', listing.includes('200 OK') && listing.includes('listed-file.txt'), listing.slice(0, 300));
+await page.goto(`${base}/sites/wizard?name=files.example.com`);
+await waitField('Root directory');
+check('reopening the site keeps the fancyindex option on', await page.getByRole('combobox', { name: 'Default sort' }).isVisible());
+
 // A reverse proxy in front of it, with the preview tab.
 await page.goto(`${base}/reverse-proxies/wizard`);
 await waitField('Forward to');
