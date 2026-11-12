@@ -8,6 +8,7 @@ using Roastgate.Core.Data.Stores;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
+using Roastgate.Core.Nginx.Modules;
 using Roastgate.Core.Nginx.Whitelists;
 using Roastgate.Core.Security;
 using Roastgate.Core.Settings;
@@ -49,6 +50,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHostExec, HostExec>();
         services.AddSingleton<ILocalExec, LocalExec>();
         services.AddSingleton<NginxProbe>();
+        services.AddSingleton<ModuleDirectiveProbe>();
         services.AddSingleton<INginxController, NginxController>();
         services.AddSingleton<IConfigBackupStore, ConfigBackupStore>();
         services.AddSingleton<IConfigStore, ConfigStore>();
