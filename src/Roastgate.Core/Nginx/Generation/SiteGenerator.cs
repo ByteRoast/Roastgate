@@ -3,7 +3,9 @@ using Roastgate.Core.Extensions;
 
 namespace Roastgate.Core.Nginx.Generation;
 
-/// <summary>Turns a validated <see cref="SiteSpec"/> into nginx configuration text. It does no validation of its own.</summary>
+/// <summary>
+/// Turns a validated <see cref="SiteSpec"/> into nginx configuration text. It does no validation of its own.
+/// </summary>
 public static class SiteGenerator
 {
     public static string Generate(SiteSpec spec, GenerationContext context)
@@ -254,7 +256,8 @@ public static class SiteGenerator
 
         if (spec.CacheStaticAssets)
         {
-            // "expires" rather than add_header: add_header in a location would drop the security headers of the server block.
+            // "expires" rather than add_header: add_header in a location would drop the security headers of the server
+            // block.
             writer.Blank();
             writer.Open("location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$");
             writer.Line("expires 30d;");
@@ -281,7 +284,9 @@ public static class SiteGenerator
         }
     }
 
-    /// <summary>A variable name suffix that is unique per config file (nginx refuses two maps that define the same variable).</summary>
+    /// <summary>
+    /// A variable name suffix that is unique per config file (nginx refuses two maps that define the same variable).
+    /// </summary>
     internal static string VariableSuffix(string fileName)
     {
         string name = fileName.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal)
@@ -306,8 +311,9 @@ public static class SiteGenerator
         writer.Line($"fancyindex_show_path {BooleanToOnOff(options.ShowPath)};");
         writer.Line($"fancyindex_directories_first {BooleanToOnOff(options.DirectoriesFirst)};");
 
-        // Only written when turned off: the directive is missing from older builds of the module (0.5.2 in Debian and
-        // Ubuntu), where sorting is always case-sensitive, and nginx refuses a file that names an unknown directive.
+        // Only written when turned off, on being the module's default: a build without the directive (0.5.2 in Debian
+        // and Ubuntu) still accepts the file. Turning it off on such a build is refused by the wizard, which asks nginx
+        // first (ModuleDirectiveProbe).
         if (!options.CaseSensitive)
         {
             writer.Line("fancyindex_case_sensitive off;");
