@@ -61,5 +61,46 @@ public sealed class NginxModulesTests
     {
         Assert.False(NginxModules.Unknown.Known);
         Assert.False(NginxModules.Unknown.Has("x.so"));
+        Assert.Empty(NginxModules.Unknown.LoadPaths);
+    }
+
+    [Fact]
+    public void Keeps_the_load_paths_in_the_order_nginx_loads_them()
+    {
+        string fakeOutput = """
+                            load_module modules/ndk_http_module.so;
+                            load_module /usr/lib/nginx/modules/ngx_http_lua_module.so;
+                            """;
+
+        NginxModules nginxModules = NginxModules.Parse(fakeOutput);
+
+        Assert.Equal(
+            ["modules/ndk_http_module.so", "/usr/lib/nginx/modules/ngx_http_lua_module.so"],
+            nginxModules.LoadPaths
+        );
+    }
+
+    [Theory]
+    [InlineData("load_module modules/x.so;", "modules/x.so")]
+    [InlineData("load_module \"modules/x.so\";", "modules/x.so")]
+    [InlineData("load_module /usr/lib/nginx/modules/x.so;", "/usr/lib/nginx/modules/x.so")]
+    public void Keeps_the_load_path_as_written_without_resolving_it(string line, string expectedPath)
+    {
+        NginxModules nginxModules = NginxModules.Parse(line);
+
+        Assert.Equal(expectedPath, Assert.Single(nginxModules.LoadPaths));
+    }
+
+    [Fact]
+    public void Lists_a_load_path_once_when_it_appears_twice()
+    {
+        string fakeOutput = """
+                            load_module modules/x.so;
+                            load_module modules/x.so;
+                            """;
+
+        NginxModules nginxModules = NginxModules.Parse(fakeOutput);
+
+        Assert.Single(nginxModules.LoadPaths);
     }
 }

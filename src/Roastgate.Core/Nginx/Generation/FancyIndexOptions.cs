@@ -10,8 +10,9 @@ public sealed record FancyIndexOptions
     public FancyIndexSort DefaultSort { get; init; } = FancyIndexSort.Name;
 
     /// <summary>
-    /// Sort names with case taken into account (<c>fancyindex_case_sensitive</c>). Older builds of the module do not have
-    /// the directive and always sort that way, so it is only written when this is off.
+    /// Sort names with case taken into account (<c>fancyindex_case_sensitive</c>, on by default). Some builds of the
+    /// module do not have the directive and always sort that way: the wizard only offers to turn it off where nginx
+    /// accepts it.
     /// </summary>
     public bool CaseSensitive { get; init; } = true;
 

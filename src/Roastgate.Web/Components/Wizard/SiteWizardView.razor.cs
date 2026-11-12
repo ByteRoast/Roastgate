@@ -114,6 +114,7 @@ public partial class SiteWizardView
     private WizardPreview? _preview;
     private ConfigResult? _result;
     private NginxModules _modules = NginxModules.Unknown;
+    private ModuleDirectives _directives = ModuleDirectives.Unknown;
     private string _fileName = string.Empty;
     private string? _loadedName;
     private bool _loaded;
@@ -136,6 +137,11 @@ public partial class SiteWizardView
 
     private bool FancyIndexModuleMissing => _modules.Known && !KnownModule.FancyIndex.IsLoaded(_modules);
 
+    private bool FancyIndexCaseSensitiveAvailable
+        => !_directives.Known ||
+           _directives.Supports(KnownModule.FancyIndex, "fancyindex_case_sensitive") ||
+           !_form.FancyIndexCaseSensitive;
+
     private List<string> UncoveredNames(CertificateInfo certificate)
     {
         return ParseNames(_form.ServerNames).Where((string name) => name != "_" && !certificate.Covers(name)).ToList();
@@ -143,7 +149,7 @@ public partial class SiteWizardView
 
     private void SelectCertificate(string? name)
     {
-        CertificateInfo? certificate = _certificates.FirstOrDefault((CertificateInfo item) => item.Name == name);
+        CertificateInfo? certificate = _certificates.FirstOrDefault(item => item.Name == name);
 
         _form.CertificatePath = certificate?.FullChainPath ?? string.Empty;
         _form.CertificateKeyPath = certificate?.PrivateKeyPath ?? string.Empty;
@@ -171,10 +177,16 @@ public partial class SiteWizardView
         ConfigListing whitelists = await Store.ListAsync(ConfigArea.Whitelists);
 
         _availableWhitelists = whitelists.Entries.Select((ConfigEntry entry) => entry.Name).ToList();
-        _certificates = (await Catalog.ListAsync()).Certificates.Select((CertificateEntry entry) => entry.Certificate)
+        _certificates = (await Catalog.ListAsync()).Certificates
+            .Select((CertificateEntry entry) => entry.Certificate)
             .ToList();
 
         _modules = await Wizard.GetModulesAsync();
+
+        if (KnownModule.FancyIndex.IsLoaded(_modules))
+        {
+            _directives = await Wizard.GetDirectivesAsync();
+        }
 
         SiteSpec spec = await Wizard.NewSpecAsync(Area);
 
