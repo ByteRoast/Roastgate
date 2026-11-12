@@ -1,4 +1,5 @@
 using Roastgate.Core.Hosting;
+using Roastgate.Core.Nginx.Modules;
 using Roastgate.Core.Nginx.Parsing;
 
 namespace Roastgate.Core.Nginx.Generation;
@@ -38,4 +39,10 @@ public interface ISiteWizardService
 
     /// <summary>The modules loaded by the host's nginx (cached for a few minutes).</summary>
     Task<NginxModules> GetModulesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Which optional directives the loaded modules accept (asked at most every few minutes). Unknown when nginx cannot
+    /// be asked: nginx then has the last word when the configuration is saved.
+    /// </summary>
+    Task<ModuleDirectives> GetDirectivesAsync(CancellationToken cancellationToken = default);
 }

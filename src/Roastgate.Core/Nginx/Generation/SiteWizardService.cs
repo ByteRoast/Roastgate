@@ -8,16 +8,20 @@ namespace Roastgate.Core.Nginx.Generation;
 public sealed class SiteWizardService(
     IConfigStore store,
     AppSettingsService settingsService,
-    NginxProbe nginxProbe
+    NginxProbe nginxProbe,
+    ModuleDirectiveProbe moduleDirectiveProbe
 ) : ISiteWizardService
 {
     private static readonly TimeSpan VersionCacheLifetime = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan ModulesCacheLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DirectivesCacheLifetime = TimeSpan.FromMinutes(5);
 
     private DateTimeOffset _versionCheckedAt = DateTimeOffset.MinValue;
     private DateTimeOffset _modulesCheckedAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _directivesCheckedAt = DateTimeOffset.MinValue;
     private Version? _version;
     private NginxModules _modules = NginxModules.Unknown;
+    private ModuleDirectives _directives = ModuleDirectives.Unknown;
 
     public async Task<SiteSpec> NewSpecAsync(ConfigArea area, CancellationToken cancellationToken = default)
     {
@@ -39,7 +43,7 @@ public sealed class SiteWizardService(
         if (area == ConfigArea.Whitelists || fileName is null)
         {
             return new WizardPreview(
-                [new SpecProblem("Name", "Enter a valid file name.")], 
+                [new SpecProblem("Name", "Enter a valid file name.")],
                 null
             );
         }
@@ -65,7 +69,7 @@ public sealed class SiteWizardService(
         if (spec.FancyIndex is not null)
         {
             NginxModules modules = await GetModulesAsync(cancellationToken);
-            
+
             if (modules.Known && !KnownModule.FancyIndex.IsLoaded(modules))
             {
                 problems.Add(
@@ -74,6 +78,23 @@ public sealed class SiteWizardService(
                         "The fancyindex module is not loaded in nginx. Install libnginx-mod-http-fancyindex and reload nginx."
                     )
                 );
+            }
+            else if (!spec.FancyIndex.CaseSensitive)
+            {
+                ModuleDirectives directives = await GetDirectivesAsync(cancellationToken);
+
+                if (
+                    directives.Known &&
+                    !directives.Supports(KnownModule.FancyIndex, "fancyindex_case_sensitive")
+                )
+                {
+                    problems.Add(
+                        new SpecProblem(
+                            nameof(SiteSpec.FancyIndex),
+                            "This build of the fancyindex module always sorts with case: it has no fancyindex_case_sensitive. Turn case-sensitive sort back on, or install a newer build of the module."
+                        )
+                    );
+                }
             }
         }
 
@@ -118,6 +139,24 @@ public sealed class SiteWizardService(
         _modulesCheckedAt = DateTimeOffset.UtcNow;
 
         return _modules;
+    }
+
+    public async Task<ModuleDirectives> GetDirectivesAsync(CancellationToken cancellationToken)
+    {
+        if (DateTimeOffset.UtcNow - _directivesCheckedAt < DirectivesCacheLifetime)
+        {
+            return _directives;
+        }
+
+        NginxModules modules = await GetModulesAsync(cancellationToken);
+        AppSettings settings = await settingsService.GetAsync(cancellationToken);
+
+        string path = Path.Combine(settings.NginxRoot, ".roastgate-probe");
+
+        _directives = await moduleDirectiveProbe.ProbeAsync(modules, path, cancellationToken);
+        _directivesCheckedAt = DateTimeOffset.UtcNow;
+
+        return _directives;
     }
 
     public async Task<ConfigResult> SaveAsync(
