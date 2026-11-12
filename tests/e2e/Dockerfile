@@ -1,5 +1,5 @@
 FROM roastgate:test
-RUN apt-get update && apt-get install -y --no-install-recommends nginx openssl && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends nginx libnginx-mod-http-fancyindex openssl && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /etc/nginx/whitelists /var/www/certbot
 # A stand-in for certbot (see fake-certbot.sh): it keeps the command line and the file layout but cannot reach Let's Encrypt.
 COPY fake-certbot.sh /usr/local/bin/certbot

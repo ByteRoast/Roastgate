@@ -1,5 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
+using Roastgate.Core.Nginx.Modules;
 using Roastgate.Core.Nginx.Parsing;
 using Roastgate.Core.Nginx.Whitelists;
 using Roastgate.Tests.Support;
@@ -15,7 +18,31 @@ public sealed class SiteWizardServiceTests
 
     private static SiteSpec ValidSpec()
     {
-        return new SiteSpec { ServerNames = ["app.example.com"], Upstream = "http://127.0.0.1:3000" };
+        return new SiteSpec
+        {
+            ServerNames = ["app.example.com"],
+            Upstream = "http://127.0.0.1:3000"
+        };
+    }
+
+    private static SiteSpec FancyIndexSpec()
+    {
+        return new SiteSpec()
+        {
+            Kind = SiteKind.StaticSite,
+            ServerNames = ["files.example.com"],
+            RootDirectory = "/srv/files",
+            FancyIndex = new FancyIndexOptions()
+        };
+    }
+
+    private static Task<NginxTestbed> TestbedWhereNginxSays(Func<HostCommandResult> answer)
+    {
+        return NginxTestbed.CreateAsync(
+            configureServices: services => services.AddSingleton<IHostExec>(
+                new ScriptedHostExec((program, arguments) => answer())
+            )
+        );
     }
 
     [Fact]
@@ -50,7 +77,15 @@ public sealed class SiteWizardServiceTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
 
-        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.ReverseProxies, "app", ValidSpec() with { Upstream = "not a url", ServerNames = [] });
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            ValidSpec() with
+            {
+                Upstream = "not a url",
+                ServerNames = []
+            }
+        );
 
         Assert.Null(preview.Text);
         Assert.Contains(preview.Problems, (SpecProblem problem) => problem.Field == nameof(SiteSpec.Upstream));
@@ -62,10 +97,19 @@ public sealed class SiteWizardServiceTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
 
-        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.ReverseProxies, "app", ValidSpec() with { Whitelists = ["ghost.conf"] });
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            ValidSpec() with
+            {
+                Whitelists = ["ghost.conf"]
+            }
+        );
 
         Assert.Null(preview.Text);
+
         SpecProblem problem = Assert.Single(preview.Problems);
+
         Assert.Contains("ghost.conf", problem.Message);
         Assert.Equal(0, nginx.Controller.Tests);
     }
@@ -74,9 +118,24 @@ public sealed class SiteWizardServiceTests
     public async Task A_whitelist_that_exists_is_included_in_the_generated_config()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-        await nginx.Database.Get<IWhitelistService>().SaveAsync("alice", new WhitelistDocument(null, [new WhitelistEntry("1.2.3.4")]), reload: false, "admin");
+        await nginx.Database.Get<IWhitelistService>().SaveAsync(
+            "alice",
+            new WhitelistDocument(
+                null,
+                [new WhitelistEntry("1.2.3.4")]
+            ),
+            reload: false,
+            "admin"
+        );
 
-        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.ReverseProxies, "app", ValidSpec() with { Whitelists = ["alice.conf"] });
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            ValidSpec() with
+            {
+                Whitelists = ["alice.conf"]
+            }
+        );
 
         Assert.Empty(preview.Problems);
         Assert.Contains("alice.conf;", preview.Text);
@@ -111,11 +170,19 @@ public sealed class SiteWizardServiceTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
 
-        ConfigResult result = await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "app.example.com", ValidSpec(), reload: true, "admin");
+        ConfigResult result = await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "app.example.com",
+            ValidSpec(),
+            reload: true,
+            "admin"
+        );
 
         Assert.True(result.Succeeded, result.Message);
         Assert.Equal(1, nginx.Controller.Reloads);
+
         string onDisk = await File.ReadAllTextAsync(Path.Combine(nginx.ConfD, "app.example.com.conf"));
+
         Assert.Contains("proxy_pass http://127.0.0.1:3000;", onDisk);
 
         WizardFile? loaded = await Wizard(nginx).LoadAsync(ConfigArea.ReverseProxies, "app.example.com");
@@ -131,7 +198,16 @@ public sealed class SiteWizardServiceTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
 
-        ConfigResult result = await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "app", ValidSpec() with { Upstream = "http://x;" }, reload: true, "admin");
+        ConfigResult result = await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            ValidSpec() with
+            {
+                Upstream = "http://x;"
+            },
+            reload: true,
+            "admin"
+        );
 
         Assert.False(result.Succeeded);
         Assert.Contains("destination", result.Message);
@@ -143,9 +219,18 @@ public sealed class SiteWizardServiceTests
     public async Task A_config_nginx_refuses_is_rolled_back_like_any_other_save()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-        nginx.Controller.FailureRule = () => Directory.EnumerateFiles(nginx.ConfD).Any() ? "nginx: [emerg] a directive the fake does not like" : null;
 
-        ConfigResult result = await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "app", ValidSpec(), reload: true, "admin");
+        nginx.Controller.FailureRule = () => Directory.EnumerateFiles(nginx.ConfD).Any()
+            ? "nginx: [emerg] a directive the fake does not like"
+            : null;
+
+        ConfigResult result = await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            ValidSpec(),
+            reload: true,
+            "admin"
+        );
 
         Assert.False(result.Succeeded);
         Assert.True(result.RolledBack);
@@ -157,8 +242,16 @@ public sealed class SiteWizardServiceTests
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
         await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "app", ValidSpec(), reload: false, "admin");
+
         WizardFile edited = (await Wizard(nginx).LoadAsync(ConfigArea.ReverseProxies, "app"))!;
-        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "app", edited.File.Content.Replace("listen 80;", "listen 81;"), reload: false, "admin");
+
+        await nginx.Store.SaveAsync(
+            ConfigArea.ReverseProxies,
+            "app",
+            edited.File.Content.Replace("listen 80;", "listen 81;"),
+            reload: false,
+            "admin"
+        );
 
         WizardFile? reopened = await Wizard(nginx).LoadAsync(ConfigArea.ReverseProxies, "app");
 
@@ -170,7 +263,13 @@ public sealed class SiteWizardServiceTests
     public async Task A_file_written_without_the_wizard_has_no_metadata()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "legacy", "server { listen 80; }", reload: false, "admin");
+        await nginx.Store.SaveAsync(
+            ConfigArea.ReverseProxies,
+            "legacy",
+            "server { listen 80; }",
+            reload: false,
+            "admin"
+        );
 
         WizardFile? loaded = await Wizard(nginx).LoadAsync(ConfigArea.ReverseProxies, "legacy");
 
@@ -181,16 +280,35 @@ public sealed class SiteWizardServiceTests
     public async Task A_hand_written_file_can_be_imported_and_saved_through_the_wizard_with_a_backup()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-        const string handWritten = "server {\n    listen 80;\n    server_name legacy.example.com;\n    location / {\n        proxy_pass http://127.0.0.1:9000;\n        proxy_buffering off;\n    }\n}\n";
-        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "legacy", handWritten, reload: false, "admin");
+
+        const string handWritten =
+            "server {\n    listen 80;\n    server_name legacy.example.com;\n    location / {\n        proxy_pass http://127.0.0.1:9000;\n        proxy_buffering off;\n    }\n}\n";
+
+        await nginx.Store.SaveAsync(
+            ConfigArea.ReverseProxies,
+            "legacy",
+            handWritten,
+            reload: false,
+            "admin"
+        );
 
         SiteImportResult? import = await Wizard(nginx).ImportAsync(ConfigArea.ReverseProxies, "legacy.conf");
 
         Assert.NotNull(import?.Spec);
         Assert.Equal("proxy_buffering off;", import.Spec.ExtraLocationDirectives);
-        ConfigResult saved = await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "legacy", import.Spec, reload: false, "admin");
+
+        ConfigResult saved = await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "legacy",
+            import.Spec,
+            reload: false,
+            "admin"
+        );
+
         Assert.True(saved.Succeeded, saved.Message);
+
         ConfigFile? after = await nginx.Store.ReadAsync(ConfigArea.ReverseProxies, "legacy");
+
         Assert.Contains("proxy_buffering off;", after!.Content);
         Assert.Contains("proxy_pass http://127.0.0.1:9000;", after.Content);
         Assert.Equal(MetadataStatus.Intact, SiteMetadataFormat.Read(after.Content).Status);
@@ -217,8 +335,22 @@ public sealed class SiteWizardServiceTests
     public async Task Listings_flag_the_files_the_wizard_can_reopen()
     {
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
-        await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "generated", ValidSpec(), reload: false, "admin");
-        await nginx.Store.SaveAsync(ConfigArea.ReverseProxies, "handmade", "server { listen 80; }", reload: false, "admin");
+
+        await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "generated",
+            ValidSpec(),
+            reload: false,
+            "admin"
+        );
+
+        await nginx.Store.SaveAsync(
+            ConfigArea.ReverseProxies,
+            "handmade",
+            "server { listen 80; }",
+            reload: false,
+            "admin"
+        );
 
         ConfigListing listing = await nginx.Store.ListAsync(ConfigArea.ReverseProxies);
 
@@ -232,12 +364,231 @@ public sealed class SiteWizardServiceTests
         await using NginxTestbed nginx = await NginxTestbed.CreateAsync();
 
         await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "one", ValidSpec(), reload: false, "admin");
-        await Wizard(nginx).SaveAsync(ConfigArea.ReverseProxies, "two", ValidSpec() with { ServerNames = ["two.example.com"] }, reload: false, "admin");
+        await Wizard(nginx).SaveAsync(
+            ConfigArea.ReverseProxies,
+            "two",
+            ValidSpec() with
+            {
+                ServerNames = ["two.example.com"]
+            },
+            reload: false,
+            "admin"
+        );
 
         string one = await File.ReadAllTextAsync(Path.Combine(nginx.ConfD, "one.conf"));
         string two = await File.ReadAllTextAsync(Path.Combine(nginx.ConfD, "two.conf"));
+
         Assert.Contains("$rg_upgrade_one", one);
         Assert.Contains("$rg_upgrade_two", two);
         Assert.DoesNotContain("$rg_upgrade_one", two);
+    }
+
+    [Fact]
+    public async Task Fancyindex_is_refused_when_the_module_is_not_loaded()
+    {
+        await using NginxTestbed nginx = await TestbedWhereNginxSays(() => ScriptedHostExec.Ok(
+                "user nginx;\nevents {}"
+            )
+        );
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.Sites, "files", FancyIndexSpec());
+
+        Assert.Null(preview.Text);
+
+        SpecProblem problem = Assert.Single(preview.Problems);
+
+        Assert.Equal(nameof(SiteSpec.FancyIndex), problem.Field);
+        Assert.Contains("libnginx-mod-http-fancyindex", problem.Message);
+    }
+
+    [Fact]
+    public async Task Fancyindex_is_accepted_when_the_module_is_loaded()
+    {
+        await using NginxTestbed nginx = await TestbedWhereNginxSays(() => ScriptedHostExec.Ok(
+                "load_module modules/ngx_http_fancyindex_module.so;"
+            )
+        );
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.Sites, "files", FancyIndexSpec());
+
+        Assert.Empty(preview.Problems);
+        Assert.Contains("fancyindex on;", preview.Text);
+    }
+
+    [Fact]
+    public async Task Fancyindex_is_accepted_when_the_module_list_is_unknown()
+    {
+        await using NginxTestbed nginx = await TestbedWhereNginxSays(ScriptedHostExec.NotFound);
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.Sites, "files", FancyIndexSpec());
+
+        Assert.Empty(preview.Problems);
+        Assert.NotNull(preview.Text);
+    }
+
+    [Fact]
+    public async Task A_site_without_fancyindex_does_not_ask_nginx_for_its_modules()
+    {
+        int moduleProbes = 0;
+
+        await using NginxTestbed nginx = await NginxTestbed.CreateAsync(
+            configureServices: (IServiceCollection services) => services.AddSingleton<IHostExec>(
+                new ScriptedHostExec((string program, IReadOnlyList<string> arguments) =>
+                {
+                    if (arguments.SequenceEqual(["-T"]))
+                    {
+                        moduleProbes++;
+                    }
+
+                    return ScriptedHostExec.NotFound();
+                })
+            )
+        );
+
+        await Wizard(nginx).PreviewAsync(ConfigArea.ReverseProxies, "app", ValidSpec());
+
+        Assert.Equal(0, moduleProbes);
+    }
+
+    private const string CaseSensitiveDirective = "fancyindex_case_sensitive";
+
+    private static SiteSpec CaseInsensitiveFancyIndexSpec()
+    {
+        SiteSpec spec = FancyIndexSpec();
+
+        return spec with { FancyIndex = new FancyIndexOptions { CaseSensitive = false } };
+    }
+
+    /// <summary>
+    /// A host where fancyindex is loaded. <paramref name="probe"/> answers the capability probe
+    /// (<c>nginx -t -c &lt;file&gt;</c>) from the configuration it was handed and the path of that file.
+    /// </summary>
+    private static Task<NginxTestbed> TestbedWithFancyIndex(
+        Func<string, string, HostCommandResult> probe,
+        List<string>? probedFiles = null
+    )
+    {
+        return NginxTestbed.CreateAsync(configureServices: (services) =>
+            services.AddSingleton<IHostExec>(new ScriptedHostExec((program, arguments) =>
+            {
+                if (arguments.SequenceEqual(["-T"]))
+                {
+                    return ScriptedHostExec.Ok("load_module modules/ngx_http_fancyindex_module.so;");
+                }
+
+                if (arguments is ["-t", "-c", string path])
+                {
+                    probedFiles?.Add(path);
+
+                    return probe(File.ReadAllText(path), path);
+                }
+
+                return ScriptedHostExec.Ok();
+            })));
+    }
+
+    private static HostCommandResult BuildWithoutCaseSensitive(string configuration, string path)
+    {
+        return configuration.Contains(CaseSensitiveDirective)
+            ? new HostCommandResult(
+                1,
+                string.Empty,
+                $"nginx: [emerg] unknown directive \"{CaseSensitiveDirective}\" in {path}:9",
+                false
+            )
+            : ScriptedHostExec.Ok();
+    }
+
+    [Fact]
+    public async Task Case_insensitive_sort_is_refused_when_the_fancyindex_build_lacks_the_directive()
+    {
+        await using NginxTestbed nginx = await TestbedWithFancyIndex(BuildWithoutCaseSensitive);
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.Sites,
+            "files",
+            CaseInsensitiveFancyIndexSpec()
+        );
+
+        Assert.Null(preview.Text);
+
+        SpecProblem problem = Assert.Single(preview.Problems);
+
+        Assert.Equal(nameof(SiteSpec.FancyIndex), problem.Field);
+        Assert.Contains(CaseSensitiveDirective, problem.Message);
+    }
+
+    [Fact]
+    public async Task Case_insensitive_sort_is_written_when_the_fancyindex_build_has_the_directive()
+    {
+        await using NginxTestbed nginx = await TestbedWithFancyIndex((_, _) => ScriptedHostExec.Ok());
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.Sites,
+            "files",
+            CaseInsensitiveFancyIndexSpec()
+        );
+
+        Assert.Empty(preview.Problems);
+        Assert.Contains($"{CaseSensitiveDirective} off;", preview.Text);
+    }
+
+    [Fact]
+    public async Task Case_insensitive_sort_is_accepted_when_nginx_cannot_tell_which_directives_it_has()
+    {
+        await using NginxTestbed nginx = await TestbedWithFancyIndex((_, _) => new HostCommandResult(
+                1,
+                string.Empty,
+                "nginx: [emerg] dlopen() failed",
+                false
+            )
+        );
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(
+            ConfigArea.Sites,
+            "files",
+            CaseInsensitiveFancyIndexSpec()
+        );
+
+        Assert.Empty(preview.Problems);
+        Assert.NotNull(preview.Text);
+    }
+
+    [Fact]
+    public async Task The_default_case_sensitive_sort_does_not_run_the_probe()
+    {
+        List<string> probedFiles = [];
+
+        await using NginxTestbed nginx = await TestbedWithFancyIndex(BuildWithoutCaseSensitive, probedFiles);
+
+        WizardPreview preview = await Wizard(nginx).PreviewAsync(ConfigArea.Sites, "files", FancyIndexSpec());
+
+        Assert.Empty(preview.Problems);
+        Assert.DoesNotContain(CaseSensitiveDirective, preview.Text);
+        Assert.Empty(probedFiles);
+    }
+
+    [Fact]
+    public async Task The_probe_writes_in_the_nginx_root_and_its_answer_is_cached()
+    {
+        List<string> probedFiles = [];
+
+        await using NginxTestbed nginx = await TestbedWithFancyIndex(
+            (_, _) => ScriptedHostExec.Ok(),
+            probedFiles
+        );
+
+        ISiteWizardService wizard = Wizard(nginx);
+
+        ModuleDirectives first = await wizard.GetDirectivesAsync();
+        ModuleDirectives second = await wizard.GetDirectivesAsync();
+
+        Assert.True(first.Supports(KnownModule.FancyIndex, CaseSensitiveDirective));
+        Assert.Same(first, second);
+
+        string probedFile = Assert.Single(probedFiles);
+
+        Assert.Equal(Path.Combine(nginx.Root, ".roastgate-probe"), Path.GetDirectoryName(probedFile));
+        Assert.False(File.Exists(probedFile));
     }
 }

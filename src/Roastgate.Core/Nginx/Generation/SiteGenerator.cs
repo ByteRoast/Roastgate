@@ -1,25 +1,11 @@
 using System.Text;
+using Roastgate.Core.Extensions;
 
 namespace Roastgate.Core.Nginx.Generation;
 
-/// <param name="Locations">Where the whitelists live, to build the include lines.</param>
-/// <param name="AcmeWebroot">The Let's Encrypt challenge directory from the settings.</param>
-/// <param name="FileName">The config file name, used to give the websocket map variable a name that is unique across files.</param>
-/// <param name="NginxVersion">The version running on the host, when known. Directives that changed between versions depend on it.</param>
-public sealed record GenerationContext(
-    ConfigLocations Locations,
-    string AcmeWebroot,
-    string FileName,
-    Version? NginxVersion = null)
-{
-    /// <summary>
-    /// nginx 1.25.1 replaced the <c>http2</c> parameter of <c>listen</c> by a separate <c>http2 on;</c> directive, which older versions
-    /// reject. The parameter form is accepted everywhere (newer versions only warn), so it is also used when the version is unknown.
-    /// </summary>
-    public bool UsesHttp2Directive => NginxVersion is { } version && version >= new Version(1, 25, 1);
-}
-
-/// <summary>Turns a validated <see cref="SiteSpec"/> into nginx configuration text. It does no validation of its own.</summary>
+/// <summary>
+/// Turns a validated <see cref="SiteSpec"/> into nginx configuration text. It does no validation of its own.
+/// </summary>
 public static class SiteGenerator
 {
     public static string Generate(SiteSpec spec, GenerationContext context)
@@ -250,8 +236,16 @@ public static class SiteGenerator
         writer.Line($"root {spec.RootDirectory};");
         writer.Line("index index.html index.htm;");
         writer.Blank();
+
+        WriteDotDirectoryExceptions(writer, spec);
+
         writer.Open("location /");
         writer.Line(spec.SpaFallback ? "try_files $uri $uri/ /index.html;" : "try_files $uri $uri/ =404;");
+
+        if (spec.FancyIndex is { } fancyIndex)
+        {
+            WriteFancyIndex(writer, fancyIndex);
+        }
 
         if (!string.IsNullOrWhiteSpace(spec.ExtraLocationDirectives))
         {
@@ -262,7 +256,8 @@ public static class SiteGenerator
 
         if (spec.CacheStaticAssets)
         {
-            // "expires" rather than add_header: add_header in a location would drop the security headers of the server block.
+            // "expires" rather than add_header: add_header in a location would drop the security headers of the server
+            // block.
             writer.Blank();
             writer.Open("location ~* \\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?)$");
             writer.Line("expires 30d;");
@@ -271,7 +266,27 @@ public static class SiteGenerator
         }
     }
 
-    /// <summary>A variable name suffix that is unique per config file (nginx refuses two maps that define the same variable).</summary>
+    private static void WriteDotDirectoryExceptions(NginxWriter writer, SiteSpec spec)
+    {
+        if (spec.FancyIndex is not { } options || !spec.BlockCommonExploits)
+        {
+            return;
+        }
+
+        IEnumerable<string> directories = DotDirectories(options);
+
+        foreach (string directory in directories)
+        {
+            writer.Open($"location ^~ {directory}/");
+            writer.Line("try_files $uri =404;");
+            writer.Close();
+            writer.Blank();
+        }
+    }
+
+    /// <summary>
+    /// A variable name suffix that is unique per config file (nginx refuses two maps that define the same variable).
+    /// </summary>
     internal static string VariableSuffix(string fileName)
     {
         string name = fileName.EndsWith(ConfigNames.ConfigSuffix, StringComparison.Ordinal)
@@ -288,60 +303,65 @@ public static class SiteGenerator
         return builder.ToString();
     }
 
-    private sealed class NginxWriter
+    private static void WriteFancyIndex(NginxWriter writer, FancyIndexOptions options)
     {
-        private readonly StringBuilder _builder = new();
-        private int _depth;
+        writer.Line("fancyindex on;");
+        writer.Line($"fancyindex_exact_size {BooleanToOnOff(options.ExactSize)};");
+        writer.Line($"fancyindex_localtime {BooleanToOnOff(options.LocalTime)};");
+        writer.Line($"fancyindex_show_path {BooleanToOnOff(options.ShowPath)};");
+        writer.Line($"fancyindex_directories_first {BooleanToOnOff(options.DirectoriesFirst)};");
 
-        public void Blank()
+        // Only written when turned off, on being the module's default: a build without the directive (0.5.2 in Debian
+        // and Ubuntu) still accepts the file. Turning it off on such a build is refused by the wizard, which asks nginx
+        // first (ModuleDirectiveProbe).
+        if (!options.CaseSensitive)
         {
-            // Never two blank lines in a row, and never one straight after an opening brace.
-            string text = _builder.ToString();
-            if (text.Length == 0 || text.EndsWith("\n\n", StringComparison.Ordinal) ||
-                text.EndsWith("{\n", StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            _builder.Append('\n');
+            writer.Line("fancyindex_case_sensitive off;");
         }
 
-        public void Line(string text)
+        writer.Line($"fancyindex_show_dotfiles {BooleanToOnOff(options.ShowDotFiles)};");
+        writer.Line($"fancyindex_hide_symlinks {BooleanToOnOff(options.HideSymlinks)};");
+        writer.Line($"fancyindex_hide_parent_dir {BooleanToOnOff(options.HideParentDir)};");
+        writer.Line($"fancyindex_default_sort {options.DefaultSort.GetDescription()};");
+        writer.Line($"fancyindex_time_format \"{options.TimeFormat}\";");
+
+        if (!string.IsNullOrWhiteSpace(options.Header))
         {
-            _builder.Append(' ', _depth * 4).Append(text).Append('\n');
+            writer.Line($"fancyindex_header \"{options.Header}\";");
         }
 
-        /// <summary>Free text from the user: each line is indented to the current depth, its own relative indentation is kept.</summary>
-        public void Lines(string text)
+        if (!string.IsNullOrWhiteSpace(options.Footer))
         {
-            foreach (string line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
-            {
-                string trimmed = line.TrimEnd();
-
-                if (trimmed.Length > 0)
-                {
-                    _builder.Append(' ', _depth * 4).Append(trimmed.Replace("\t", "    ")).Append('\n');
-                }
-            }
+            writer.Line($"fancyindex_footer \"{options.Footer}\";");
         }
 
-        public void Open(string header)
+        if (!string.IsNullOrWhiteSpace(options.CssHref))
         {
-            Line(header + " {");
-
-            _depth++;
+            writer.Line($"fancyindex_css_href \"{options.CssHref}\";");
         }
 
-        public void Close()
+        if (options.Ignore.Count > 0)
         {
-            _depth--;
-
-            Line("}");
+            writer.Line($"fancyindex_ignore {string.Join(' ', options.Ignore)};");
         }
+    }
 
-        public override string ToString()
-        {
-            return _builder.ToString();
-        }
+    private static string BooleanToOnOff(bool value)
+    {
+        return value ? "on" : "off";
+    }
+
+    internal static IReadOnlyList<string> DotDirectories(FancyIndexOptions options)
+    {
+        string?[] paths = [options.Header, options.Footer, options.CssHref];
+
+        return paths
+            .OfType<string>()
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Where(path => path.Contains('/'))
+            .Select(path => path[..path.LastIndexOf('/')])
+            .Where(path => path.Split('/').Any(segment => segment.StartsWith('.')))
+            .Distinct()
+            .ToList();
     }
 }

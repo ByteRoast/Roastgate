@@ -3,12 +3,6 @@ using Roastgate.Core.Settings;
 
 namespace Roastgate.Core.Nginx.Whitelists;
 
-public interface IWhitelistUsageScanner
-{
-    /// <summary>Every include, in the managed configs, that pulls in each of the given whitelists.</summary>
-    Task<IReadOnlyDictionary<string, IReadOnlyList<WhitelistUsage>>> FindAsync(IReadOnlyCollection<string> whitelistNames, CancellationToken cancellationToken = default);
-}
-
 /// <summary>
 /// Finds where whitelists are included by reading the reverse proxies (conf.d) and the sites (sites-available).
 /// It understands quoted and relative paths and wildcard includes. It does not read nginx.conf or files that

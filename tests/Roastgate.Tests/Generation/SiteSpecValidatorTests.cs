@@ -24,7 +24,11 @@ public sealed class SiteSpecValidatorTests
     public void A_minimal_static_site_is_valid()
     {
         SiteSpec spec = new()
-            { Kind = SiteKind.StaticSite, ServerNames = ["docs.example.com"], RootDirectory = "/var/www/docs" };
+        {
+            Kind = SiteKind.StaticSite,
+            ServerNames = ["docs.example.com"],
+            RootDirectory = "/var/www/docs"
+        };
 
         Assert.Empty(SiteSpecValidator.Validate(spec));
     }
@@ -61,7 +65,16 @@ public sealed class SiteSpecValidatorTests
     [InlineData("my-app.example.com")]
     public void Valid_server_names_are_accepted(string name)
     {
-        Assert.False(HasProblem(Proxy() with { ServerNames = [name] }, nameof(SiteSpec.ServerNames)), name);
+        Assert.False(
+            HasProblem(
+                Proxy() with
+                {
+                    ServerNames = [name]
+                },
+                nameof(SiteSpec.ServerNames)
+            ),
+            name
+        );
     }
 
     [Theory]
@@ -80,7 +93,16 @@ public sealed class SiteSpecValidatorTests
     [InlineData("a*.example.com")]
     public void Anything_that_is_not_a_plain_hostname_is_refused(string name)
     {
-        Assert.True(HasProblem(Proxy() with { ServerNames = [name] }, nameof(SiteSpec.ServerNames)), name);
+        Assert.True(
+            HasProblem(
+                Proxy() with
+                {
+                    ServerNames = [name]
+                },
+                nameof(SiteSpec.ServerNames)
+            ),
+            name
+        );
     }
 
     [Fact]
@@ -92,8 +114,10 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void Too_many_server_names_are_refused()
     {
-        string[] names = Enumerable.Range(0, SiteSpecValidator.MaximumServerNames + 1)
-            .Select((int index) => $"h{index}.example.com").ToArray();
+        string[] names = Enumerable.Range(
+            0,
+            SiteSpecValidator.MaximumServerNames + 1
+        ).Select((int index) => $"h{index}.example.com").ToArray();
 
         Assert.True(HasProblem(Proxy() with { ServerNames = names }, nameof(SiteSpec.ServerNames)));
     }
@@ -101,8 +125,16 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void A_server_name_listed_twice_is_refused_whatever_its_case()
     {
-        Assert.True(HasProblem(Proxy() with { ServerNames = ["a.example.com", "A.EXAMPLE.COM"] },
-            nameof(SiteSpec.ServerNames)));
+        Assert.True(
+            HasProblem(
+                Proxy() with
+                {
+                    ServerNames = ["a.example.com", "A.EXAMPLE.COM"]
+                },
+                nameof(SiteSpec.ServerNames
+                )
+            )
+        );
     }
 
     // ---- Upstream --------------------------------------------------------------------
@@ -145,8 +177,12 @@ public sealed class SiteSpecValidatorTests
     public void A_destination_path_without_a_trailing_slash_is_refused_because_nginx_would_glue_it_to_the_request()
     {
         SpecProblem problem = Assert.Single(
-            SiteSpecValidator.Validate(Proxy() with { Upstream = "http://backend:3000/app" }),
-            (SpecProblem item) => item.Field == nameof(SiteSpec.Upstream));
+            SiteSpecValidator.Validate(Proxy() with
+            {
+                Upstream = "http://backend:3000/app"
+            }),
+            (SpecProblem item) => item.Field == nameof(SiteSpec.Upstream)
+        );
 
         Assert.Contains("slash", problem.Message);
     }
@@ -160,8 +196,16 @@ public sealed class SiteSpecValidatorTests
     [InlineData(3601, false)]
     public void The_proxy_timeout_is_bounded(int seconds, bool valid)
     {
-        Assert.Equal(valid,
-            !HasProblem(Proxy() with { ProxyTimeoutSeconds = seconds }, nameof(SiteSpec.ProxyTimeoutSeconds)));
+        Assert.Equal(
+            valid,
+            !HasProblem(
+                Proxy() with
+                {
+                    ProxyTimeoutSeconds = seconds
+                },
+                nameof(SiteSpec.ProxyTimeoutSeconds)
+            )
+        );
     }
 
     // ---- Static site -----------------------------------------------------------------
@@ -202,7 +246,9 @@ public sealed class SiteSpecValidatorTests
     {
         SiteSpec spec = Proxy() with
         {
-            EnableTls = true, CertificatePath = path, CertificateKeyPath = "/etc/ssl/key.pem"
+            EnableTls = true,
+            CertificatePath = path,
+            CertificateKeyPath = "/etc/ssl/key.pem"
         };
 
         Assert.True(HasProblem(spec, nameof(SiteSpec.CertificatePath)), path);
@@ -278,12 +324,27 @@ public sealed class SiteSpecValidatorTests
     [InlineData("add_header X-Note 'it''s { fine';")]
     public void Free_directives_with_balanced_braces_are_accepted(string text)
     {
-        Assert.False(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)),
-            text);
+        Assert.False(
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraServerDirectives = text
+                },
+                nameof(SiteSpec.ExtraServerDirectives)
+            ),
+            text
+        );
 
         Assert.False(
-            HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)),
-            text);
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraLocationDirectives = text
+                },
+                nameof(SiteSpec.ExtraLocationDirectives)
+            ),
+            text
+        );
     }
 
     [Theory]
@@ -295,23 +356,51 @@ public sealed class SiteSpecValidatorTests
     [InlineData("a }\n{ b")]
     public void Free_directives_that_could_leave_their_block_are_refused(string text)
     {
-        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = text }, nameof(SiteSpec.ExtraServerDirectives)),
-            text);
+        Assert.True(
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraServerDirectives = text
+                },
+                nameof(SiteSpec.ExtraServerDirectives)
+            ),
+            text
+        );
 
         Assert.True(
-            HasProblem(Proxy() with { ExtraLocationDirectives = text }, nameof(SiteSpec.ExtraLocationDirectives)),
-            text);
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraLocationDirectives = text
+                },
+                nameof(SiteSpec.ExtraLocationDirectives)
+            ),
+            text
+        );
     }
 
     [Fact]
     public void Free_directives_cannot_contain_control_characters_or_be_huge()
     {
-        Assert.True(HasProblem(Proxy() with { ExtraServerDirectives = "a;\0b;" },
-            nameof(SiteSpec.ExtraServerDirectives)));
+        Assert.True(
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraServerDirectives = "a;\0b;"
+                },
+                nameof(SiteSpec.ExtraServerDirectives)
+            )
+        );
 
-        Assert.True(HasProblem(
-            Proxy() with { ExtraServerDirectives = new string('a', SiteSpecValidator.MaximumExtraLength + 1) },
-            nameof(SiteSpec.ExtraServerDirectives)));
+        Assert.True(
+            HasProblem(
+                Proxy() with
+                {
+                    ExtraServerDirectives = new string('a', SiteSpecValidator.MaximumExtraLength + 1)
+                },
+                nameof(SiteSpec.ExtraServerDirectives)
+            )
+        );
     }
 
     // ---- Denied visitors --------------------------------------------------------------
@@ -322,7 +411,13 @@ public sealed class SiteSpecValidatorTests
     public void A_denied_behavior_with_a_whitelist_is_valid(DeniedBehavior behavior)
     {
         Assert.Empty(
-            SiteSpecValidator.Validate(Proxy() with { Whitelists = ["alice.conf"], DeniedBehavior = behavior }));
+            SiteSpecValidator.Validate(
+                Proxy() with
+                {
+                    Whitelists = ["alice.conf"], DeniedBehavior = behavior
+                }
+            )
+        );
     }
 
     [Theory]
@@ -339,10 +434,14 @@ public sealed class SiteSpecValidatorTests
     [Fact]
     public void Forbidden_needs_nothing_more_even_without_a_whitelist()
     {
-        Assert.Empty(SiteSpecValidator.Validate(Proxy() with
-        {
-            DeniedBehavior = DeniedBehavior.Forbidden, DeniedUrl = "not a url"
-        }));
+        Assert.Empty(
+            SiteSpecValidator.Validate(
+                Proxy() with
+                {
+                    DeniedBehavior = DeniedBehavior.Forbidden, DeniedUrl = "not a url"
+                }
+            )
+        );
     }
 
     [Theory]
@@ -355,7 +454,9 @@ public sealed class SiteSpecValidatorTests
     {
         SiteSpec spec = Proxy() with
         {
-            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+            Whitelists = ["alice.conf"],
+            DeniedBehavior = DeniedBehavior.Redirect,
+            DeniedUrl = url
         };
 
         Assert.Empty(SiteSpecValidator.Validate(spec));
@@ -379,7 +480,9 @@ public sealed class SiteSpecValidatorTests
     {
         SiteSpec spec = Proxy() with
         {
-            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+            Whitelists = ["alice.conf"],
+            DeniedBehavior = DeniedBehavior.Redirect,
+            DeniedUrl = url
         };
 
         Assert.True(HasProblem(spec, nameof(SiteSpec.DeniedUrl)), url);
@@ -389,9 +492,12 @@ public sealed class SiteSpecValidatorTests
     public void A_redirect_address_cannot_be_huge()
     {
         string url = "https://example.com/" + new string('a', SiteSpecValidator.MaximumRedirectUrlLength);
+
         SiteSpec spec = Proxy() with
         {
-            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.Redirect, DeniedUrl = url
+            Whitelists = ["alice.conf"],
+            DeniedBehavior = DeniedBehavior.Redirect,
+            DeniedUrl = url
         };
 
         Assert.True(HasProblem(spec, nameof(SiteSpec.DeniedUrl)));
@@ -402,7 +508,9 @@ public sealed class SiteSpecValidatorTests
     {
         SiteSpec spec = Proxy() with
         {
-            Whitelists = ["alice.conf"], DeniedBehavior = DeniedBehavior.NotFound, DeniedUrl = "not a url"
+            Whitelists = ["alice.conf"],
+            DeniedBehavior = DeniedBehavior.NotFound,
+            DeniedUrl = "not a url"
         };
 
         Assert.Empty(SiteSpecValidator.Validate(spec));
@@ -420,5 +528,150 @@ public sealed class SiteSpecValidatorTests
     public void Brace_balance_ignores_strings_and_comments(string text, bool balanced)
     {
         Assert.Equal(balanced, SiteSpecValidator.BracesBalanced(text));
+    }
+
+    private static SiteSpec FileServer(FancyIndexOptions options)
+    {
+        return new SiteSpec
+        {
+            Kind = SiteKind.StaticSite,
+            ServerNames = ["files.example.com"],
+            RootDirectory = "/srv/files",
+            FancyIndex = options,
+        };
+    }
+
+    [Fact]
+    public void Accepts_the_options_of_a_typical_file_server()
+    {
+        SiteSpec spec = FileServer(new FancyIndexOptions
+        {
+            Header = "/.nginxy/header.html",
+            Footer = "/.nginxy/footer.html",
+            CssHref = "/.nginxy/style.css",
+            Ignore = ["radarr", "tv-sonarr", "uploads"],
+            TimeFormat = "%d-%b-%Y %H:%M",
+            LocalTime = true,
+            ExactSize = false,
+        });
+
+        Assert.Empty(SiteSpecValidator.Validate(spec));
+    }
+
+    [Fact]
+    public void Refuses_the_file_listing_on_a_reverse_proxy()
+    {
+        SiteSpec spec = Proxy() with { FancyIndex = new FancyIndexOptions() };
+
+        Assert.True(HasProblem(spec, nameof(SiteSpec.FancyIndex)));
+    }
+
+    [Theory]
+    [InlineData(nameof(FancyIndexOptions.Header), "header.html")]
+    [InlineData(nameof(FancyIndexOptions.Header), "/../header.html")]
+    [InlineData(nameof(FancyIndexOptions.Header), "/header.html;")]
+    [InlineData(nameof(FancyIndexOptions.Footer), "footer.html")]
+    [InlineData(nameof(FancyIndexOptions.CssHref), "https://cdn.example.com/style.css")]
+    public void Refuses_a_header_footer_or_style_sheet_that_is_not_an_absolute_path(string property, string value)
+    {
+        FancyIndexOptions options = property switch
+        {
+            nameof(FancyIndexOptions.Header) => new FancyIndexOptions { Header = value },
+            nameof(FancyIndexOptions.Footer) => new FancyIndexOptions { Footer = value },
+            _ => new FancyIndexOptions { CssHref = value },
+        };
+
+        Assert.True(HasProblem(FileServer(options), $"{nameof(SiteSpec.FancyIndex)}.{property}"));
+    }
+
+    [Fact]
+    public void Refuses_to_hide_the_path_without_a_custom_header()
+    {
+        SiteSpec spec = FileServer(new FancyIndexOptions { ShowPath = false });
+
+        Assert.True(HasProblem(spec, "FancyIndex.ShowPath"));
+        Assert.Empty(
+            SiteSpecValidator.Validate(
+                FileServer(
+                    new FancyIndexOptions
+                    {
+                        ShowPath = false,
+                        Header = "/.nginxy/header.html"
+                    }
+                )
+            )
+        );
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("%Q")]
+    [InlineData("%")]
+    [InlineData("%Y\"; return 200; #")]
+    [InlineData("%Y{%m}")]
+    public void Refuses_a_time_format_the_module_does_not_know(string format)
+    {
+        SiteSpec spec = FileServer(new FancyIndexOptions { TimeFormat = format });
+
+        Assert.True(HasProblem(spec, "FancyIndex.TimeFormat"));
+    }
+
+    [Theory]
+    [InlineData("with space")]
+    [InlineData("a;b")]
+    [InlineData("a{b}")]
+    [InlineData("\"quoted\"")]
+    [InlineData("")]
+    public void Refuses_an_ignored_name_with_special_characters(string name)
+    {
+        SiteSpec spec = FileServer(new FancyIndexOptions
+        {
+            Ignore = [name]
+        });
+
+        Assert.True(HasProblem(spec, "FancyIndex.Ignore"));
+    }
+
+    [Fact]
+    public void Refuses_more_ignored_names_than_the_maximum()
+    {
+        string[] names = Enumerable.Range(0, SiteSpecValidator.MaximumIgnoredNames + 1)
+            .Select((int index) => $"name{index}")
+            .ToArray();
+
+        Assert.True(HasProblem(
+            FileServer(
+                new FancyIndexOptions
+                {
+                    Ignore = names
+                }
+            ),
+            "FancyIndex.Ignore")
+        );
+    }
+
+    [Fact]
+    public void Refuses_listing_dotfiles_while_the_exploit_protection_blocks_them()
+    {
+        FancyIndexOptions options = new() { ShowDotFiles = true };
+
+        Assert.True(
+            HasProblem(
+                FileServer(options) with
+                {
+                    BlockCommonExploits = true
+                },
+                "FancyIndex.ShowDotFiles"
+            )
+        );
+
+        Assert.Empty(
+            SiteSpecValidator.Validate(
+                FileServer(options) with
+                {
+                    BlockCommonExploits = false
+                }
+            )
+        );
     }
 }
