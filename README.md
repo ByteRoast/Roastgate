@@ -170,7 +170,10 @@ are atomic (temporary file, then rename) and keep the original file permissions.
   [fancyindex](https://github.com/aperezdc/ngx-fancyindex), which turns a static site into a browsable directory
   listing (sort order, sizes, dates, hidden names, custom header, footer and CSS). The option is greyed out, with the
   package to install, when the module is not loaded. When nginx cannot be asked, the option stays available and
-  `nginx -t` has the last word at save time.
+  `nginx -t` has the last word at save time. Builds of a module differ: Ubuntu's fancyindex 0.5.2, for instance, has no
+  `fancyindex_case_sensitive`. Before offering an option that only some builds have, Roastgate asks nginx itself: it
+  tests the directive with `nginx -t` on a temporary file in `<nginx root>/.roastgate-probe` (deleted right after), and
+  hides the option when nginx does not know it.
   Roastgate only writes the directives: the header, footer and CSS files must be served by the site itself, and the
   header and footer also need nginx's `http_addition_module`.
 - **Whitelists**: strict IPv4, IPv6 and CIDR validation, and the list of configs that use each one. Visitors outside a

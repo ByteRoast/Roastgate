@@ -338,6 +338,12 @@ check('nginx lists the directory through fancyindex', listing.includes('200 OK')
 await page.goto(`${base}/sites/wizard?name=files.example.com`);
 await waitField('Root directory');
 check('reopening the site keeps the fancyindex option on', await page.getByRole('combobox', { name: 'Default sort' }).isVisible());
+// The image's fancyindex is Ubuntu's 0.5.2 package, which has no fancyindex_case_sensitive: the wizard asked nginx and
+// hides the option. If the base image changes, this build may have it and the check below must be revisited.
+check('the case-sensitive sort is not offered by a fancyindex build without it', await page.getByLabel('Case-sensitive sort').count() === 0);
+// The folder only exists if the probe ran for real; an error from ls (folder missing) fails the check as well.
+const probeLeftovers = sh('ls -A /etc/nginx/.roastgate-probe');
+check('the directive probe leaves no file in the nginx root', probeLeftovers === '', probeLeftovers);
 
 // A reverse proxy in front of it, with the preview tab.
 await page.goto(`${base}/reverse-proxies/wizard`);
