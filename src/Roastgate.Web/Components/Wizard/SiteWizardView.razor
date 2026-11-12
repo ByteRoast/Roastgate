@@ -101,6 +101,7 @@
                 </div>
             </MudAlert>
         }
+
         break;
 }
 
@@ -137,17 +138,16 @@
             @if (_isNew)
             {
                 <MudTextField T="string"
-                              @bind-Value="_form.Name"
                               Label="File name"
                               Variant="Variant.Outlined"
                               Class="mb-4"
                               Immediate="true"
                               Placeholder="@(FirstDomain ?? "app.example.com")"
-                              HelperText="@("Optional: the first domain is used when left empty. " + (Area == ConfigArea.Sites ? string.Empty : "The .conf extension is added."))"/>
+                              HelperText="@("Optional: the first domain is used when left empty. " + (Area == ConfigArea.Sites ? string.Empty : "The .conf extension is added."))"
+                              @bind-Value="_form.Name"/>
             }
 
             <MudTextField T="string"
-                          @bind-Value="_form.ServerNames"
                           Label="Domain names"
                           Variant="Variant.Outlined"
                           Lines="2"
@@ -155,12 +155,12 @@
                           Immediate="true"
                           Error="@(ErrorFor(nameof(SiteSpec.ServerNames), _form.ServerNames) is not null)"
                           ErrorText="@ErrorFor(nameof(SiteSpec.ServerNames), _form.ServerNames)"
-                          HelperText="One per line or separated by spaces, for example app.example.com www.example.com *.example.com"/>
+                          HelperText="One per line or separated by spaces, for example app.example.com www.example.com *.example.com"
+                          @bind-Value="_form.ServerNames"/>
 
             @if (_kind == SiteKind.ReverseProxy)
             {
                 <MudTextField T="string"
-                              @bind-Value="_form.Upstream"
                               Label="Forward to"
                               Variant="Variant.Outlined"
                               Class="mb-4"
@@ -168,27 +168,27 @@
                               Placeholder="http://127.0.0.1:3000"
                               Error="@(ErrorFor(nameof(SiteSpec.Upstream), _form.Upstream) is not null)"
                               ErrorText="@ErrorFor(nameof(SiteSpec.Upstream), _form.Upstream)"
-                              HelperText="The application or container that serves the site. Use https:// if it speaks TLS."/>
+                              HelperText="The application or container that serves the site. Use https:// if it speaks TLS."
+                              @bind-Value="_form.Upstream"/>
 
                 <div class="rg-switch-row">
                     <MudSwitch T="bool"
-                               @bind-Value="_form.Websockets"
                                Color="Color.Primary"
-                               Label="Support WebSockets"/>
+                               Label="Support WebSockets"
+                               @bind-Value="_form.Websockets"/>
 
                     <MudNumericField T="int?"
-                                     @bind-Value="_form.ProxyTimeout"
                                      Label="Timeout (seconds)"
                                      Variant="Variant.Outlined"
                                      Min="1"
                                      Max="3600"
-                                     HelperText="Empty keeps nginx's 60 s"/>
+                                     HelperText="Empty keeps nginx's 60 s"
+                                     @bind-Value="_form.ProxyTimeout"/>
                 </div>
             }
             else
             {
                 <MudTextField T="string"
-                              @bind-Value="_form.RootDirectory"
                               Label="Root directory"
                               Variant="Variant.Outlined"
                               Class="mb-4"
@@ -196,27 +196,28 @@
                               Placeholder="/var/www/example.com"
                               Error="@(ErrorFor(nameof(SiteSpec.RootDirectory), _form.RootDirectory) is not null)"
                               ErrorText="@ErrorFor(nameof(SiteSpec.RootDirectory), _form.RootDirectory)"
-                              HelperText="The folder that holds your files, as nginx sees it on the host."/>
+                              HelperText="The folder that holds your files, as nginx sees it on the host."
+                              @bind-Value="_form.RootDirectory"/>
 
                 <div class="rg-switch-row">
                     <MudSwitch T="bool"
-                               @bind-Value="_form.SpaFallback"
                                Color="Color.Primary"
-                               Label="Single page application (unknown paths serve index.html)"/>
+                               Label="Single page application (unknown paths serve index.html)"
+                               @bind-Value="_form.SpaFallback"/>
 
                     <MudSwitch T="bool"
-                               @bind-Value="_form.CacheStaticAssets"
                                Color="Color.Primary"
-                               Label="Cache static assets for 30 days"/>
+                               Label="Cache static assets for 30 days"
+                               @bind-Value="_form.CacheStaticAssets"/>
                 </div>
-                
+
                 <MudSwitch T="bool"
-                           @bind-Value="_form.FancyIndexEnabled"
                            Color="Color.Primary"
                            Class="mt-4"
                            Disabled="@(FancyIndexModuleMissing && !_form.FancyIndexEnabled)"
-                           Label="Browsable directory listing (fancyindex)"/>
-                    
+                           Label="Browsable directory listing (fancyindex)"
+                           @bind-Value="_form.FancyIndexEnabled"/>
+
                 @if (FancyIndexModuleMissing)
                 {
                     <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
@@ -227,36 +228,88 @@
                 else if (!_modules.Known)
                 {
                     <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
-                        Roastgate could not list nginx's modules. Make sure fancyindex is installed: nginx will tell you when you save if it is not.
+                        Roastgate could not list nginx's modules. Make sure fancyindex is installed: nginx will tell you
+                        when you save if it is not.
                     </MudAlert>
                 }
-                    
+
                 @if (_form.FancyIndexEnabled)
                 {
                     <MudSelect T="FancyIndexSort"
-                               @bind-Value="_form.FancyIndexSort"
                                Label="Default sort"
                                Variant="Variant.Outlined"
-                               Class="mt-4">
-                        <MudSelectItem Value="FancyIndexSort.Name">Name</MudSelectItem>
-                        <MudSelectItem Value="FancyIndexSort.NameDescending">Name Descending</MudSelectItem>
-                        <MudSelectItem Value="FancyIndexSort.Size">Size</MudSelectItem>
-                        <MudSelectItem Value="FancyIndexSort.SizeDescending">Size Descending</MudSelectItem>
-                        <MudSelectItem Value="FancyIndexSort.Date">Date</MudSelectItem>
-                        <MudSelectItem Value="FancyIndexSort.DateDescending">Date Descending</MudSelectItem>
+                               Class="mt-4"
+                               @bind-Value="_form.FancyIndexSort">
+                        <MudSelectItem Value="FancyIndexSort.Name">
+                            Name
+                        </MudSelectItem>
+
+                        <MudSelectItem Value="FancyIndexSort.NameDescending">
+                            Name Descending
+                        </MudSelectItem>
+
+                        <MudSelectItem Value="FancyIndexSort.Size">
+                            Size
+                        </MudSelectItem>
+
+                        <MudSelectItem Value="FancyIndexSort.SizeDescending">
+                            Size Descending
+                        </MudSelectItem>
+
+                        <MudSelectItem Value="FancyIndexSort.Date">
+                            Date
+                        </MudSelectItem>
+
+                        <MudSelectItem Value="FancyIndexSort.DateDescending">
+                            Date Descending
+                        </MudSelectItem>
                     </MudSelect>
 
                     <div class="rg-switch-grid mt-4">
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexCaseSensitive" Color="Color.Primary" Label="Case-sensitive sort"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexDirectoriesFirst" Color="Color.Primary" Label="Directories first"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexExactSize" Color="Color.Primary" Label="Exact file sizes"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexLocalTime" Color="Color.Primary" Label="Local time"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexShowPath" Color="Color.Primary" Label="Show the path above the listing"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexShowDotFiles" Color="Color.Primary" Label="Show dotfiles"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexHideSymlinks" Color="Color.Primary" Label="Hide symlinks"/>
-                        <MudSwitch T="bool" @bind-Value="_form.FancyIndexHideParentDir" Color="Color.Primary" Label="Hide the parent directory link"/>
+                        @if (FancyIndexCaseSensitiveAvailable)
+                        {
+                            <MudSwitch T="bool"
+                                       Color="Color.Primary"
+                                       Label="Case-sensitive sort"
+                                       @bind-Value="_form.FancyIndexCaseSensitive"/>
+                        }
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Directories first"
+                                   @bind-Value="_form.FancyIndexDirectoriesFirst"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Exact file sizes"
+                                   @bind-Value="_form.FancyIndexExactSize"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Local time"
+                                   @bind-Value="_form.FancyIndexLocalTime"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Show the path above the listing"
+                                   @bind-Value="_form.FancyIndexShowPath"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Show dotfiles"
+                                   @bind-Value="_form.FancyIndexShowDotFiles"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Hide symlinks"
+                                   @bind-Value="_form.FancyIndexHideSymlinks"/>
+
+                        <MudSwitch T="bool"
+                                   Color="Color.Primary"
+                                   Label="Hide the parent directory link"
+                                   @bind-Value="_form.FancyIndexHideParentDir"/>
                     </div>
-                    
+
                     @foreach (string field in new[] { "FancyIndex.ShowPath", "FancyIndex.ShowDotFiles" })
                     {
                         @if (ErrorFor(field, "x") is { } message)
@@ -266,7 +319,6 @@
                     }
 
                     <MudTextField T="string"
-                                  @bind-Value="_form.FancyIndexHeader"
                                   Label="Header file (URL path)"
                                   Variant="Variant.Outlined"
                                   Class="mt-4"
@@ -274,10 +326,10 @@
                                   Placeholder="/.nginxy/header.html"
                                   Error="@(ErrorFor("FancyIndex.Header", _form.FancyIndexHeader) is not null)"
                                   ErrorText="@ErrorFor("FancyIndex.Header", _form.FancyIndexHeader)"
-                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."/>
-                    
+                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."
+                                  @bind-Value="_form.FancyIndexHeader"/>
+
                     <MudTextField T="string"
-                                  @bind-Value="_form.FancyIndexFooter"
                                   Label="Footer file (URL path)"
                                   Variant="Variant.Outlined"
                                   Class="mt-4"
@@ -285,10 +337,10 @@
                                   Placeholder="/.nginxy/footer.html"
                                   Error="@(ErrorFor("FancyIndex.Footer", _form.FancyIndexFooter) is not null)"
                                   ErrorText="@ErrorFor("FancyIndex.Footer", _form.FancyIndexFooter)"
-                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."/>
-                    
+                                  HelperText="Needs the nginx addition module. The file itself must be served by the site."
+                                  @bind-Value="_form.FancyIndexFooter"/>
+
                     <MudTextField T="string"
-                                  @bind-Value="_form.FancyIndexCssHref"
                                   Label="CSS file (URL path)"
                                   Variant="Variant.Outlined"
                                   Class="mt-4"
@@ -296,10 +348,10 @@
                                   Placeholder="/.nginxy/style.css"
                                   Error="@(ErrorFor("FancyIndex.CssHref", _form.FancyIndexCssHref) is not null)"
                                   ErrorText="@ErrorFor("FancyIndex.CssHref", _form.FancyIndexCssHref)"
-                                  HelperText="The file itself must be served by the site."/>
-                    
+                                  HelperText="The file itself must be served by the site."
+                                  @bind-Value="_form.FancyIndexCssHref"/>
+
                     <MudTextField T="string"
-                                  @bind-Value="_form.FancyIndexIgnore"
                                   Label="Ignored names"
                                   Variant="Variant.Outlined"
                                   Class="mt-4 rg-resizable"
@@ -308,22 +360,22 @@
                                   Placeholder="lost+found"
                                   Error="@(ErrorFor("FancyIndex.Ignore", _form.FancyIndexIgnore) is not null)"
                                   ErrorText="@ErrorFor("FancyIndex.Ignore", _form.FancyIndexIgnore)"
-                                  HelperText="One name per line. Files and folders with these names are hidden."/>
-                    
+                                  HelperText="One name per line. Files and folders with these names are hidden."
+                                  @bind-Value="_form.FancyIndexIgnore"/>
+
                     <MudTextField T="string"
-                                  @bind-Value="_form.FancyIndexTimeFormat"
                                   Label="Time Format"
                                   Variant="Variant.Outlined"
                                   Class="mt-4"
                                   Immediate="true"
                                   Placeholder="%Y-%b-%d %H:%M"
                                   Error="@(ErrorFor("FancyIndex.TimeFormat", _form.FancyIndexTimeFormat) is not null)"
-                                  ErrorText="@ErrorFor("FancyIndex.TimeFormat", _form.FancyIndexTimeFormat)"/>
+                                  ErrorText="@ErrorFor("FancyIndex.TimeFormat", _form.FancyIndexTimeFormat)"
+                                  @bind-Value="_form.FancyIndexTimeFormat"/>
                 }
             }
 
             <MudTextField T="string"
-                          @bind-Value="_form.MaxBodySize"
                           Label="Maximum upload size"
                           Variant="Variant.Outlined"
                           Class="mt-4"
@@ -331,14 +383,15 @@
                           Placeholder="100m"
                           Error="@(ErrorFor(nameof(SiteSpec.MaxBodySize), _form.MaxBodySize) is not null)"
                           ErrorText="@ErrorFor(nameof(SiteSpec.MaxBodySize), _form.MaxBodySize)"
-                          HelperText="Empty keeps nginx's 1m. 0 removes the limit."/>
+                          HelperText="Empty keeps nginx's 1m. 0 removes the limit."
+                          @bind-Value="_form.MaxBodySize"/>
         </MudTabPanel>
 
         <MudTabPanel Text="HTTPS">
             <MudSwitch T="bool"
-                       @bind-Value="_form.EnableTls"
                        Color="Color.Primary"
-                       Label="Serve the site over HTTPS"/>
+                       Label="Serve the site over HTTPS"
+                       @bind-Value="_form.EnableTls"/>
 
             @if (_form.EnableTls)
             {
@@ -373,24 +426,24 @@
                 }
 
                 <MudTextField T="string"
-                              @bind-Value="_form.CertificatePath"
                               Label="Certificate (full chain)"
                               Variant="Variant.Outlined"
                               Class="mt-4"
                               Immediate="true"
                               Placeholder="/etc/letsencrypt/live/app.example.com/fullchain.pem"
                               Error="@(ErrorFor(nameof(SiteSpec.CertificatePath), _form.CertificatePath) is not null)"
-                              ErrorText="@ErrorFor(nameof(SiteSpec.CertificatePath), _form.CertificatePath)"/>
+                              ErrorText="@ErrorFor(nameof(SiteSpec.CertificatePath), _form.CertificatePath)"
+                              @bind-Value="_form.CertificatePath"/>
 
                 <MudTextField T="string"
-                              @bind-Value="_form.CertificateKeyPath"
                               Label="Private key"
                               Variant="Variant.Outlined"
                               Class="mt-4"
                               Immediate="true"
                               Placeholder="/etc/letsencrypt/live/app.example.com/privkey.pem"
                               Error="@(ErrorFor(nameof(SiteSpec.CertificateKeyPath), _form.CertificateKeyPath) is not null)"
-                              ErrorText="@ErrorFor(nameof(SiteSpec.CertificateKeyPath), _form.CertificateKeyPath)"/>
+                              ErrorText="@ErrorFor(nameof(SiteSpec.CertificateKeyPath), _form.CertificateKeyPath)"
+                              @bind-Value="_form.CertificateKeyPath"/>
 
                 <MudButton Variant="Variant.Outlined"
                            Size="Size.Small"
@@ -402,27 +455,27 @@
 
                 <div class="rg-switch-grid mt-4">
                     <MudSwitch T="bool"
-                               @bind-Value="_form.ForceHttps"
                                Color="Color.Primary"
-                               Label="Redirect HTTP to HTTPS"/>
+                               Label="Redirect HTTP to HTTPS"
+                               @bind-Value="_form.ForceHttps"/>
 
                     <MudSwitch T="bool"
-                               @bind-Value="_form.Http2"
                                Color="Color.Primary"
-                               Label="Enable HTTP/2"/>
+                               Label="Enable HTTP/2"
+                               @bind-Value="_form.Http2"/>
 
                     <MudSwitch T="bool"
-                               @bind-Value="_form.Hsts"
                                Color="Color.Primary"
-                               Label="HSTS (browsers insist on HTTPS for a year)"/>
+                               Label="HSTS (browsers insist on HTTPS for a year)"
+                               @bind-Value="_form.Hsts"/>
                 </div>
             }
 
             <MudSwitch T="bool"
-                       @bind-Value="_form.ServeAcmeChallenge"
                        Color="Color.Primary"
                        Class="mt-4"
-                       Label="Let the Let's Encrypt validation through (needed to issue and renew certificates)"/>
+                       Label="Let the Let's Encrypt validation through (needed to issue and renew certificates)"
+                       @bind-Value="_form.ServeAcmeChallenge"/>
         </MudTabPanel>
 
         <MudTabPanel Text="Access">
@@ -454,13 +507,13 @@
                 @if (_selectedWhitelists.Count > 0 || _form.DeniedBehavior != DeniedBehavior.Forbidden)
                 {
                     <MudSelect T="DeniedBehavior"
-                               @bind-Value="_form.DeniedBehavior"
                                Label="Visitors outside the whitelists"
                                Variant="Variant.Outlined"
                                Class="mt-4"
                                Error="@(ErrorFor(nameof(SiteSpec.DeniedBehavior), "x") is not null)"
                                ErrorText="@ErrorFor(nameof(SiteSpec.DeniedBehavior), "x")"
-                               HelperText="Also applies to the site's other 403s (blocked dotfiles, a directory without an index).">
+                               HelperText="Also applies to the site's other 403s (blocked dotfiles, a directory without an index)."
+                               @bind-Value="_form.DeniedBehavior">
                         <MudSelectItem Value="DeniedBehavior.Forbidden">
                             Forbidden (403)
                         </MudSelectItem>
@@ -481,7 +534,6 @@
                     @if (_form.DeniedBehavior == DeniedBehavior.Redirect)
                     {
                         <MudTextField T="string"
-                                      @bind-Value="_form.DeniedUrl"
                                       Label="Redirect to"
                                       Variant="Variant.Outlined"
                                       Class="mt-4"
@@ -489,12 +541,13 @@
                                       Placeholder="https://example.com/"
                                       Error="@(ErrorFor(nameof(SiteSpec.DeniedUrl), _form.DeniedUrl) is not null)"
                                       ErrorText="@ErrorFor(nameof(SiteSpec.DeniedUrl), _form.DeniedUrl)"
-                                      HelperText="A full address: https://example.com/page?from=app works."/>
+                                      HelperText="A full address: https://example.com/page?from=app works."
+                                      @bind-Value="_form.DeniedUrl"/>
                     }
                 }
             }
 
-            @foreach (string missing in _selectedWhitelists.Except(_availableWhitelists).OrderBy((string item) => item))
+            @foreach (string missing in _selectedWhitelists.Except(_availableWhitelists).OrderBy((item) => item))
             {
                 <MudAlert Severity="Severity.Warning"
                           Dense="true"
@@ -507,41 +560,40 @@
         <MudTabPanel Text="Advanced">
             <div class="rg-switch-grid">
                 <MudSwitch T="bool"
-                           @bind-Value="_form.SecurityHeaders"
                            Color="Color.Primary"
-                           Label="Security headers (nosniff, frame, referrer)"/>
+                           Label="Security headers (nosniff, frame, referrer)"
+                           @bind-Value="_form.SecurityHeaders"/>
 
                 <MudSwitch T="bool"
-                           @bind-Value="_form.BlockCommonExploits"
                            Color="Color.Primary"
-                           Label="Block TRACE and dotfiles (except /.well-known)"/>
+                           Label="Block TRACE and dotfiles (except /.well-known)"
+                           @bind-Value="_form.BlockCommonExploits"/>
             </div>
 
             <div class="rg-port-row mt-4">
                 <MudNumericField T="int"
-                                 @bind-Value="_form.HttpPort"
                                  Label="HTTP port"
                                  Variant="Variant.Outlined"
                                  Min="1"
-                                 Max="65535"/>
+                                 Max="65535"
+                                 @bind-Value="_form.HttpPort"/>
 
                 <MudNumericField T="int"
-                                 @bind-Value="_form.HttpsPort"
                                  Label="HTTPS port"
                                  Variant="Variant.Outlined"
                                  Min="1"
                                  Max="65535"
-                                 Disabled="!_form.EnableTls"/>
+                                 Disabled="!_form.EnableTls"
+                                 @bind-Value="_form.HttpsPort"/>
             </div>
 
             <MudSwitch T="bool"
-                       @bind-Value="_form.Ipv6"
                        Color="Color.Primary"
                        Class="mt-2"
-                       Label="Also listen on IPv6 (turn off if nginx refuses listen [::] on this host)"/>
+                       Label="Also listen on IPv6 (turn off if nginx refuses listen [::] on this host)"
+                       @bind-Value="_form.Ipv6"/>
 
             <MudTextField T="string"
-                          @bind-Value="_form.ExtraServerDirectives"
                           Label="Extra directives in the server block"
                           Variant="Variant.Outlined"
                           Lines="4"
@@ -549,10 +601,10 @@
                           Immediate="true"
                           Error="@(ErrorFor(nameof(SiteSpec.ExtraServerDirectives), _form.ExtraServerDirectives) is not null)"
                           ErrorText="@ErrorFor(nameof(SiteSpec.ExtraServerDirectives), _form.ExtraServerDirectives)"
-                          HelperText="Raw nginx. Braces must balance so it cannot leave the block."/>
+                          HelperText="Raw nginx. Braces must balance so it cannot leave the block."
+                          @bind-Value="_form.ExtraServerDirectives"/>
 
             <MudTextField T="string"
-                          @bind-Value="_form.ExtraLocationDirectives"
                           Label="Extra directives in the main location"
                           Variant="Variant.Outlined"
                           Lines="3"
@@ -560,7 +612,8 @@
                           Immediate="true"
                           Error="@(ErrorFor(nameof(SiteSpec.ExtraLocationDirectives), _form.ExtraLocationDirectives) is not null)"
                           ErrorText="@ErrorFor(nameof(SiteSpec.ExtraLocationDirectives), _form.ExtraLocationDirectives)"
-                          HelperText="Careful: an add_header here replaces the security headers of the server block for that location."/>
+                          HelperText="Careful: an add_header here replaces the security headers of the server block for that location."
+                          @bind-Value="_form.ExtraLocationDirectives"/>
         </MudTabPanel>
 
         <MudTabPanel Text="Preview">
@@ -613,9 +666,9 @@
           Class="pa-4 rg-wizard-actions">
     <div class="rg-editor-actions rg-editor-actions-flush">
         <MudSwitch T="bool"
-                   @bind-Value="_reload"
                    Color="Color.Primary"
-                   Label="Reload nginx after saving"/>
+                   Label="Reload nginx after saving"
+                   @bind-Value="_reload"/>
 
         <MudSpacer/>
 
