@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.HttpOverrides;
+using MudBlazor;
 using MudBlazor.Services;
 using Roastgate.Core;
 using Roastgate.Core.Data;
@@ -23,13 +24,13 @@ if (args.Length > 0)
         case "reset-password":
             return await ResetPasswordCommand.RunAsync();
         case "disable-2fa":
-            return await  DisableTwoFactorCommand.RunAsync();
+            return await DisableTwoFactorCommand.RunAsync();
     }
 }
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
 RoastgateOptions options = RoastgateOptions.FromEnvironment();
+
 builder.Services.AddRoastgateCore(options);
 builder.Services.AddSingleton<SignInTicketService>();
 builder.Services.AddScoped<CurrentUser>();
@@ -40,13 +41,21 @@ builder.Services.AddHostedService<CertificateRenewalService>();
 // recreating the container (an upgrade, for instance) does not sign everybody out.
 builder.Services.AddDataProtection().SetApplicationName(AppInfo.AppName);
 builder.Services.AddOptions<KeyManagementOptions>()
-    .Configure<RoastgateOptions, ILoggerFactory>((KeyManagementOptions keys, RoastgateOptions current,
-            ILoggerFactory loggerFactory) =>
-        keys.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(Path.Combine(current.DataDirectory, "keys")),
-            loggerFactory)
+    .Configure<RoastgateOptions, ILoggerFactory>((keys, current, loggerFactory) =>
+        keys.XmlRepository = new FileSystemXmlRepository(
+            new DirectoryInfo(Path.Combine(current.DataDirectory, "keys")),
+            loggerFactory
+        )
     );
 
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(mud =>
+    {
+        mud.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopCenter;
+        mud.SnackbarConfiguration.VisibleStateDuration = 5000;
+        mud.SnackbarConfiguration.PreventDuplicates = false;
+    }
+);
+
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(cookie =>
@@ -54,8 +63,9 @@ builder.Services
         cookie.Cookie.Name = "roastgate.auth";
         cookie.Cookie.HttpOnly = true;
         cookie.Cookie.SameSite = SameSiteMode.Strict;
-        cookie.Cookie.SecurePolicy =
-            options.SecureCookies ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+        cookie.Cookie.SecurePolicy = options.SecureCookies
+            ? CookieSecurePolicy.Always
+            : CookieSecurePolicy.SameAsRequest;
         cookie.LoginPath = "/login";
         cookie.ReturnUrlParameter = "returnUrl";
         cookie.AccessDeniedPath = "/login";
@@ -65,13 +75,17 @@ builder.Services
         {
             // A cookie issued before the last password change carries an old security stamp: it is no longer valid.
             ISessionStamp sessionStamp = context.HttpContext.RequestServices.GetRequiredService<ISessionStamp>();
-            if (!await AuthenticationHelper.IsCurrentAsync(
+
+            if (
+                !await AuthenticationHelper.IsCurrentAsync(
                     context.Principal,
                     sessionStamp,
-                    context.HttpContext.RequestAborted)
-               )
+                    context.HttpContext.RequestAborted
+                )
+            )
             {
                 context.RejectPrincipal();
+
                 await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             }
         };
@@ -97,19 +111,26 @@ builder.Services.AddControllers();
 WebApplication app = builder.Build();
 
 bool databaseExisted = File.Exists(options.DatabasePath);
+
 await app.Services.MigrateRoastgateDatabaseAsync();
+
 app.Logger.LogInformation(
-    databaseExisted ? "Using the existing database {DatabasePath}." : "No database found, created {DatabasePath}. If this container used to be set up, its data volume is missing.",
-    options.DatabasePath);
+    databaseExisted
+        ? "Using the existing database {DatabasePath}."
+        : "No database found, created {DatabasePath}. If this container used to be set up, its data volume is missing.",
+    options.DatabasePath
+);
 
 ISetupService setup = app.Services.GetRequiredService<ISetupService>();
+
 await setup.InitializeAsync();
 
 if (!setup.IsInitialized)
 {
     app.Logger.LogWarning(
         "Roastgate is not set up yet. Open /setup in the browser and enter this setup token: {SetupToken}",
-        setup.SetupToken);
+        setup.SetupToken
+    );
 }
 
 if (options.TrustForwardedHeaders)
