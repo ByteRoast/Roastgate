@@ -10,7 +10,7 @@ const base32Decode = (text: string): Buffer<ArrayBuffer> => {
     bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
   }
 
-  const bytes: any[] = [];
+  const bytes: number[] = [];
 
   for (let index: number = 0; index + 8 <= bits.length; index += 8) {
     bytes.push(parseInt(bits.slice(index, index + 8), 2));
