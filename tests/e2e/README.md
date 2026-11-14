@@ -73,7 +73,8 @@ tests/e2e/
     sections/          one function per part of the scenario
     globals.d.ts       the few parts of Monaco the scenario reaches through window.monaco
   Dockerfile           the test image: Roastgate with nginx, the fancyindex module and fake-certbot.sh
-  fake-certbot.sh      a stand-in for certbot that keeps its command line and file layout but never reaches Let's Encrypt
+  scripts/
+    fake-certbot.sh    a stand-in for certbot that keeps its command line and file layout but never reaches Let's Encrypt
   out/                 screenshots of the last run (not committed)
 ```
 

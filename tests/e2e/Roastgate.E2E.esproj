@@ -5,4 +5,7 @@
         <BuildCommand>pnpm typecheck</BuildCommand>
         <TestCommand>pnpm test:fresh</TestCommand>
     </PropertyGroup>
+    <ItemGroup>
+      <Folder Include="scripts\" />
+    </ItemGroup>
 </Project>
