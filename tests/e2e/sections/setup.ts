@@ -13,10 +13,12 @@ export const setup = async ({
 }: Context): Promise<void> => {
   await page.goto(`${BASE}/setup`);
   await helpers.waitText('Step 1 of 5');
+  await helpers.shot('setup-token');
   await page.waitForTimeout(1500);
   await page.getByLabel('Setup token').fill(token);
   await helpers.button('Continue').click();
   await helpers.waitText('Step 2 of 5');
+  await helpers.shot('setup-password');
   await page.getByLabel('Password', { exact: true }).fill(INITIAL_PASSWORD);
   await page.getByLabel('Repeat the password').fill(INITIAL_PASSWORD);
   await helpers.button('Continue').click();
@@ -33,7 +35,7 @@ export const setup = async ({
       diagnostics.includes('is visible to Roastgate'),
   );
 
-  await helpers.shot('00-diagnostics');
+  await helpers.shot('diagnostics');
   await helpers.button('Continue').click();
   await helpers.waitText('Step 5 of 5');
   await helpers.button('Finish setup').click();

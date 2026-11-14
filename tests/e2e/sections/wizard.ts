@@ -17,6 +17,7 @@ export const wizard = async ({ helpers, page }: Context): Promise<void> => {
   await page.getByLabel('Root directory').fill('/var/www/html');
   await helpers.tab('Advanced').click();
   await page.getByLabel('HTTP port').fill('8091');
+  await helpers.shot('wizard-static-site');
   await helpers.button('Save').click();
   await helpers.expectSaved();
 
@@ -60,6 +61,7 @@ export const wizard = async ({ helpers, page }: Context): Promise<void> => {
     .getByRole('combobox', { name: 'Default sort' })
     .waitFor({ timeout: 10000 });
 
+  await helpers.shot('wizard-fancyindex');
   await helpers.tab('Advanced').click();
   await page.getByLabel('HTTP port').fill('8097');
   await helpers.button('Save').click();
@@ -142,7 +144,7 @@ export const wizard = async ({ helpers, page }: Context): Promise<void> => {
       preview.includes('listen 8092;'),
   );
 
-  await helpers.shot('08-wizard-preview');
+  await helpers.shot('wizard-preview');
 
   check(
     'and the preview wrote nothing',

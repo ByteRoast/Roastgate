@@ -61,7 +61,7 @@ export const backups = async ({ helpers, page }: Context): Promise<void> => {
     (await page.locator('.rg-diff-added, .rg-diff-removed').count()) > 0,
   );
 
-  await helpers.shot('10-backups');
+  await helpers.shot('backups');
 
   const beforeRestore = sh('cat /etc/nginx/conf.d/app.example.com.conf');
 

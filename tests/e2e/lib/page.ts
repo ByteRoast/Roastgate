@@ -11,9 +11,11 @@ export type Position = {
 };
 
 /**
- * // The helpers the scenario uses, bound to the page they act on.
+ * The helpers the scenario uses, bound to the page they act on.
  */
 export const pageHelper = (page: Page) => {
+  let taken: number = 0;
+
   /**
    * What an action reports: a success is a toast (MudBlazor snackbar), a failure stays inline (MudAlert) with nginx's
    * output.
@@ -89,7 +91,10 @@ export const pageHelper = (page: Page) => {
   };
 
   const shot = async (name: string): Promise<void> => {
-    await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+    await page.screenshot({
+      path: `${SHOTS}/${String(++taken).padStart(2, '0')}-${name}.png`,
+      fullPage: true,
+    });
   };
 
   const tab = (name: string): Locator => {

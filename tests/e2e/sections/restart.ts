@@ -8,7 +8,7 @@ import type { Context } from '../lib/context.ts';
 /**
  * The account survives a restart of the container.
  */
-export const restart = async ({ page }: Context): Promise<void> => {
+export const restart = async ({ helpers, page }: Context): Promise<void> => {
   execSync(`docker restart ${CONTAINER}`, { stdio: 'ignore' });
 
   for (let i: number = 0; i < 60; i += 1) {
@@ -33,6 +33,7 @@ export const restart = async ({ page }: Context): Promise<void> => {
   );
 
   await page.goto(`${BASE}/`);
+  await helpers.shot('after-restart');
 
   check(
     'after a restart the account and the session are still there (no setup)',

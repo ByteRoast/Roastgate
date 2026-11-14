@@ -13,6 +13,7 @@ export const reverseProxies = async ({
 }: Context): Promise<void> => {
   await page.goto(`${BASE}/reverse-proxies`);
   await helpers.waitText('No reverse proxy yet');
+  await helpers.shot('reverse-proxies-empty');
   await page.getByRole('link', { name: 'New from raw text' }).click();
   await page.waitForURL(/\/reverse-proxies\/edit$/);
   await helpers.waitMonaco('new-proxy');
@@ -23,7 +24,7 @@ export const reverseProxies = async ({
 
   await page.getByLabel('File name').fill('app.example.com');
   await helpers.setEditor(goodProxy);
-  await helpers.shot('02-editor-new');
+  await helpers.shot('editor-new');
   await helpers.button('Save').click();
   await helpers.waitText('Saved.');
 
@@ -50,7 +51,7 @@ export const reverseProxies = async ({
     sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open',
   );
 
-  await helpers.shot('03-editor-saved');
+  await helpers.shot('editor-saved');
 
   // a change nginx refuses
   await helpers.openEditor('/reverse-proxies/edit?name=app.example.com.conf');
@@ -92,12 +93,13 @@ export const reverseProxies = async ({
     sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open',
   );
 
-  await helpers.shot('04-refused');
+  await helpers.shot('refused');
 
   // disable and enable
   await page.goto(`${BASE}/reverse-proxies`);
   await helpers.waitText('app.example.com.conf');
   await page.getByLabel('Enable app.example.com.conf').click();
+  await helpers.shot('reverse-proxy-disabled');
   await page.waitForTimeout(1500);
 
   check(

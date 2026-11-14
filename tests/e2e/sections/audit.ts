@@ -27,5 +27,5 @@ export const audit = async ({ helpers, page }: Context): Promise<void> => {
     ].every((a) => auditLog.includes(a)),
   );
 
-  await helpers.shot('05-audit');
+  await helpers.shot('audit');
 };

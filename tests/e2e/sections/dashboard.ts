@@ -14,5 +14,5 @@ export const dashboard = async ({ helpers }: Context): Promise<void> => {
 
   check('dashboard: Reload nginx reloads the real nginx', true);
 
-  await helpers.shot('01a-dashboard');
+  await helpers.shot('dashboard');
 };

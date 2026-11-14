@@ -23,13 +23,13 @@ export const twoFactor = async ({
 
   const newBrowserAtLogin = async (): Promise<{
     context: BrowserContext;
-    fresh: any;
+    fresh: Page;
   }> => {
     const context: BrowserContext = await browser.newContext({
       viewport: { width: 1300, height: 900 },
     });
 
-    const fresh: any = await context.newPage();
+    const fresh: Page = await context.newPage();
 
     await fresh.goto(`${BASE}/login`);
     await fresh.getByLabel('Username').waitFor();
@@ -71,7 +71,7 @@ export const twoFactor = async ({
     (await page.locator('.rg-qr svg').count()) === 1,
   );
 
-  await helpers.shot('12-two-factor-setup');
+  await helpers.shot('two-factor-setup');
 
   const secret: string = (await page.locator('.rg-secret').innerText()).replace(
     /\s+/g,
@@ -96,6 +96,7 @@ export const twoFactor = async ({
   await page.getByLabel('Code from the app').fill(totp(secret));
   await helpers.button('Turn on two-factor authentication').click();
   await helpers.waitText('Save these recovery codes now');
+  await helpers.shot('two-factor-recovery-codes');
 
   const recovery: string[] = (
     await page.locator('pre.rg-recovery-codes').innerText()
@@ -129,7 +130,7 @@ export const twoFactor = async ({
     page.url().includes('/login'),
   );
 
-  await helpers.shot('13-two-step');
+  await helpers.shot('two-step');
   await page.getByLabel('Authentication code').fill('000000');
   await helpers.button('Verify').click();
   await helpers.waitText('That code is not valid');
@@ -143,7 +144,7 @@ export const twoFactor = async ({
   check('the code computed independently signs in', true);
 
   // A recovery code works once.
-  const first: { context: BrowserContext; fresh: any } =
+  const first: { context: BrowserContext; fresh: Page } =
     await newBrowserAtLogin();
 
   await typePasswordStep(first.fresh, NEW_PASSWORD);
@@ -161,7 +162,7 @@ export const twoFactor = async ({
 
   await first.context.close();
 
-  const second: { context: BrowserContext; fresh: any } =
+  const second: { context: BrowserContext; fresh: Page } =
     await newBrowserAtLogin();
 
   await typePasswordStep(second.fresh, NEW_PASSWORD);
@@ -229,7 +230,7 @@ export const twoFactor = async ({
     !page.url().includes('/login'),
   );
 
-  const third: { context: BrowserContext; fresh: any } =
+  const third: { context: BrowserContext; fresh: Page } =
     await newBrowserAtLogin();
 
   await typePasswordStep(third.fresh, NEW_PASSWORD);

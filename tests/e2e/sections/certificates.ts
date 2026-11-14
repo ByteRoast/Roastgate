@@ -59,7 +59,7 @@ export const certificates = async ({
     certificatesText.slice(0, 300),
   );
 
-  await helpers.shot('09-certificates');
+  await helpers.shot('certificates');
 
   // The wizard picks it from a list and fills in the paths.
   await page.goto(`${BASE}/reverse-proxies/wizard`);

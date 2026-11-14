@@ -54,7 +54,7 @@ export const whitelists = async ({ helpers, page }: Context): Promise<void> => {
     /add my address \(/i.test(await helpers.body()),
   );
 
-  await helpers.shot('06-whitelist-editor');
+  await helpers.shot('whitelist-editor');
   await helpers.button('Save').click();
   await helpers.waitText('Saved.');
 
@@ -109,7 +109,7 @@ export const whitelists = async ({ helpers, page }: Context): Promise<void> => {
       /alice\.conf\s+\d/.test(listText),
   );
 
-  await helpers.shot('07-whitelist-list');
+  await helpers.shot('whitelist-list');
   await page.goto(`${BASE}/whitelists/edit?name=alice.conf`);
   await helpers.waitText('Used by');
 

@@ -1,7 +1,7 @@
 import { BASE, INITIAL_PASSWORD, NEW_PASSWORD } from '../lib/config.ts';
 import { check } from '../lib/report.ts';
 
-import type { BrowserContext } from 'playwright-core';
+import type { BrowserContext, Page } from 'playwright-core';
 import type { Context } from '../lib/context.ts';
 
 /**
@@ -51,14 +51,14 @@ export const settings = async ({
       /Let's Encrypt directory/.test(await helpers.body()),
   );
 
-  await helpers.shot('11-settings');
+  await helpers.shot('settings');
 
   // Another browser, signed in with the current password.
   const context2: BrowserContext = await browser.newContext({
     viewport: { width: 1300, height: 900 },
   });
 
-  const page2: any = await context2.newPage();
+  const page2: Page = await context2.newPage();
 
   await page2.goto(`${BASE}/login`);
   await page2.getByLabel('Username').fill('admin');
@@ -76,6 +76,7 @@ export const settings = async ({
   await page.getByLabel('Current password').fill(INITIAL_PASSWORD);
   await helpers.button('Change the password').click();
   await page.waitForURL(/\/login\?notice=password-changed/, { timeout: 15000 });
+  await helpers.shot('password-changed');
 
   check(
     'changing the password sends the user to the sign-in page with an explanation',

@@ -22,7 +22,7 @@ export const defaultSite = async ({
     await defaultSwitch.isChecked(),
   );
 
-  await helpers.shot('01-sites-existing');
+  await helpers.shot('sites-existing');
 };
 
 /**
@@ -46,6 +46,7 @@ export const sites = async ({ helpers, page }: Context): Promise<void> => {
 
   await helpers.button('Save').click();
   await helpers.waitText('Saved.');
+  await helpers.shot('site-saved');
 
   check(
     'a new site is saved but not enabled yet',
@@ -81,6 +82,7 @@ export const sites = async ({ helpers, page }: Context): Promise<void> => {
 
   await page.goto(`${BASE}/sites`);
   await helpers.waitText('example.com');
+  await helpers.shot('sites-enabled');
   await page.getByLabel('Delete example.com').click();
   await helpers.button('Delete').click();
   await page.waitForTimeout(1500);
@@ -121,6 +123,7 @@ export const sites = async ({ helpers, page }: Context): Promise<void> => {
 
   await page.waitForURL(`${BASE}/sites`);
   await helpers.waitText('Deleted.');
+  await helpers.shot('site-deleted');
 
   check(
     'deleting from the editor goes back to the list with a toast naming the file',
