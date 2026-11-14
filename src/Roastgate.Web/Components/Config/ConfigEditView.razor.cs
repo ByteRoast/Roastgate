@@ -14,12 +14,10 @@ public partial class ConfigEditView
     [Inject] private IDialogService Dialogs { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
-    [Parameter, EditorRequired]
-    public ConfigArea Area { get; set; }
-
-    [Parameter]
-    public string? Name { get; set; }
+    [Parameter, EditorRequired] public ConfigArea Area { get; set; }
+    [Parameter] public string? Name { get; set; }
 
     private StandaloneCodeEditor? _editor;
     private ConfigFile? _file;
@@ -46,6 +44,7 @@ public partial class ConfigEditView
 
         _isNew = string.IsNullOrWhiteSpace(Name);
         _loadedName = Name;
+
         if (_isNew)
         {
             _name = string.Empty;
@@ -56,6 +55,7 @@ public partial class ConfigEditView
         }
 
         _file = await Store.ReadAsync(Area, Name!);
+
         if (_file is null)
         {
             _notFound = true;
@@ -73,7 +73,9 @@ public partial class ConfigEditView
         {
             // Never create the editor before Monaco has finished loading, or the whole circuit crashes.
             await JS.InvokeVoidAsync("roastgateMonacoReady");
+
             _monacoReady = true;
+
             StateHasChanged();
         }
     }
@@ -97,14 +99,17 @@ public partial class ConfigEditView
     private async Task OnEditorInitAsync()
     {
         await JS.InvokeVoidAsync("roastgateRegisterNginx");
+
         if (_editor is not null)
         {
             TextModel model = await _editor.GetModel();
+
             await Global.SetModelLanguage(JS, model, "nginx");
             await Global.SetTheme(JS, "roastgate");
         }
 
         _editorReady = true;
+
         StateHasChanged();
     }
 
@@ -116,29 +121,36 @@ public partial class ConfigEditView
         }
 
         string content = await _editor.GetValue();
+
         await RunAsync(async () =>
         {
             string actor = await User.GetNameAsync();
+
             ConfigResult result = await Store.SaveAsync(Area, _name, content, _reload, actor);
-            _result = result;
+
+            _result = Snackbar.ToastSuccess(result, ConfigNames.Normalize(Area, _name) ?? _name);
+
             if (!result.Succeeded)
             {
                 return;
             }
 
             string? normalized = ConfigNames.Normalize(Area, _name);
+
             if (normalized is null)
             {
                 return;
             }
 
             _file = await Store.ReadAsync(Area, normalized);
+
             if (_isNew)
             {
                 // Switch the page to the saved file without reloading the editor (query-only navigation).
                 _isNew = false;
                 _name = normalized;
                 _loadedName = normalized;
+
                 Navigation.NavigateTo(Info.EditUrl(normalized), replace: true);
             }
         });
@@ -153,7 +165,15 @@ public partial class ConfigEditView
 
         await RunAsync(async () =>
         {
-            _result = await Store.SetEnabledAsync(Area, _file.Name, !_file.Enabled, _reload, await User.GetNameAsync());
+            ConfigResult result = await Store.SetEnabledAsync(
+                Area,
+                _file.Name,
+                !_file.Enabled,
+                _reload,
+                await User.GetNameAsync()
+            );
+
+            _result = Snackbar.ToastSuccess(result, _file.Name);
             _file = await Store.ReadAsync(Area, _file.Name);
         });
     }
@@ -164,7 +184,9 @@ public partial class ConfigEditView
             "Delete " + _name + "?",
             "The file is removed and nginx is reloaded. A backup of its content is kept.",
             yesText: "Delete",
-            cancelText: "Cancel");
+            cancelText: "Cancel"
+        );
+
         if (confirmed != true)
         {
             return;
@@ -173,8 +195,10 @@ public partial class ConfigEditView
         await RunAsync(async () =>
         {
             ConfigResult result = await Store.DeleteAsync(Area, _name, _reload, await User.GetNameAsync());
+
             if (result.Succeeded)
             {
+                Snackbar.ToastBeforeLeaving(result, _name);
                 Navigation.NavigateTo(Info.ListRoute);
                 return;
             }
@@ -186,6 +210,7 @@ public partial class ConfigEditView
     private async Task RunAsync(Func<Task> action)
     {
         _isBusy = true;
+
         try
         {
             await action();

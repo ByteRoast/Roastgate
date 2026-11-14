@@ -14,19 +14,19 @@ public partial class WhitelistEditView
     [Inject] private IDialogService Dialogs { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     private sealed class EntryRow
     {
         public string Address { get; set; } = string.Empty;
-
         public string Comment { get; set; } = string.Empty;
     }
 
-    [Parameter]
-    public string? Name { get; set; }
+    [Parameter] public string? Name { get; set; }
 
     // Asked from the browser once the page is interactive (the server-side HttpContext only exists during prerendering).
     private string? ClientAddress { get; set; }
+
     private readonly List<EntryRow> _rows = [];
     private List<string> _unsupported = [];
     private WhitelistDetails? _details;
@@ -42,17 +42,20 @@ public partial class WhitelistEditView
     private string? _loadedName;
     private bool _loaded;
 
-    private bool HasBlockingError => CurrentProblems().Any((WhitelistProblem problem) => problem.Severity == ProblemSeverity.Error)
-                                     || (_isNew && string.IsNullOrWhiteSpace(_name));
+    private bool HasBlockingError =>
+        CurrentProblems().Any(problem => problem.Severity == ProblemSeverity.Error) ||
+        (_isNew && string.IsNullOrWhiteSpace(_name));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             string address = await JS.InvokeAsync<string>("roastgateClientAddress");
+
             if (!string.IsNullOrWhiteSpace(address))
             {
                 ClientAddress = address;
+
                 StateHasChanged();
             }
         }
@@ -70,14 +73,18 @@ public partial class WhitelistEditView
         _isNew = string.IsNullOrWhiteSpace(Name);
         _rows.Clear();
         _unsupported = [];
+
         if (_isNew)
         {
             _name = string.Empty;
+
             AddRow();
+
             return;
         }
 
         _details = await Whitelists.ReadAsync(Name!);
+
         if (_details is null)
         {
             _notFound = true;
@@ -85,6 +92,7 @@ public partial class WhitelistEditView
         }
 
         _name = _details.Name;
+
         ApplyDetails();
     }
 
@@ -98,6 +106,7 @@ public partial class WhitelistEditView
 
         _header = document.Header;
         _rows.Clear();
+
         foreach (WhitelistEntry entry in document.Entries)
         {
             _rows.Add(new EntryRow { Address = entry.Address, Comment = entry.Comment ?? string.Empty });
@@ -113,17 +122,22 @@ public partial class WhitelistEditView
     {
         // Entries are validated as a whole (duplicates depend on the other rows); map the result back to this row.
         List<EntryRow> filled = _rows.Where((EntryRow row) => !IsBlank(row)).ToList();
+
         int filledIndex = filled.IndexOf(_rows[position]);
+
         return IsBlank(_rows[position])
             ? []
-            : WhitelistValidator.Validate(ToEntries()).Where((WhitelistProblem problem) => problem.EntryIndex == filledIndex).ToList();
+            : WhitelistValidator.Validate(ToEntries())
+                .Where(problem => problem.EntryIndex == filledIndex)
+                .ToList();
     }
 
     private List<WhitelistEntry> ToEntries()
     {
         return _rows
-            .Where((EntryRow row) => !IsBlank(row))
-            .Select((EntryRow row) => new WhitelistEntry(row.Address.Trim(), string.IsNullOrWhiteSpace(row.Comment) ? null : row.Comment.Trim()))
+            .Where(row => !IsBlank(row))
+            .Select(row => new WhitelistEntry(row.Address.Trim(),
+                string.IsNullOrWhiteSpace(row.Comment) ? null : row.Comment.Trim()))
             .ToList();
     }
 
@@ -150,13 +164,16 @@ public partial class WhitelistEditView
         }
 
         RemoveTrailingBlankRows();
+
         _rows.Add(new EntryRow { Address = ClientAddress, Comment = "my address" });
     }
 
     private void AddPasted()
     {
         RemoveTrailingBlankRows();
+
         string[] tokens = _paste.Split([' ', '\t', '\r', '\n', ',', ';'], StringSplitOptions.RemoveEmptyEntries);
+
         foreach (string token in tokens)
         {
             if (!token.Equals("allow", StringComparison.OrdinalIgnoreCase))
@@ -179,6 +196,7 @@ public partial class WhitelistEditView
     private static string UsageUrl(WhitelistUsage usage)
     {
         string route = usage.Area == ConfigArea.Sites ? "/sites/edit" : "/reverse-proxies/edit";
+
         return route + "?name=" + Uri.EscapeDataString(usage.FileName);
     }
 
@@ -195,28 +213,40 @@ public partial class WhitelistEditView
     private async Task SaveAsync()
     {
         _isBusy = true;
+
         try
         {
             string actor = await User.GetNameAsync();
-            ConfigResult result = await Whitelists.SaveAsync(_name, new WhitelistDocument(_header, ToEntries()), _reload, actor);
-            _result = result;
+
+            ConfigResult result = await Whitelists.SaveAsync(
+                _name,
+                new WhitelistDocument(_header, ToEntries()),
+                _reload,
+                actor
+            );
+
+            _result = Snackbar.ToastSuccess(result, ConfigNames.Normalize(ConfigArea.Whitelists, _name) ?? _name);
+
             if (!result.Succeeded)
             {
                 return;
             }
 
             string? normalized = ConfigNames.Normalize(ConfigArea.Whitelists, _name);
+
             if (normalized is null)
             {
                 return;
             }
 
             _details = await Whitelists.ReadAsync(normalized);
+
             if (_isNew)
             {
                 _isNew = false;
                 _name = normalized;
                 _loadedName = normalized;
+
                 Navigation.NavigateTo("/whitelists/edit?name=" + Uri.EscapeDataString(normalized), replace: true);
             }
         }
@@ -232,18 +262,23 @@ public partial class WhitelistEditView
             "Delete " + _name + "?",
             "The file is removed and nginx is reloaded. A backup of its content is kept.",
             yesText: "Delete",
-            cancelText: "Cancel");
+            cancelText: "Cancel"
+        );
+
         if (confirmed != true)
         {
             return;
         }
 
         _isBusy = true;
+
         try
         {
             ConfigResult result = await Whitelists.DeleteAsync(_name, _reload, await User.GetNameAsync());
+
             if (result.Succeeded)
             {
+                Snackbar.ToastBeforeLeaving(result, _name);
                 Navigation.NavigateTo("/whitelists");
                 return;
             }

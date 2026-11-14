@@ -60,6 +60,9 @@ const waitText = async (t, timeout = 10000) => {
   await page.waitForTimeout(700);
 };
 const button = (name) => page.getByRole('button', { name, exact: true });
+// What an action reports: a success is a toast (MudBlazor snackbar), a failure stays inline (MudAlert) with nginx's output.
+const toasts = async () => (await page.locator('.mud-snackbar').allInnerTexts()).join('\n');
+const alerts = async () => (await page.locator('.mud-alert').allInnerTexts()).join('\n');
 
 
 const waitMonaco = async (label) => {
@@ -145,6 +148,7 @@ await shot('02-editor-new');
 await button('Save').click();
 await waitText('Saved.');
 check('creating a reverse proxy saves, validates and reloads', (await body()).includes('nginx reloaded.'));
+check('a successful save is a toast that names the file, not an inline alert', (await toasts()).includes('app.example.com.conf: Saved.') && !(await alerts()).includes('Saved.'));
 check('the file really exists on the nginx host', sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('proxy_pass http://127.0.0.1:3000;'));
 check('the new proxy is really listening after the reload', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
 await shot('03-editor-saved');
@@ -157,6 +161,7 @@ await button('Save').click();
 await waitText('undone');
 const refused = await body();
 check('a refused change shows the real nginx error and says it was undone', refused.includes('unknown directive "bogus_directive"') && refused.includes('undone'));
+check('a refused change stays inline with the nginx output, not in a toast', (await alerts()).includes('unknown directive "bogus_directive"') && !(await toasts()).includes('undone'));
 check('the file on the host is unchanged after the refusal', sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('proxy_pass http://127.0.0.1:3000;') && !sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('bogus'));
 check('nginx still serves the old configuration', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
 await shot('04-refused');
@@ -168,6 +173,7 @@ await page.getByLabel('Enable app.example.com.conf').click();
 await page.waitForTimeout(1500);
 check('disabling renames the file to .conf.disabled', sh('ls /etc/nginx/conf.d').includes('app.example.com.conf.disabled') && !sh('ls /etc/nginx/conf.d').split('\n').includes('app.example.com.conf'));
 check('a disabled proxy no longer listens', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`).startsWith('ERR'));
+check('the switch in the list reports in a toast that names the file', (await toasts()).includes('app.example.com.conf: Disabled.'));
 await page.getByLabel('Enable app.example.com.conf').click();
 await page.waitForTimeout(1500);
 check('enabling renames it back and nginx listens again', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
@@ -185,6 +191,7 @@ await button('Enable').click();
 await page.waitForTimeout(1500);
 const link = sh('readlink /etc/nginx/sites-enabled/example.com');
 check('enabling a site creates a relative symlink', link === '../sites-available/example.com', link);
+check('enabling from the editor reports in a toast', (await toasts()).includes('example.com: Enabled.'));
 const served = sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; cat <&3'`);
 check('the enabled site is really served by nginx', served.includes('hello from roastgate'), served);
 await page.goto(`${base}/sites`);
@@ -193,7 +200,22 @@ await page.getByLabel('Delete example.com').click();
 await button('Delete').click();
 await page.waitForTimeout(1500);
 check('deleting a site removes the file AND its symlink', !sh('ls /etc/nginx/sites-available').includes('example.com') && !sh('ls /etc/nginx/sites-enabled').includes('example.com'));
+check('deleting from the list reports in a toast that names the file', (await toasts()).includes('example.com: Deleted.'));
 check('the default site was not touched', sh('readlink /etc/nginx/sites-enabled/default') === '/etc/nginx/sites-available/default');
+
+// Deleting from the editor leaves the page: the toast must still say what happened once the list is shown.
+await page.goto(`${base}/sites/edit`);
+await waitMonaco('throwaway-site');
+await page.waitForTimeout(800);
+await page.getByLabel('File name').fill('throwaway.example.com');
+await setEditor('server {\n    listen 8089;\n    location / { return 200 "bye\\n"; }\n}');
+await button('Save').click();
+await waitText('Saved.');
+await button('Delete').click();
+await page.locator('.mud-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+await page.waitForURL(`${base}/sites`);
+await waitText('Deleted.');
+check('deleting from the editor goes back to the list with a toast naming the file', (await toasts()).includes('throwaway.example.com: Deleted.') && !sh('ls /etc/nginx/sites-available').includes('throwaway'));
 
 // ---- whitelists: the list editor, then a real nginx enforcing it ----
 const requestFromLocalhost = (port) => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`);
@@ -255,6 +277,7 @@ await page.getByLabel('Delete alice.conf').click();
 await button('Delete').click();
 await waitText('is still included by');
 check('deleting a whitelist that is in use is refused and names the file', (await body()).includes('private.example.com.conf') && sh('ls /etc/nginx/whitelists').includes('alice.conf'));
+check('the refusal stays inline, not in a toast', (await alerts()).includes('is still included by') && !(await toasts()).includes('is still included by'));
 
 // a file the list editor cannot represent is never rewritten
 sh(`printf 'allow 198.51.100.1;\\ndeny 198.51.100.2;\\n' > /etc/nginx/whitelists/mixed.conf`);
@@ -479,6 +502,7 @@ await page.getByLabel('Domain names').fill('lets.example.com');
 await button('Test first (dry run)').click();
 await waitText('The dry run succeeded');
 check('a dry run succeeds and issues nothing', !sh('ls /etc/letsencrypt/live 2>&1').includes('lets.example.com'));
+check('a successful certbot run is a toast, with no certbot output left on the page', (await toasts()).includes('The dry run succeeded') && !(await alerts()).includes('The dry run succeeded') && (await page.locator('.rg-output').count()) === 0);
 await button('Get the certificate').click();
 await waitText('was issued');
 check('issuing creates the certificate where nginx will read it', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
@@ -513,6 +537,7 @@ await page.getByLabel('Delete lets.example.com').click();
 await button('Delete').click();
 await waitText('is still used by');
 check('deleting a certificate that is in use is refused', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
+check('a refused certbot action stays inline, not in a toast', (await alerts()).includes('is still used by') && !(await toasts()).includes('is still used by'));
 
 // Let it age, then renew: Roastgate sees the new file and reloads nginx so the new certificate is served.
 sh(`openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout /etc/letsencrypt/live/lets.example.com/privkey.pem -out /etc/letsencrypt/live/lets.example.com/fullchain.pem -subj /CN=lets.example.com -addext subjectAltName=DNS:lets.example.com -days 5`);
@@ -557,6 +582,7 @@ await button('Restore this version').click();
 await button('Restore').click();
 await waitText('Restored.');
 check('restoring puts the old version back and reloads nginx', (await body()).includes('nginx reloaded.') && sh('cat /etc/nginx/conf.d/app.example.com.conf') !== beforeRestore);
+check('restoring reports in a toast that names the file', (await toasts()).includes('app.example.com.conf: Restored.'));
 
 // A deleted site comes back (it was deleted earlier in the scenario).
 await page.goto(`${base}/backups?area=Sites&name=example.com`);
@@ -580,6 +606,7 @@ await page.getByLabel('nginx directory').fill('/etc/nginx');
 await page.getByLabel("Let's Encrypt e-mail").fill('ops@example.com');
 await button('Save settings').click();
 await waitText('Settings saved.');
+check('saving the settings is a toast, no longer an inline alert', (await toasts()).includes('Settings saved.') && !(await alerts()).includes('Settings saved.'));
 await page.goto(`${base}/certificates`);
 await waitField('Domain names');
 check('saved settings are used elsewhere (the e-mail is pre-filled when getting a certificate)', (await page.getByLabel('E-mail for expiry notices').inputValue()) === 'ops@example.com');
@@ -596,7 +623,7 @@ const page2 = await context2.newPage();
 await page2.goto(`${base}/login`);
 await page2.getByLabel('Username').fill('admin');
 await page2.getByLabel('Password').fill('Correct-Horse-9');
-await page2.getByRole('button', { name: 'Sign in' }).click();
+await page2.getByRole('button', { name: 'Sign in', exact: true }).click();
 await page2.waitForURL(`${base}/`);
 
 await page.getByLabel('Current password').fill('definitely-not-it-1!');
@@ -616,11 +643,11 @@ await context2.close();
 
 await page.getByLabel('Username').fill('admin');
 await page.getByLabel('Password').fill('Correct-Horse-9');
-await page.getByRole('button', { name: 'Sign in' }).click();
+await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 await waitText('Invalid username or password.');
 check('the old password no longer works', true);
 await page.getByLabel('Password').fill('A-brand-new-Passw0rd');
-await page.getByRole('button', { name: 'Sign in' }).click();
+await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 await page.waitForURL(`${base}/`, { timeout: 10000 });
 check('the new password works', true);
 
@@ -629,7 +656,7 @@ const NEW_PASSWORD = 'A-brand-new-Passw0rd';
 const typePasswordStep = async (p, password) => {
   await p.getByLabel('Username').fill('admin');
   await p.getByLabel('Password', { exact: true }).fill(password);
-  await p.getByRole('button', { name: 'Sign in' }).click();
+  await p.getByRole('button', { name: 'Sign in', exact: true }).click();
 };
 const newBrowserAtLogin = async () => {
   const context = await browser.newContext({ viewport: { width: 1300, height: 900 } });

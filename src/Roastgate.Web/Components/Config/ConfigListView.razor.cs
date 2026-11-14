@@ -10,15 +10,15 @@ public partial class ConfigListView
     [Inject] private IConfigStore Store { get; set; } = null!;
     [Inject] private CurrentUser User { get; set; } = null!;
     [Inject] private IDialogService Dialogs { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
-    [Parameter, EditorRequired]
-    public ConfigArea Area { get; set; }
+    [Parameter, EditorRequired] public ConfigArea Area { get; set; }
+
+    private AreaInfo Info => AreaInfo.For(Area);
 
     private ConfigListing? _listing;
     private ConfigResult? _result;
     private bool _isBusy;
-
-    private AreaInfo Info => AreaInfo.For(Area);
 
     /// <summary>Files the wizard created open as a form; everything else opens as raw text.</summary>
     private string OpenUrl(ConfigEntry entry)
@@ -38,17 +38,33 @@ public partial class ConfigListView
 
     private async Task TestAsync()
     {
-        await RunAsync(async () => _result = await Store.TestNginxAsync(await User.GetNameAsync()));
+        await RunAsync(async () => _result = Snackbar.ToastSuccess(
+                await Store.TestNginxAsync(await User.GetNameAsync())
+            )
+        );
     }
 
     private async Task ReloadAsync()
     {
-        await RunAsync(async () => _result = await Store.ReloadNginxAsync(await User.GetNameAsync()));
+        await RunAsync(async () => _result = Snackbar.ToastSuccess(
+                await Store.ReloadNginxAsync(await User.GetNameAsync())
+            )
+        );
     }
 
     private async Task SetEnabledAsync(ConfigEntry entry, bool enabled)
     {
-        await RunAsync(async () => _result = await Store.SetEnabledAsync(Area, entry.Name, enabled, reload: true, await User.GetNameAsync()));
+        await RunAsync(async () => _result = Snackbar.ToastSuccess(
+                await Store.SetEnabledAsync(
+                    Area,
+                    entry.Name,
+                    enabled,
+                    reload: true,
+                    await User.GetNameAsync()
+                ),
+                entry.Name
+            )
+        );
     }
 
     private async Task DeleteAsync(ConfigEntry entry)
@@ -57,18 +73,30 @@ public partial class ConfigListView
             "Delete " + entry.Name + "?",
             "The file is removed and nginx is reloaded. A backup of its content is kept.",
             yesText: "Delete",
-            cancelText: "Cancel");
+            cancelText: "Cancel"
+        );
+
         if (confirmed != true)
         {
             return;
         }
 
-        await RunAsync(async () => _result = await Store.DeleteAsync(Area, entry.Name, reload: true, await User.GetNameAsync()));
+        await RunAsync(async () => _result = Snackbar.ToastSuccess(
+                await Store.DeleteAsync(
+                    Area,
+                    entry.Name,
+                    reload: true,
+                    await User.GetNameAsync()
+                ),
+                entry.Name
+            )
+        );
     }
 
     private async Task RunAsync(Func<Task> action)
     {
         _isBusy = true;
+
         try
         {
             await action();
@@ -82,6 +110,8 @@ public partial class ConfigListView
 
     private static string FormatSize(long bytes)
     {
-        return bytes < 1024 ? bytes + " B" : (bytes / 1024.0).ToString("0.#") + " KiB";
+        return bytes < 1024
+            ? bytes + " B"
+            : (bytes / 1024.0).ToString("0.#") + " KiB";
     }
 }
