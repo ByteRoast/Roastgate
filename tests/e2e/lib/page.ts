@@ -3,7 +3,12 @@ import type { Locator, Page } from 'playwright-core';
 import { BASE, SHOTS } from './config.ts';
 import { PROBLEMS, TRACE } from './report.ts';
 
-type Position = { x: number; y: number; width: number; height: number };
+export type Position = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
 
 /**
  * // The helpers the scenario uses, bound to the page they act on.

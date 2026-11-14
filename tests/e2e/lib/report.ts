@@ -54,3 +54,19 @@ export const watchPage = (page: Page): void => {
     );
   });
 };
+
+// Prints the browser problems and the count of passed checks, and returns the exit code of the run.
+export const printSummary = (): number => {
+  console.log(
+    '\nbrowser problems:',
+    PROBLEMS.length ? '\n  ' + [...new Set(PROBLEMS)].join('\n  ') : 'none',
+  );
+
+  const failed: { name: string; ok: boolean }[] = RESULTS.filter((r) => !r.ok);
+
+  console.log(
+    `\n${RESULTS.length - failed.length}/${RESULTS.length} checks passed`,
+  );
+
+  return failed.length ? 1 : 0;
+};
