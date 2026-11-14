@@ -21,7 +21,7 @@ npm test
 ```
 
 | Variable        | Default                 | Purpose                                      |
-|-----------------|-------------------------|----------------------------------------------|
+| --------------- | ----------------------- | -------------------------------------------- |
 | `E2E_CONTAINER` | `roastgate-e2e`         | container to inspect with `docker exec`      |
 | `E2E_BASE`      | `http://127.0.0.1:8199` | where Roastgate listens                      |
 | `E2E_CHANNEL`   | `msedge`                | installed browser (`msedge`, `chrome`)       |

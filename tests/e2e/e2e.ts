@@ -10,17 +10,26 @@ import crypto from 'node:crypto';
 const base32Decode = (text: string) => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
-  for (const character of text.replace(/[\s=-]/g, '').toUpperCase()) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
+  for (const character of text.replace(/[\s=-]/g, '').toUpperCase())
+    bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
   const bytes = [];
-  for (let index = 0; index + 8 <= bits.length; index += 8) bytes.push(parseInt(bits.slice(index, index + 8), 2));
+  for (let index = 0; index + 8 <= bits.length; index += 8)
+    bytes.push(parseInt(bits.slice(index, index + 8), 2));
   return Buffer.from(bytes);
 };
 const totp = (secret: string, stepOffset = 0) => {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000) + stepOffset));
-  const hash = crypto.createHmac('sha1', base32Decode(secret)).update(counter).digest();
+  const hash = crypto
+    .createHmac('sha1', base32Decode(secret))
+    .update(counter)
+    .digest();
   const offset = hash[hash.length - 1] & 0x0f;
-  const binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
+  const binary =
+    ((hash[offset] & 0x7f) << 24) |
+    (hash[offset + 1] << 16) |
+    (hash[offset + 2] << 8) |
+    hash[offset + 3];
   return String(binary % 1000000).padStart(6, '0');
 };
 
@@ -32,32 +41,70 @@ fs.mkdirSync(shots, { recursive: true });
 const container = process.env.E2E_CONTAINER ?? 'roastgate-e2e';
 const base = process.env.E2E_BASE ?? 'http://127.0.0.1:8199';
 const sh = (command: string) => {
-  try { return execSync(`docker exec ${container} sh -c ${JSON.stringify(command)}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
-  catch (e) {
+  try {
+    return execSync(
+      `docker exec ${container} sh -c ${JSON.stringify(command)}`,
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    ).trim();
+  } catch (e) {
     // execSync throws an Error carrying the exit status and the output of the command.
-    const failure = e as { status?: number; stderr?: Buffer | string; stdout?: Buffer | string };
+    const failure = e as {
+      status?: number;
+      stderr?: Buffer | string;
+      stdout?: Buffer | string;
+    };
     return `ERR ${failure.status}: ${(failure.stderr || failure.stdout || '').toString().trim()}`;
   }
 };
 const logs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
 const token = /setup token: (\w+)/.exec(logs)?.[1];
-if (!token) throw new Error(`No setup token in the logs of ${container}: the scenario needs a fresh container.`);
+if (!token)
+  throw new Error(
+    `No setup token in the logs of ${container}: the scenario needs a fresh container.`,
+  );
 
 const results: { name: string; ok: boolean }[] = [];
 const problems: string[] = [];
-const check = (name: string, ok: boolean, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${!ok && detail ? '\n        ' + detail : ''}`); };
+const check = (name: string, ok: boolean, detail = '') => {
+  results.push({ name, ok });
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${!ok && detail ? '\n        ' + detail : ''}`,
+  );
+};
 
-const browser = await chromium.launch({ channel: process.env.E2E_CHANNEL ?? 'msedge', headless: true });
+const browser = await chromium.launch({
+  channel: process.env.E2E_CHANNEL ?? 'msedge',
+  headless: true,
+});
 const page = await browser.newPage({ viewport: { width: 1300, height: 950 } });
 page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
 const trace: string[] = [];
 const t0 = Date.now();
-page.on('console', (m) => { trace.push(`+${Date.now() - t0}ms console.${m.type()}: ${m.text().slice(0, 200)}`); if (m.type() === 'error') problems.push('console: ' + m.text()); });
-page.on('websocket', (ws) => { trace.push(`+${Date.now() - t0}ms websocket open ${ws.url()}`); ws.on('close', () => trace.push(`+${Date.now() - t0}ms websocket CLOSED`)); });
-page.on('framenavigated', (f) => { if (f === page.mainFrame()) trace.push(`+${Date.now() - t0}ms navigated ${f.url()}`); });
-page.on('requestfailed', (r) => trace.push(`+${Date.now() - t0}ms request failed ${r.url()} ${r.failure()?.errorText}`));
+page.on('console', (m) => {
+  trace.push(
+    `+${Date.now() - t0}ms console.${m.type()}: ${m.text().slice(0, 200)}`,
+  );
+  if (m.type() === 'error') problems.push('console: ' + m.text());
+});
+page.on('websocket', (ws) => {
+  trace.push(`+${Date.now() - t0}ms websocket open ${ws.url()}`);
+  ws.on('close', () => trace.push(`+${Date.now() - t0}ms websocket CLOSED`));
+});
+page.on('framenavigated', (f) => {
+  if (f === page.mainFrame())
+    trace.push(`+${Date.now() - t0}ms navigated ${f.url()}`);
+});
+page.on('requestfailed', (r) =>
+  trace.push(
+    `+${Date.now() - t0}ms request failed ${r.url()} ${r.failure()?.errorText}`,
+  ),
+);
 
-const shot = (name: string) => page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+const shot = (name: string) =>
+  page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
 const body = async () => page.locator('body').innerText();
 // After the text shows up, give the Blazor circuit a moment to attach, the way a person reading the page would.
 // (A click within ~50 ms of the WebSocket opening can leave Blazor's URL and page out of step: a framework race.)
@@ -65,7 +112,8 @@ const waitText = async (t: string, timeout = 10000) => {
   await page.getByText(t, { exact: false }).first().waitFor({ timeout });
   await page.waitForTimeout(700);
 };
-const button = (name: string) => page.getByRole('button', { name, exact: true });
+const button = (name: string) =>
+  page.getByRole('button', { name, exact: true });
 // Where an element is on the page; fails with its locator when it is not visible, instead of reading from null.
 const box = async (locator: Locator) => {
   const found = await locator.boundingBox();
@@ -73,32 +121,51 @@ const box = async (locator: Locator) => {
   return found;
 };
 // What an action reports: a success is a toast (MudBlazor snackbar), a failure stays inline (MudAlert) with nginx's output.
-const toasts = async () => (await page.locator('.mud-snackbar').allInnerTexts()).join('\n');
-const alerts = async () => (await page.locator('.mud-alert').allInnerTexts()).join('\n');
-
+const toasts = async () =>
+  (await page.locator('.mud-snackbar').allInnerTexts()).join('\n');
+const alerts = async () =>
+  (await page.locator('.mud-alert').allInnerTexts()).join('\n');
 
 const waitMonaco = async (label: string) => {
   try {
-    await page.waitForFunction(() => window.monaco && window.monaco.editor.getModels().length > 0, null, { timeout: 40000 });
+    await page.waitForFunction(
+      () => window.monaco && window.monaco.editor.getModels().length > 0,
+      null,
+      {
+        timeout: 40000,
+      },
+    );
   } catch (error) {
     const state = await page.evaluate(() => ({
-      url: location.href, monaco: typeof window.monaco, models: window.monaco?.editor ? window.monaco.editor.getModels().length : null,
-      editorDom: document.querySelectorAll('.monaco-editor').length, containers: document.querySelectorAll('.rg-editor').length,
+      url: location.href,
+      monaco: typeof window.monaco,
+      models: window.monaco?.editor
+        ? window.monaco.editor.getModels().length
+        : null,
+      editorDom: document.querySelectorAll('.monaco-editor').length,
+      containers: document.querySelectorAll('.rg-editor').length,
       text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 300),
     }));
     console.log(`MONACO FAILED at ${label}:`, JSON.stringify(state));
     console.log('TRACE (last 25):\n' + trace.slice(-25).join('\n'));
     console.log('browser problems so far:', [...new Set(problems)].join(' | '));
-    await page.screenshot({ path: `${shots}/failure-${label.replace(/[^a-z0-9]+/gi, '_')}.png`, fullPage: true });
+    await page.screenshot({
+      path: `${shots}/failure-${label.replace(/[^a-z0-9]+/gi, '_')}.png`,
+      fullPage: true,
+    });
     throw error;
   }
 };
 
 const setEditor = async (text: string) => {
   await waitMonaco('setEditor');
-  await page.evaluate((value) => window.monaco.editor.getModels()[0].setValue(value), text);
+  await page.evaluate(
+    (value) => window.monaco.editor.getModels()[0].setValue(value),
+    text,
+  );
 };
-const getEditor = async () => page.evaluate(() => window.monaco.editor.getModels()[0].getValue());
+const getEditor = async () =>
+  page.evaluate(() => window.monaco.editor.getModels()[0].getValue());
 const openEditor = async (url: string) => {
   await page.goto(`${base}${url}`);
   await waitMonaco('openEditor ' + url);
@@ -120,7 +187,11 @@ await button('Continue').click();
 await waitText('Step 4 of 5', 20000);
 await page.getByText('host access').first().waitFor({ timeout: 25000 });
 const diagnostics = await body();
-check('diagnostics see the real nginx and its directories', diagnostics.includes('nginx 1.24') && diagnostics.includes('is visible to Roastgate'));
+check(
+  'diagnostics see the real nginx and its directories',
+  diagnostics.includes('nginx 1.24') &&
+    diagnostics.includes('is visible to Roastgate'),
+);
 await shot('00-diagnostics');
 await button('Continue').click();
 await waitText('Step 5 of 5');
@@ -143,7 +214,10 @@ await shot('01a-dashboard');
 await page.goto(`${base}/sites`);
 await waitText('default');
 const defaultSwitch = page.getByLabel('Enable default');
-check('an existing site enabled by an ABSOLUTE symlink shows as enabled', await defaultSwitch.isChecked());
+check(
+  'an existing site enabled by an ABSOLUTE symlink shows as enabled',
+  await defaultSwitch.isChecked(),
+);
 await shot('01-sites-existing');
 
 // ---- reverse proxy: create ----
@@ -153,29 +227,64 @@ await page.getByRole('link', { name: 'New from raw text' }).click();
 await page.waitForURL(/\/reverse-proxies\/edit$/);
 await waitMonaco('new-proxy');
 await page.waitForTimeout(800);
-const goodProxy = 'server {\n    listen 8080;\n    server_name app.example.com;\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n    }\n}';
+const goodProxy =
+  'server {\n    listen 8080;\n    server_name app.example.com;\n    location / {\n        proxy_pass http://127.0.0.1:3000;\n    }\n}';
 await page.getByLabel('File name').fill('app.example.com');
 await setEditor(goodProxy);
 await shot('02-editor-new');
 await button('Save').click();
 await waitText('Saved.');
-check('creating a reverse proxy saves, validates and reloads', (await body()).includes('nginx reloaded.'));
-check('a successful save is a toast that names the file, not an inline alert', (await toasts()).includes('app.example.com.conf: Saved.') && !(await alerts()).includes('Saved.'));
-check('the file really exists on the nginx host', sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('proxy_pass http://127.0.0.1:3000;'));
-check('the new proxy is really listening after the reload', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
+check(
+  'creating a reverse proxy saves, validates and reloads',
+  (await body()).includes('nginx reloaded.'),
+);
+check(
+  'a successful save is a toast that names the file, not an inline alert',
+  (await toasts()).includes('app.example.com.conf: Saved.') &&
+    !(await alerts()).includes('Saved.'),
+);
+check(
+  'the file really exists on the nginx host',
+  sh('cat /etc/nginx/conf.d/app.example.com.conf').includes(
+    'proxy_pass http://127.0.0.1:3000;',
+  ),
+);
+check(
+  'the new proxy is really listening after the reload',
+  sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open',
+);
 await shot('03-editor-saved');
 
 // ---- reverse proxy: a change nginx refuses ----
 await openEditor('/reverse-proxies/edit?name=app.example.com.conf');
-check('the editor opens the saved content', (await getEditor()).includes('proxy_pass http://127.0.0.1:3000;'));
+check(
+  'the editor opens the saved content',
+  (await getEditor()).includes('proxy_pass http://127.0.0.1:3000;'),
+);
 await setEditor('server {\n    listen 8080;\n    bogus_directive on;\n}');
 await button('Save').click();
 await waitText('undone');
 const refused = await body();
-check('a refused change shows the real nginx error and says it was undone', refused.includes('unknown directive "bogus_directive"') && refused.includes('undone'));
-check('a refused change stays inline with the nginx output, not in a toast', (await alerts()).includes('unknown directive "bogus_directive"') && !(await toasts()).includes('undone'));
-check('the file on the host is unchanged after the refusal', sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('proxy_pass http://127.0.0.1:3000;') && !sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('bogus'));
-check('nginx still serves the old configuration', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
+check(
+  'a refused change shows the real nginx error and says it was undone',
+  refused.includes('unknown directive "bogus_directive"') &&
+    refused.includes('undone'),
+);
+check(
+  'a refused change stays inline with the nginx output, not in a toast',
+  (await alerts()).includes('unknown directive "bogus_directive"') &&
+    !(await toasts()).includes('undone'),
+);
+check(
+  'the file on the host is unchanged after the refusal',
+  sh('cat /etc/nginx/conf.d/app.example.com.conf').includes(
+    'proxy_pass http://127.0.0.1:3000;',
+  ) && !sh('cat /etc/nginx/conf.d/app.example.com.conf').includes('bogus'),
+);
+check(
+  'nginx still serves the old configuration',
+  sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open',
+);
 await shot('04-refused');
 
 // ---- reverse proxy: disable and enable ----
@@ -183,54 +292,117 @@ await page.goto(`${base}/reverse-proxies`);
 await waitText('app.example.com.conf');
 await page.getByLabel('Enable app.example.com.conf').click();
 await page.waitForTimeout(1500);
-check('disabling renames the file to .conf.disabled', sh('ls /etc/nginx/conf.d').includes('app.example.com.conf.disabled') && !sh('ls /etc/nginx/conf.d').split('\n').includes('app.example.com.conf'));
-check('a disabled proxy no longer listens', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`).startsWith('ERR'));
-check('the switch in the list reports in a toast that names the file', (await toasts()).includes('app.example.com.conf: Disabled.'));
+check(
+  'disabling renames the file to .conf.disabled',
+  sh('ls /etc/nginx/conf.d').includes('app.example.com.conf.disabled') &&
+    !sh('ls /etc/nginx/conf.d').split('\n').includes('app.example.com.conf'),
+);
+check(
+  'a disabled proxy no longer listens',
+  sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`).startsWith(
+    'ERR',
+  ),
+);
+check(
+  'the switch in the list reports in a toast that names the file',
+  (await toasts()).includes('app.example.com.conf: Disabled.'),
+);
 await page.getByLabel('Enable app.example.com.conf').click();
 await page.waitForTimeout(1500);
-check('enabling renames it back and nginx listens again', sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open');
+check(
+  'enabling renames it back and nginx listens again',
+  sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && echo open'`) === 'open',
+);
 
 // ---- site: create, enable (symlink), serve, delete ----
 await page.goto(`${base}/sites/edit`);
-await page.waitForFunction(() => window.monaco && window.monaco.editor.getModels().length > 0, null, { timeout: 15000 });
+await page.waitForFunction(
+  () => window.monaco && window.monaco.editor.getModels().length > 0,
+  null,
+  {
+    timeout: 15000,
+  },
+);
 await page.waitForTimeout(800);
 await page.getByLabel('File name').fill('example.com');
-await setEditor('server {\n    listen 8081;\n    location / { return 200 "hello from roastgate\\n"; }\n}');
+await setEditor(
+  'server {\n    listen 8081;\n    location / { return 200 "hello from roastgate\\n"; }\n}',
+);
 await button('Save').click();
 await waitText('Saved.');
-check('a new site is saved but not enabled yet', sh('ls /etc/nginx/sites-available').includes('example.com') && !sh('ls /etc/nginx/sites-enabled').includes('example.com'));
+check(
+  'a new site is saved but not enabled yet',
+  sh('ls /etc/nginx/sites-available').includes('example.com') &&
+    !sh('ls /etc/nginx/sites-enabled').includes('example.com'),
+);
 await button('Enable').click();
 await page.waitForTimeout(1500);
 const link = sh('readlink /etc/nginx/sites-enabled/example.com');
-check('enabling a site creates a relative symlink', link === '../sites-available/example.com', link);
-check('enabling from the editor reports in a toast', (await toasts()).includes('example.com: Enabled.'));
-const served = sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; cat <&3'`);
-check('the enabled site is really served by nginx', served.includes('hello from roastgate'), served);
+check(
+  'enabling a site creates a relative symlink',
+  link === '../sites-available/example.com',
+  link,
+);
+check(
+  'enabling from the editor reports in a toast',
+  (await toasts()).includes('example.com: Enabled.'),
+);
+const served = sh(
+  `bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; cat <&3'`,
+);
+check(
+  'the enabled site is really served by nginx',
+  served.includes('hello from roastgate'),
+  served,
+);
 await page.goto(`${base}/sites`);
 await waitText('example.com');
 await page.getByLabel('Delete example.com').click();
 await button('Delete').click();
 await page.waitForTimeout(1500);
-check('deleting a site removes the file AND its symlink', !sh('ls /etc/nginx/sites-available').includes('example.com') && !sh('ls /etc/nginx/sites-enabled').includes('example.com'));
-check('deleting from the list reports in a toast that names the file', (await toasts()).includes('example.com: Deleted.'));
-check('the default site was not touched', sh('readlink /etc/nginx/sites-enabled/default') === '/etc/nginx/sites-available/default');
+check(
+  'deleting a site removes the file AND its symlink',
+  !sh('ls /etc/nginx/sites-available').includes('example.com') &&
+    !sh('ls /etc/nginx/sites-enabled').includes('example.com'),
+);
+check(
+  'deleting from the list reports in a toast that names the file',
+  (await toasts()).includes('example.com: Deleted.'),
+);
+check(
+  'the default site was not touched',
+  sh('readlink /etc/nginx/sites-enabled/default') ===
+    '/etc/nginx/sites-available/default',
+);
 
 // Deleting from the editor leaves the page: the toast must still say what happened once the list is shown.
 await page.goto(`${base}/sites/edit`);
 await waitMonaco('throwaway-site');
 await page.waitForTimeout(800);
 await page.getByLabel('File name').fill('throwaway.example.com');
-await setEditor('server {\n    listen 8089;\n    location / { return 200 "bye\\n"; }\n}');
+await setEditor(
+  'server {\n    listen 8089;\n    location / { return 200 "bye\\n"; }\n}',
+);
 await button('Save').click();
 await waitText('Saved.');
 await button('Delete').click();
-await page.locator('.mud-dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+await page
+  .locator('.mud-dialog')
+  .getByRole('button', { name: 'Delete', exact: true })
+  .click();
 await page.waitForURL(`${base}/sites`);
 await waitText('Deleted.');
-check('deleting from the editor goes back to the list with a toast naming the file', (await toasts()).includes('throwaway.example.com: Deleted.') && !sh('ls /etc/nginx/sites-available').includes('throwaway'));
+check(
+  'deleting from the editor goes back to the list with a toast naming the file',
+  (await toasts()).includes('throwaway.example.com: Deleted.') &&
+    !sh('ls /etc/nginx/sites-available').includes('throwaway'),
+);
 
 // ---- whitelists: the list editor, then a real nginx enforcing it ----
-const requestFromLocalhost = (port: number) => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`);
+const requestFromLocalhost = (port: number) =>
+  sh(
+    `bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`,
+  );
 await page.goto(`${base}/whitelists/edit`);
 await waitText('Allowed addresses');
 await page.getByLabel('Name', { exact: true }).fill('alice');
@@ -239,48 +411,96 @@ await page.getByLabel('Comment').first().fill('alice at home');
 await button('Add address').click();
 await page.getByLabel('Address', { exact: true }).nth(1).fill('999.1.1.1');
 await page.waitForTimeout(500);
-check('an invalid address is flagged on its own row', (await body()).includes('is not a valid IPv4 or IPv6 address'));
-check('saving is blocked while an address is invalid', await button('Save').isDisabled());
+check(
+  'an invalid address is flagged on its own row',
+  (await body()).includes('is not a valid IPv4 or IPv6 address'),
+);
+check(
+  'saving is blocked while an address is invalid',
+  await button('Save').isDisabled(),
+);
 await page.getByLabel('Address', { exact: true }).nth(1).fill('10.0.0.5/24');
 await page.waitForTimeout(500);
-check('host bits in a CIDR range are a warning that suggests the network, not an error', (await body()).includes('did you mean 10.0.0.0/24') && !(await button('Save').isDisabled()));
+check(
+  'host bits in a CIDR range are a warning that suggests the network, not an error',
+  (await body()).includes('did you mean 10.0.0.0/24') &&
+    !(await button('Save').isDisabled()),
+);
 await page.getByLabel('Address', { exact: true }).nth(1).fill('');
-await page.getByPlaceholder(/One per line/).fill('10.0.0.0/8, 192.168.1.0/24\nallow 2001:db8::/32;');
+await page
+  .getByPlaceholder(/One per line/)
+  .fill('10.0.0.0/8, 192.168.1.0/24\nallow 2001:db8::/32;');
 await button('Add them to the list').click();
 await page.waitForTimeout(500);
-check('pasting several addresses adds one row each', (await page.getByLabel('Address', { exact: true }).count()) >= 4);
-check('the "add my address" shortcut shows what Roastgate sees', /add my address \(/i.test(await body()));
+check(
+  'pasting several addresses adds one row each',
+  (await page.getByLabel('Address', { exact: true }).count()) >= 4,
+);
+check(
+  'the "add my address" shortcut shows what Roastgate sees',
+  /add my address \(/i.test(await body()),
+);
 await shot('06-whitelist-editor');
 await button('Save').click();
 await waitText('Saved.');
 const saved = sh('cat /etc/nginx/whitelists/alice.conf');
-check('the whitelist is written as clean allow lines', saved.includes('allow 203.0.113.7; # alice at home') && saved.includes('allow 10.0.0.0/8;') && saved.includes('allow 2001:db8::/32;') && !saved.includes('999'), saved);
-check('the page shows the include line to copy', (await body()).includes('include /etc/nginx/whitelists/alice.conf;'));
-check('a whitelist nothing includes says so', (await body()).includes('Nothing includes this whitelist yet'));
+check(
+  'the whitelist is written as clean allow lines',
+  saved.includes('allow 203.0.113.7; # alice at home') &&
+    saved.includes('allow 10.0.0.0/8;') &&
+    saved.includes('allow 2001:db8::/32;') &&
+    !saved.includes('999'),
+  saved,
+);
+check(
+  'the page shows the include line to copy',
+  (await body()).includes('include /etc/nginx/whitelists/alice.conf;'),
+);
+check(
+  'a whitelist nothing includes says so',
+  (await body()).includes('Nothing includes this whitelist yet'),
+);
 
 // A proxy that includes it. It serves a static file on purpose: nginx runs "return" before allow/deny, which would hide the whitelist.
 await page.goto(`${base}/reverse-proxies/edit`);
 await waitMonaco('private-proxy');
 await page.getByLabel('File name').fill('private.example.com');
-await setEditor('server {\n    listen 8082;\n    include /etc/nginx/whitelists/alice.conf;\n    deny all;\n    location / { root /var/www/html; index index.nginx-debian.html; }\n}');
+await setEditor(
+  'server {\n    listen 8082;\n    include /etc/nginx/whitelists/alice.conf;\n    deny all;\n    location / { root /var/www/html; index index.nginx-debian.html; }\n}',
+);
 await button('Save').click();
 await waitText('Saved.');
-check('nginx really DENIES an address that is not in the whitelist', requestFromLocalhost(8082).includes('403'), requestFromLocalhost(8082));
+check(
+  'nginx really DENIES an address that is not in the whitelist',
+  requestFromLocalhost(8082).includes('403'),
+  requestFromLocalhost(8082),
+);
 
 await page.goto(`${base}/whitelists`);
 await waitText('alice.conf');
 const listText = await body();
-check('the list shows how many addresses and who uses the whitelist', listText.includes('private.example.com.conf') && /alice\.conf\s+\d/.test(listText));
+check(
+  'the list shows how many addresses and who uses the whitelist',
+  listText.includes('private.example.com.conf') &&
+    /alice\.conf\s+\d/.test(listText),
+);
 await shot('07-whitelist-list');
 
 await page.goto(`${base}/whitelists/edit?name=alice.conf`);
 await waitText('Used by');
-check('the editor lists the including file and links to it', (await body()).includes('private.example.com.conf (line 3)'));
+check(
+  'the editor lists the including file and links to it',
+  (await body()).includes('private.example.com.conf (line 3)'),
+);
 await button('Add address').click();
 await page.getByLabel('Address', { exact: true }).last().fill('127.0.0.1');
 await button('Save').click();
 await waitText('Saved.');
-check('after adding 127.0.0.1 nginx really ALLOWS it', requestFromLocalhost(8082).includes('200'), requestFromLocalhost(8082));
+check(
+  'after adding 127.0.0.1 nginx really ALLOWS it',
+  requestFromLocalhost(8082).includes('200'),
+  requestFromLocalhost(8082),
+);
 
 // deletion is blocked while the whitelist is in use
 await page.goto(`${base}/whitelists`);
@@ -288,18 +508,37 @@ await waitText('alice.conf');
 await page.getByLabel('Delete alice.conf').click();
 await button('Delete').click();
 await waitText('is still included by');
-check('deleting a whitelist that is in use is refused and names the file', (await body()).includes('private.example.com.conf') && sh('ls /etc/nginx/whitelists').includes('alice.conf'));
-check('the refusal stays inline, not in a toast', (await alerts()).includes('is still included by') && !(await toasts()).includes('is still included by'));
+check(
+  'deleting a whitelist that is in use is refused and names the file',
+  (await body()).includes('private.example.com.conf') &&
+    sh('ls /etc/nginx/whitelists').includes('alice.conf'),
+);
+check(
+  'the refusal stays inline, not in a toast',
+  (await alerts()).includes('is still included by') &&
+    !(await toasts()).includes('is still included by'),
+);
 
 // a file the list editor cannot represent is never rewritten
-sh(`printf 'allow 198.51.100.1;\\ndeny 198.51.100.2;\\n' > /etc/nginx/whitelists/mixed.conf`);
+sh(
+  `printf 'allow 198.51.100.1;\\ndeny 198.51.100.2;\\n' > /etc/nginx/whitelists/mixed.conf`,
+);
 await page.goto(`${base}/whitelists/edit?name=mixed.conf`);
 await waitText('more than a list');
-check('a whitelist with other directives shows a warning instead of the list editor', /open the raw editor/i.test(await body()));
-check('the file on disk is untouched', sh('cat /etc/nginx/whitelists/mixed.conf').includes('deny 198.51.100.2;'));
+check(
+  'a whitelist with other directives shows a warning instead of the list editor',
+  /open the raw editor/i.test(await body()),
+);
+check(
+  'the file on disk is untouched',
+  sh('cat /etc/nginx/whitelists/mixed.conf').includes('deny 198.51.100.2;'),
+);
 await page.goto(`${base}/whitelists/raw?name=mixed.conf`);
 await waitMonaco('whitelist-raw');
-check('the raw editor opens it', (await getEditor()).includes('deny 198.51.100.2;'));
+check(
+  'the raw editor opens it',
+  (await getEditor()).includes('deny 198.51.100.2;'),
+);
 
 // an unused whitelist can be deleted from the list
 await page.goto(`${base}/whitelists`);
@@ -307,20 +546,34 @@ await waitText('mixed.conf');
 await page.getByLabel('Delete mixed.conf').click();
 await button('Delete').click();
 await page.waitForTimeout(1500);
-check('an unused whitelist is deleted', !sh('ls /etc/nginx/whitelists').includes('mixed.conf'));
+check(
+  'an unused whitelist is deleted',
+  !sh('ls /etc/nginx/whitelists').includes('mixed.conf'),
+);
 
 // ---- the wizard, against a real nginx ----
-const httpGet = (port: number, host: string, path = '/') => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`);
+const httpGet = (port: number, host: string, path = '/') =>
+  sh(
+    `bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`,
+  );
 // Writes a file in the container with its real newlines (printf through two shells would keep the backslashes).
-const writeHostFile = (path: string, content: string) => sh(`bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`);
+const writeHostFile = (path: string, content: string) =>
+  sh(
+    `bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`,
+  );
 const tab = (name: string) => page.getByRole('tab', { name, exact: true });
 // Waits for the "Saved." message, and when the save failed shows why instead of just timing out.
 const expectSaved = async () => {
   try {
-    await page.getByText('Saved.', { exact: false }).first().waitFor({ timeout: 10000 });
+    await page
+      .getByText('Saved.', { exact: false })
+      .first()
+      .waitFor({ timeout: 10000 });
   } catch (error) {
     const alert = await page.locator('.mud-alert').allInnerTexts();
-    throw new Error('The save did not succeed. Alerts on the page: ' + JSON.stringify(alert));
+    throw new Error(
+      'The save did not succeed. Alerts on the page: ' + JSON.stringify(alert),
+    );
   }
   await page.waitForTimeout(500);
 };
@@ -342,43 +595,76 @@ await page.getByLabel('HTTP port').fill('8091');
 await button('Save').click();
 await expectSaved();
 const siteFile = sh('cat /etc/nginx/sites-available/static.example.com');
-check('the wizard writes a static site with its header and settings', siteFile.includes('# roastgate-spec:') && siteFile.includes('root /var/www/html;') && siteFile.includes('listen 8091;'), siteFile.slice(0, 300));
+check(
+  'the wizard writes a static site with its header and settings',
+  siteFile.includes('# roastgate-spec:') &&
+    siteFile.includes('root /var/www/html;') &&
+    siteFile.includes('listen 8091;'),
+  siteFile.slice(0, 300),
+);
 await page.goto(`${base}/sites`);
 await waitText('static.example.com');
 check('the list marks wizard sites', /wizard/i.test(await body()));
 await page.getByLabel('Enable static.example.com').click();
 await page.waitForTimeout(1500);
-check('the wizard site, once enabled, is served by nginx', httpGet(8091, 'static.example.com').includes('200 OK'), httpGet(8091, 'static.example.com').slice(0, 120));
+check(
+  'the wizard site, once enabled, is served by nginx',
+  httpGet(8091, 'static.example.com').includes('200 OK'),
+  httpGet(8091, 'static.example.com').slice(0, 120),
+);
 
 // A directory listing through the fancyindex module, which the test image installs.
-sh("sh -c 'mkdir -p /var/www/files && echo listed > /var/www/files/listed-file.txt'");
+sh(
+  "sh -c 'mkdir -p /var/www/files && echo listed > /var/www/files/listed-file.txt'",
+);
 await page.goto(`${base}/sites/wizard`);
 await waitField('Root directory');
 await page.getByLabel('Domain names').fill('files.example.com');
 await page.getByLabel('Root directory').fill('/var/www/files');
 await page.getByLabel('Browsable directory listing (fancyindex)').click();
-await page.getByRole('combobox', { name: 'Default sort' }).waitFor({ timeout: 10000 });
+await page
+  .getByRole('combobox', { name: 'Default sort' })
+  .waitFor({ timeout: 10000 });
 await tab('Advanced').click();
 await page.getByLabel('HTTP port').fill('8097');
 await button('Save').click();
 await expectSaved();
 const filesSite = sh('cat /etc/nginx/sites-available/files.example.com');
-check('the wizard writes the fancyindex directives', filesSite.includes('fancyindex on;') && filesSite.includes('fancyindex_default_sort name;'), filesSite.slice(0, 400));
+check(
+  'the wizard writes the fancyindex directives',
+  filesSite.includes('fancyindex on;') &&
+    filesSite.includes('fancyindex_default_sort name;'),
+  filesSite.slice(0, 400),
+);
 await page.goto(`${base}/sites`);
 await waitText('files.example.com');
 await page.getByLabel('Enable files.example.com').click();
 await page.waitForTimeout(1500);
 const listing = httpGet(8097, 'files.example.com');
-check('nginx lists the directory through fancyindex', listing.includes('200 OK') && listing.includes('listed-file.txt'), listing.slice(0, 300));
+check(
+  'nginx lists the directory through fancyindex',
+  listing.includes('200 OK') && listing.includes('listed-file.txt'),
+  listing.slice(0, 300),
+);
 await page.goto(`${base}/sites/wizard?name=files.example.com`);
 await waitField('Root directory');
-check('reopening the site keeps the fancyindex option on', await page.getByRole('combobox', { name: 'Default sort' }).isVisible());
+check(
+  'reopening the site keeps the fancyindex option on',
+  await page.getByRole('combobox', { name: 'Default sort' }).isVisible(),
+);
 // The image's fancyindex is Ubuntu's 0.5.2 package, which has no fancyindex_case_sensitive: the wizard asked nginx and
 // hides the option. If the base image changes, this build may have it and the check below must be revisited.
-check('the case-sensitive sort is not offered by a fancyindex build without it', await page.getByLabel('Case-sensitive sort').count() === 0);
+check(
+  'the case-sensitive sort is not offered by a fancyindex build without it',
+  (await page.getByLabel('Case-sensitive sort').count()) === 0,
+);
 // The folder only exists if the probe ran for real; an error from ls (folder missing) fails the check as well.
 const probeLeftovers = sh('ls -A /etc/nginx/.roastgate-probe');
-check('the directive probe leaves no file in the nginx root', probeLeftovers === '', probeLeftovers);
+check(
+  'the directive probe leaves no file in the nginx root',
+  probeLeftovers === '',
+  probeLeftovers,
+);
 
 // A reverse proxy in front of it, with the preview tab.
 await page.goto(`${base}/reverse-proxies/wizard`);
@@ -387,60 +673,138 @@ await page.getByLabel('Domain names').fill('proxied.example.com');
 await page.getByLabel('Forward to').fill('not a url;');
 await button('Save').click();
 await waitText('Fix these first');
-check('invalid input is explained and nothing is written', (await body()).includes('The destination must look like') && !sh('ls /etc/nginx/conf.d').includes('proxied'));
+check(
+  'invalid input is explained and nothing is written',
+  (await body()).includes('The destination must look like') &&
+    !sh('ls /etc/nginx/conf.d').includes('proxied'),
+);
 await page.getByLabel('Forward to').fill('http://127.0.0.1:8091');
 await tab('Advanced').click();
 await page.getByLabel('HTTP port').fill('8092');
 await tab('Preview').click();
 await waitText('This is exactly what will be written');
 const preview = await body();
-check('the preview shows the generated config before anything is saved', preview.includes('server_name proxied.example.com;') && preview.includes('proxy_pass http://127.0.0.1:8091;') && preview.includes('listen 8092;'));
+check(
+  'the preview shows the generated config before anything is saved',
+  preview.includes('server_name proxied.example.com;') &&
+    preview.includes('proxy_pass http://127.0.0.1:8091;') &&
+    preview.includes('listen 8092;'),
+);
 await shot('08-wizard-preview');
-check('and the preview wrote nothing', !sh('ls /etc/nginx/conf.d').includes('proxied'));
+check(
+  'and the preview wrote nothing',
+  !sh('ls /etc/nginx/conf.d').includes('proxied'),
+);
 await button('Save').click();
 await expectSaved();
-check('the wizard proxy really forwards to the site behind it', httpGet(8092, 'proxied.example.com').includes('200 OK') && sh('cat /etc/nginx/conf.d/proxied.example.com.conf').includes('# roastgate-spec:'));
+check(
+  'the wizard proxy really forwards to the site behind it',
+  httpGet(8092, 'proxied.example.com').includes('200 OK') &&
+    sh('cat /etc/nginx/conf.d/proxied.example.com.conf').includes(
+      '# roastgate-spec:',
+    ),
+);
 
 // Reopening it fills the form from the file, and a change regenerates it.
 await page.goto(`${base}/reverse-proxies/wizard?name=proxied.example.com.conf`);
 await waitField('Forward to');
-check('reopening the wizard restores the settings', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:8091' && (await page.getByLabel('Domain names').inputValue()).includes('proxied.example.com'));
+check(
+  'reopening the wizard restores the settings',
+  (await page.getByLabel('Forward to').inputValue()) ===
+    'http://127.0.0.1:8091' &&
+    (await page.getByLabel('Domain names').inputValue()).includes(
+      'proxied.example.com',
+    ),
+);
 await page.getByLabel('Timeout (seconds)').fill('90');
 // Layout: the WebSockets switch lines up with the timeout input, and the switches start where the inputs start.
-const centerY = async (locator: Locator) => { const position = await box(locator); return position.y + position.height / 2; };
-const switchY = await centerY(page.locator('.rg-switch-row .mud-switch').first());
-const timeoutY = await centerY(page.locator('.rg-switch-row .mud-input-outlined').first());
-check('the WebSockets switch is vertically centred on the timeout input', Math.abs(switchY - timeoutY) <= 3, `${switchY} vs ${timeoutY}`);
+const centerY = async (locator: Locator) => {
+  const position = await box(locator);
+  return position.y + position.height / 2;
+};
+const switchY = await centerY(
+  page.locator('.rg-switch-row .mud-switch').first(),
+);
+const timeoutY = await centerY(
+  page.locator('.rg-switch-row .mud-input-outlined').first(),
+);
+check(
+  'the WebSockets switch is vertically centred on the timeout input',
+  Math.abs(switchY - timeoutY) <= 3,
+  `${switchY} vs ${timeoutY}`,
+);
 await tab('Advanced').click();
-const trackX = (await box(page.locator('.rg-switch-grid .mud-switch-track').first())).x;
+const trackX = (
+  await box(page.locator('.rg-switch-grid .mud-switch-track').first())
+).x;
 const portX = (await box(page.getByLabel('HTTP port'))).x;
-check('in Advanced the switches start at the same edge as the port inputs', Math.abs(trackX - portX) <= 3, `${trackX} vs ${portX}`);
+check(
+  'in Advanced the switches start at the same edge as the port inputs',
+  Math.abs(trackX - portX) <= 3,
+  `${trackX} vs ${portX}`,
+);
 const httpsX = (await box(page.getByLabel('HTTPS port'))).x;
-const secondTrackX = (await box(page.locator('.rg-switch-grid .mud-switch-track').nth(1))).x;
-check('the second switch column lines up with the HTTPS port input', Math.abs(secondTrackX - httpsX) <= 3, `${secondTrackX} vs ${httpsX}`);
+const secondTrackX = (
+  await box(page.locator('.rg-switch-grid .mud-switch-track').nth(1))
+).x;
+check(
+  'the second switch column lines up with the HTTPS port input',
+  Math.abs(secondTrackX - httpsX) <= 3,
+  `${secondTrackX} vs ${httpsX}`,
+);
 await tab('Essentials').click();
-check('the Domain names text area can be resized by the user', (await page.getByLabel('Domain names').evaluate((element) => getComputedStyle(element).resize)) === 'vertical');
+check(
+  'the Domain names text area can be resized by the user',
+  (await page
+    .getByLabel('Domain names')
+    .evaluate((element) => getComputedStyle(element).resize)) === 'vertical',
+);
 await button('Save').click();
 await expectSaved();
-check('a change in the form is regenerated into the file', sh('cat /etc/nginx/conf.d/proxied.example.com.conf').includes('proxy_read_timeout 90s;'));
+check(
+  'a change in the form is regenerated into the file',
+  sh('cat /etc/nginx/conf.d/proxied.example.com.conf').includes(
+    'proxy_read_timeout 90s;',
+  ),
+);
 
 // A hand edit is noticed.
 sh(`printf '# my own note\\n' >> /etc/nginx/conf.d/proxied.example.com.conf`);
 await page.goto(`${base}/reverse-proxies/wizard?name=proxied.example.com.conf`);
 await waitText('edited by hand');
-check('a hand edit is detected and the user is warned before it would be replaced', (await body()).includes('replaces those edits'));
+check(
+  'a hand edit is detected and the user is warned before it would be replaced',
+  (await body()).includes('replaces those edits'),
+);
 await page.goto(`${base}/reverse-proxies`);
 await waitText('proxied.example.com.conf');
-check('the list still opens an edited wizard file in the wizard', ((await page.getByLabel('Edit proxied.example.com.conf', { exact: true }).getAttribute('href')) ?? '').includes('/wizard'));
+check(
+  'the list still opens an edited wizard file in the wizard',
+  (
+    (await page
+      .getByLabel('Edit proxied.example.com.conf', { exact: true })
+      .getAttribute('href')) ?? ''
+  ).includes('/wizard'),
+);
 
 // A file the wizard did not create is read into the form, and the user is told that saving regenerates it.
 await page.goto(`${base}/reverse-proxies/wizard?name=app.example.com.conf`);
 await waitText('not created by the wizard');
-check('a hand-made file is imported and the user is told saving regenerates it', (await body()).includes('read from the existing config') && (await body()).includes('regenerates the whole file'));
-check('the imported form shows what the file said', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:3000');
+check(
+  'a hand-made file is imported and the user is told saving regenerates it',
+  (await body()).includes('read from the existing config') &&
+    (await body()).includes('regenerates the whole file'),
+);
+check(
+  'the imported form shows what the file said',
+  (await page.getByLabel('Forward to').inputValue()) ===
+    'http://127.0.0.1:3000',
+);
 
 // A richer hand-made file: what the form has no field for must survive a save through the wizard, checked by the real nginx.
-writeHostFile('/etc/nginx/conf.d/legacy.example.com.conf', `server {
+writeHostFile(
+  '/etc/nginx/conf.d/legacy.example.com.conf',
+  `server {
     listen 8095;
     server_name legacy.example.com;
     gzip on;
@@ -452,21 +816,38 @@ writeHostFile('/etc/nginx/conf.d/legacy.example.com.conf', `server {
         proxy_buffering off;
     }
 }
-`);
+`,
+);
 await openEditor('/reverse-proxies/edit?name=legacy.example.com.conf');
 await page.getByTestId('import-link').click();
 await waitText('read from the existing config');
-check('the import fills the fields of a richer file', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:9000');
+check(
+  'the import fills the fields of a richer file',
+  (await page.getByLabel('Forward to').inputValue()) ===
+    'http://127.0.0.1:9000',
+);
 await button('Save').click();
 await expectSaved();
 const legacyFile = sh('cat /etc/nginx/conf.d/legacy.example.com.conf');
-check('free directives survive a save through the wizard and the real nginx accepts the result',
-    legacyFile.includes('proxy_buffering off;') && legacyFile.includes('return 200 "ok";') && legacyFile.includes('gzip on;') && legacyFile.includes('# roastgate-spec:'), legacyFile.slice(0, 300));
+check(
+  'free directives survive a save through the wizard and the real nginx accepts the result',
+  legacyFile.includes('proxy_buffering off;') &&
+    legacyFile.includes('return 200 "ok";') &&
+    legacyFile.includes('gzip on;') &&
+    legacyFile.includes('# roastgate-spec:'),
+  legacyFile.slice(0, 300),
+);
 const legacyAnswer = httpGet(8095, 'legacy.example.com', '/health');
-check('the imported site still answers on its own port', legacyAnswer.includes('200') && legacyAnswer.endsWith('ok'), legacyAnswer.slice(0, 200));
+check(
+  'the imported site still answers on its own port',
+  legacyAnswer.includes('200') && legacyAnswer.endsWith('ok'),
+  legacyAnswer.slice(0, 200),
+);
 
 // A file the wizard could not reproduce faithfully is refused with the reason, and nothing is rewritten unless the user insists.
-writeHostFile('/etc/nginx/conf.d/blocked.example.com.conf', `upstream backend {
+writeHostFile(
+  '/etc/nginx/conf.d/blocked.example.com.conf',
+  `upstream backend {
     server 127.0.0.1:9100;
 }
 server {
@@ -476,20 +857,29 @@ server {
         proxy_pass http://backend;
     }
 }
-`);
+`,
+);
 await page.goto(`${base}/reverse-proxies/wizard?name=blocked.example.com.conf`);
 await waitText('cannot be imported without changing what it does');
-check('a file with an upstream block is refused with the reason', (await body()).includes('outside a server block would be lost') && (await body()).includes('replaces the whole file'));
+check(
+  'a file with an upstream block is refused with the reason',
+  (await body()).includes('outside a server block would be lost') &&
+    (await body()).includes('replaces the whole file'),
+);
 
 // HTTPS with a real certificate, a redirect and a whitelist.
-sh('openssl req -x509 -nodes -newkey rsa:2048 -keyout /etc/ssl/private/rg-e2e.key -out /etc/ssl/certs/rg-e2e.crt -subj /CN=secure.example.com -days 2');
+sh(
+  'openssl req -x509 -nodes -newkey rsa:2048 -keyout /etc/ssl/private/rg-e2e.key -out /etc/ssl/certs/rg-e2e.crt -subj /CN=secure.example.com -days 2',
+);
 await page.goto(`${base}/reverse-proxies/wizard`);
 await waitField('Forward to');
 await page.getByLabel('Domain names').fill('secure.example.com');
 await page.getByLabel('Forward to').fill('http://127.0.0.1:8091');
 await tab('HTTPS').click();
 await page.getByLabel('Serve the site over HTTPS').check();
-await page.getByLabel('Certificate (full chain)').fill('/etc/ssl/certs/rg-e2e.crt');
+await page
+  .getByLabel('Certificate (full chain)')
+  .fill('/etc/ssl/certs/rg-e2e.crt');
 await page.getByLabel('Private key').fill('/etc/ssl/private/rg-e2e.key');
 await tab('Access').click();
 await page.getByLabel('alice.conf').check();
@@ -499,27 +889,68 @@ await page.getByLabel('HTTPS port').fill('8443');
 await button('Save').click();
 await expectSaved();
 const secureFile = sh('cat /etc/nginx/conf.d/secure.example.com.conf');
-check('the HTTPS config is accepted by the real nginx -t and reloaded', (await body()).includes('nginx reloaded.') && secureFile.includes('ssl_certificate /etc/ssl/certs/rg-e2e.crt;') && secureFile.includes('include /etc/nginx/whitelists/alice.conf;'), secureFile.slice(0, 200));
+check(
+  'the HTTPS config is accepted by the real nginx -t and reloaded',
+  (await body()).includes('nginx reloaded.') &&
+    secureFile.includes('ssl_certificate /etc/ssl/certs/rg-e2e.crt;') &&
+    secureFile.includes('include /etc/nginx/whitelists/alice.conf;'),
+  secureFile.slice(0, 200),
+);
 const redirect = httpGet(8093, 'secure.example.com');
-check('plain HTTP is redirected to HTTPS on the chosen port', redirect.includes('301') && redirect.includes('Location: https://secure.example.com:8443/'), redirect.slice(0, 200));
-const secure = sh(`bash -c 'printf "GET / HTTP/1.0\\r\\nHost: secure.example.com\\r\\n\\r\\n" | openssl s_client -quiet -connect 127.0.0.1:8443 -servername secure.example.com 2>/dev/null | head -1'`);
-check('HTTPS is really served with the certificate, behind the whitelist (127.0.0.1 is whitelisted)', secure.includes('200 OK'), secure);
+check(
+  'plain HTTP is redirected to HTTPS on the chosen port',
+  redirect.includes('301') &&
+    redirect.includes('Location: https://secure.example.com:8443/'),
+  redirect.slice(0, 200),
+);
+const secure = sh(
+  `bash -c 'printf "GET / HTTP/1.0\\r\\nHost: secure.example.com\\r\\n\\r\\n" | openssl s_client -quiet -connect 127.0.0.1:8443 -servername secure.example.com 2>/dev/null | head -1'`,
+);
+check(
+  'HTTPS is really served with the certificate, behind the whitelist (127.0.0.1 is whitelisted)',
+  secure.includes('200 OK'),
+  secure,
+);
 
 // ---- certificates (against a stand-in for certbot: it cannot reach Let's Encrypt) ----
 await page.goto(`${base}/certificates`);
 await waitText('No certificate yet');
-check('the page says certificates are handled by the embedded certbot', /embedded certbot/i.test(await body()));
-check('the certificate Domain names text area can be resized', (await page.getByLabel('Domain names').evaluate((element) => getComputedStyle(element).resize)) === 'vertical');
+check(
+  'the page says certificates are handled by the embedded certbot',
+  /embedded certbot/i.test(await body()),
+);
+check(
+  'the certificate Domain names text area can be resized',
+  (await page
+    .getByLabel('Domain names')
+    .evaluate((element) => getComputedStyle(element).resize)) === 'vertical',
+);
 await page.getByLabel('Domain names').fill('lets.example.com');
 await button('Test first (dry run)').click();
 await waitText('The dry run succeeded');
-check('a dry run succeeds and issues nothing', !sh('ls /etc/letsencrypt/live 2>&1').includes('lets.example.com'));
-check('a successful certbot run is a toast, with no certbot output left on the page', (await toasts()).includes('The dry run succeeded') && !(await alerts()).includes('The dry run succeeded') && (await page.locator('.rg-output').count()) === 0);
+check(
+  'a dry run succeeds and issues nothing',
+  !sh('ls /etc/letsencrypt/live 2>&1').includes('lets.example.com'),
+);
+check(
+  'a successful certbot run is a toast, with no certbot output left on the page',
+  (await toasts()).includes('The dry run succeeded') &&
+    !(await alerts()).includes('The dry run succeeded') &&
+    (await page.locator('.rg-output').count()) === 0,
+);
 await button('Get the certificate').click();
 await waitText('was issued');
-check('issuing creates the certificate where nginx will read it', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
+check(
+  'issuing creates the certificate where nginx will read it',
+  sh('ls /etc/letsencrypt/live').includes('lets.example.com'),
+);
 const certificatesText = await body();
-check('the page lists it with its domain and its expiry read from the file', certificatesText.includes('lets.example.com') && /in (89|90) days/.test(certificatesText), certificatesText.slice(0, 300));
+check(
+  'the page lists it with its domain and its expiry read from the file',
+  certificatesText.includes('lets.example.com') &&
+    /in (89|90) days/.test(certificatesText),
+  certificatesText.slice(0, 300),
+);
 await shot('09-certificates');
 
 // The wizard picks it from a list and fills in the paths.
@@ -532,34 +963,72 @@ await page.getByLabel('Serve the site over HTTPS').check();
 await page.getByLabel("Use a Let's Encrypt certificate").click();
 await page.getByRole('option', { name: /lets\.example\.com/ }).click();
 await page.waitForTimeout(500);
-check('choosing a certificate fills in the certificate and key paths', (await page.getByLabel('Certificate (full chain)').inputValue()).endsWith('/live/lets.example.com/fullchain.pem') && (await page.getByLabel('Private key').inputValue()).endsWith('/live/lets.example.com/privkey.pem'));
+check(
+  'choosing a certificate fills in the certificate and key paths',
+  (await page.getByLabel('Certificate (full chain)').inputValue()).endsWith(
+    '/live/lets.example.com/fullchain.pem',
+  ) &&
+    (await page.getByLabel('Private key').inputValue()).endsWith(
+      '/live/lets.example.com/privkey.pem',
+    ),
+);
 await tab('Advanced').click();
 await page.getByLabel('HTTP port').fill('8094');
 await page.getByLabel('HTTPS port').fill('8444');
 await button('Save').click();
 await expectSaved();
-const servedCertificate = () => sh(`bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -noout -subject -enddate'`);
-check('nginx serves the Let\'s Encrypt certificate that was chosen', servedCertificate().includes('lets.example.com'), servedCertificate());
+const servedCertificate = () =>
+  sh(
+    `bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -noout -subject -enddate'`,
+  );
+check(
+  "nginx serves the Let's Encrypt certificate that was chosen",
+  servedCertificate().includes('lets.example.com'),
+  servedCertificate(),
+);
 
 // A certificate that a config uses cannot be deleted.
 await page.goto(`${base}/certificates`);
 await waitText('lets.example.com.conf');
-check('the list shows which config uses the certificate', (await body()).includes('lets.example.com.conf'));
+check(
+  'the list shows which config uses the certificate',
+  (await body()).includes('lets.example.com.conf'),
+);
 await page.getByLabel('Delete lets.example.com').click();
 await button('Delete').click();
 await waitText('is still used by');
-check('deleting a certificate that is in use is refused', sh('ls /etc/letsencrypt/live').includes('lets.example.com'));
-check('a refused certbot action stays inline, not in a toast', (await alerts()).includes('is still used by') && !(await toasts()).includes('is still used by'));
+check(
+  'deleting a certificate that is in use is refused',
+  sh('ls /etc/letsencrypt/live').includes('lets.example.com'),
+);
+check(
+  'a refused certbot action stays inline, not in a toast',
+  (await alerts()).includes('is still used by') &&
+    !(await toasts()).includes('is still used by'),
+);
 
 // Let it age, then renew: Roastgate sees the new file and reloads nginx so the new certificate is served.
-sh(`openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout /etc/letsencrypt/live/lets.example.com/privkey.pem -out /etc/letsencrypt/live/lets.example.com/fullchain.pem -subj /CN=lets.example.com -addext subjectAltName=DNS:lets.example.com -days 5`);
+sh(
+  `openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout /etc/letsencrypt/live/lets.example.com/privkey.pem -out /etc/letsencrypt/live/lets.example.com/fullchain.pem -subj /CN=lets.example.com -addext subjectAltName=DNS:lets.example.com -days 5`,
+);
 await page.goto(`${base}/certificates`);
 await waitText('in 4 days');
-check('a certificate close to expiry is shown with its few remaining days', /in [34] days/.test(await body()));
+check(
+  'a certificate close to expiry is shown with its few remaining days',
+  /in [34] days/.test(await body()),
+);
 await page.getByLabel('Renew lets.example.com now').click();
 await waitText('Renewed lets.example.com');
-check('renewing replaces the certificate and reloads nginx', (await body()).includes('nginx was reloaded'));
-check('nginx now serves a certificate valid for more than 60 days', sh(`bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -checkend 5184000 -noout'`).includes('will not expire'));
+check(
+  'renewing replaces the certificate and reloads nginx',
+  (await body()).includes('nginx was reloaded'),
+);
+check(
+  'nginx now serves a certificate valid for more than 60 days',
+  sh(
+    `bash -c 'openssl s_client -connect 127.0.0.1:8444 -servername lets.example.com </dev/null 2>/dev/null | openssl x509 -checkend 5184000 -noout'`,
+  ).includes('will not expire'),
+);
 
 // An unused certificate can be deleted.
 await page.getByLabel('Domain names').fill('unused.example.com');
@@ -568,44 +1037,82 @@ await waitText('was issued');
 await page.getByLabel('Delete unused.example.com').click();
 await button('Delete').click();
 await waitText('was deleted');
-check('an unused certificate is deleted through certbot', !sh('ls /etc/letsencrypt/live').includes('unused.example.com'));
+check(
+  'an unused certificate is deleted through certbot',
+  !sh('ls /etc/letsencrypt/live').includes('unused.example.com'),
+);
 
 // ---- backups: compare and restore ----
 // The refused change earlier left no backup behind; a successful second edit creates the first one.
-check('a refused change left no backup', sh('ls /etc/nginx/conf.d').includes('app.example.com.conf'));
+check(
+  'a refused change left no backup',
+  sh('ls /etc/nginx/conf.d').includes('app.example.com.conf'),
+);
 await openEditor('/reverse-proxies/edit?name=app.example.com.conf');
 await setEditor((await getEditor()) + '\n# second version');
 await button('Save').click();
 await expectSaved();
-await page.goto(`${base}/backups?area=ReverseProxies&name=app.example.com.conf`);
+await page.goto(
+  `${base}/backups?area=ReverseProxies&name=app.example.com.conf`,
+);
 await waitText('Taken before');
 const showBox = await box(button('Show'));
-const fileInput = await box(page.locator('.mud-input-outlined').filter({ has: page.getByLabel('File name') }));
-check('the Show button is centred on the filter inputs', Math.abs((showBox.y + showBox.height / 2) - (fileInput.y + fileInput.height / 2)) <= 3, `${showBox.y + showBox.height / 2} vs ${fileInput.y + fileInput.height / 2}`);
+const fileInput = await box(
+  page
+    .locator('.mud-input-outlined')
+    .filter({ has: page.getByLabel('File name') }),
+);
+check(
+  'the Show button is centred on the filter inputs',
+  Math.abs(
+    showBox.y + showBox.height / 2 - (fileInput.y + fileInput.height / 2),
+  ) <= 3,
+  `${showBox.y + showBox.height / 2} vs ${fileInput.y + fileInput.height / 2}`,
+);
 check('the backups of a file are listed', /a change/i.test(await body()));
 await button('Compare').first().click();
 await waitText('Restoring');
 const comparison = await body();
-check('comparing shows what restoring would add and remove', /adds \d+ line/.test(comparison) && /removes \d+ line/.test(comparison), comparison.slice(0, 300));
-check('the differences are drawn line by line', (await page.locator('.rg-diff-added, .rg-diff-removed').count()) > 0);
+check(
+  'comparing shows what restoring would add and remove',
+  /adds \d+ line/.test(comparison) && /removes \d+ line/.test(comparison),
+  comparison.slice(0, 300),
+);
+check(
+  'the differences are drawn line by line',
+  (await page.locator('.rg-diff-added, .rg-diff-removed').count()) > 0,
+);
 await shot('10-backups');
 const beforeRestore = sh('cat /etc/nginx/conf.d/app.example.com.conf');
 await button('Restore this version').click();
 await button('Restore').click();
 await waitText('Restored.');
-check('restoring puts the old version back and reloads nginx', (await body()).includes('nginx reloaded.') && sh('cat /etc/nginx/conf.d/app.example.com.conf') !== beforeRestore);
-check('restoring reports in a toast that names the file', (await toasts()).includes('app.example.com.conf: Restored.'));
+check(
+  'restoring puts the old version back and reloads nginx',
+  (await body()).includes('nginx reloaded.') &&
+    sh('cat /etc/nginx/conf.d/app.example.com.conf') !== beforeRestore,
+);
+check(
+  'restoring reports in a toast that names the file',
+  (await toasts()).includes('app.example.com.conf: Restored.'),
+);
 
 // A deleted site comes back (it was deleted earlier in the scenario).
 await page.goto(`${base}/backups?area=Sites&name=example.com`);
 await waitText('a deletion');
 await button('Compare').first().click();
 await waitText('does not exist any more');
-check('a deleted file says restoring creates it again', (await body()).includes('restoring creates it again'));
+check(
+  'a deleted file says restoring creates it again',
+  (await body()).includes('restoring creates it again'),
+);
 await button('Restore this version').click();
 await button('Restore').click();
 await waitText('Restored.');
-check('the deleted site is back in sites-available', sh('ls /etc/nginx/sites-available').includes('example.com'));
+check(
+  'the deleted site is back in sites-available',
+  sh('ls /etc/nginx/sites-available').includes('example.com'),
+);
 
 // ---- settings ----
 await page.goto(`${base}/settings`);
@@ -618,19 +1125,32 @@ await page.getByLabel('nginx directory').fill('/etc/nginx');
 await page.getByLabel("Let's Encrypt e-mail").fill('ops@example.com');
 await button('Save settings').click();
 await waitText('Settings saved.');
-check('saving the settings is a toast, no longer an inline alert', (await toasts()).includes('Settings saved.') && !(await alerts()).includes('Settings saved.'));
+check(
+  'saving the settings is a toast, no longer an inline alert',
+  (await toasts()).includes('Settings saved.') &&
+    !(await alerts()).includes('Settings saved.'),
+);
 await page.goto(`${base}/certificates`);
 await waitField('Domain names');
-check('saved settings are used elsewhere (the e-mail is pre-filled when getting a certificate)', (await page.getByLabel('E-mail for expiry notices').inputValue()) === 'ops@example.com');
+check(
+  'saved settings are used elsewhere (the e-mail is pre-filled when getting a certificate)',
+  (await page.getByLabel('E-mail for expiry notices').inputValue()) ===
+    'ops@example.com',
+);
 await page.goto(`${base}/settings`);
 await waitField('nginx directory');
 await button('Check the host with these values').click();
 await waitText('host access');
-check('the host can be checked from the settings page', /nginx/.test(await body()) && /Let's Encrypt directory/.test(await body()));
+check(
+  'the host can be checked from the settings page',
+  /nginx/.test(await body()) && /Let's Encrypt directory/.test(await body()),
+);
 await shot('11-settings');
 
 // Another browser, signed in with the current password.
-const context2 = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+const context2 = await browser.newContext({
+  viewport: { width: 1300, height: 900 },
+});
 const page2 = await context2.newPage();
 await page2.goto(`${base}/login`);
 await page2.getByLabel('Username').fill('admin');
@@ -639,7 +1159,9 @@ await page2.getByRole('button', { name: 'Sign in', exact: true }).click();
 await page2.waitForURL(`${base}/`);
 
 await page.getByLabel('Current password').fill('definitely-not-it-1!');
-await page.getByLabel('New password', { exact: true }).fill('A-brand-new-Passw0rd');
+await page
+  .getByLabel('New password', { exact: true })
+  .fill('A-brand-new-Passw0rd');
 await page.getByLabel('Repeat the new password').fill('A-brand-new-Passw0rd');
 await button('Change the password').click();
 await waitText('current password is not correct');
@@ -648,9 +1170,16 @@ check('a wrong current password is refused', true);
 await page.getByLabel('Current password').fill('Correct-Horse-9');
 await button('Change the password').click();
 await page.waitForURL(/\/login\?notice=password-changed/, { timeout: 15000 });
-check('changing the password sends the user to the sign-in page with an explanation', (await body()).includes('Your password was changed'));
+check(
+  'changing the password sends the user to the sign-in page with an explanation',
+  (await body()).includes('Your password was changed'),
+);
 await page2.goto(`${base}/`);
-check('the other browser, still open, is signed out as well', page2.url().includes('/login'), page2.url());
+check(
+  'the other browser, still open, is signed out as well',
+  page2.url().includes('/login'),
+  page2.url(),
+);
 await context2.close();
 
 await page.getByLabel('Username').fill('admin');
@@ -671,7 +1200,9 @@ const typePasswordStep = async (p: Page, password: string) => {
   await p.getByRole('button', { name: 'Sign in', exact: true }).click();
 };
 const newBrowserAtLogin = async () => {
-  const context = await browser.newContext({ viewport: { width: 1300, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1300, height: 900 },
+  });
   const fresh = await context.newPage();
   await fresh.goto(`${base}/login`);
   await fresh.getByLabel('Username').waitFor();
@@ -683,11 +1214,16 @@ const enableTwoFactor = async () => {
   await waitText('Two-factor authentication');
   await button('Set up two-factor authentication').click();
   await page.locator('.rg-qr svg').waitFor();
-  const secret = (await page.locator('.rg-secret').innerText()).replace(/\s+/g, '');
+  const secret = (await page.locator('.rg-secret').innerText()).replace(
+    /\s+/g,
+    '',
+  );
   await page.getByLabel('Code from the app').fill(totp(secret));
   await button('Turn on two-factor authentication').click();
   await waitText('Save these recovery codes now');
-  const recovery = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
+  const recovery = (await page.locator('pre.rg-recovery-codes').innerText())
+    .trim()
+    .split(/\s+/);
   return { secret, recovery };
 };
 
@@ -695,27 +1231,53 @@ await page.goto(`${base}/settings`);
 await waitText('Two-factor authentication');
 await button('Set up two-factor authentication').click();
 await page.locator('.rg-qr svg').waitFor();
-check('a QR code is shown to scan', (await page.locator('.rg-qr svg').count()) === 1);
+check(
+  'a QR code is shown to scan',
+  (await page.locator('.rg-qr svg').count()) === 1,
+);
 await shot('12-two-factor-setup');
-const secret = (await page.locator('.rg-secret').innerText()).replace(/\s+/g, '');
-check('the secret is shown too, for apps that cannot scan', /^[A-Z2-7]{32}$/.test(secret), secret);
+const secret = (await page.locator('.rg-secret').innerText()).replace(
+  /\s+/g,
+  '',
+);
+check(
+  'the secret is shown too, for apps that cannot scan',
+  /^[A-Z2-7]{32}$/.test(secret),
+  secret,
+);
 await page.getByLabel('Code from the app').fill('000000');
 await button('Turn on two-factor authentication').click();
 await waitText('That code is not valid');
-check('a wrong code does not turn it on', (await body()).includes('Set up two-factor') === false);
+check(
+  'a wrong code does not turn it on',
+  (await body()).includes('Set up two-factor') === false,
+);
 await page.getByLabel('Code from the app').fill(totp(secret));
 await button('Turn on two-factor authentication').click();
 await waitText('Save these recovery codes now');
-const recovery = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
-check('ten recovery codes are shown, once', recovery.length === 10 && recovery.every((code) => /^[a-z2-7]{4}(-[a-z2-7]{4}){3}$/.test(code)), recovery.join(' '));
+const recovery = (await page.locator('pre.rg-recovery-codes').innerText())
+  .trim()
+  .split(/\s+/);
+check(
+  'ten recovery codes are shown, once',
+  recovery.length === 10 &&
+    recovery.every((code) => /^[a-z2-7]{4}(-[a-z2-7]{4}){3}$/.test(code)),
+  recovery.join(' '),
+);
 await button('I have saved them, sign in again').click();
 await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
-check('turning it on ends the session and says why', (await body()).includes('Two-factor authentication was changed'));
+check(
+  'turning it on ends the session and says why',
+  (await body()).includes('Two-factor authentication was changed'),
+);
 
 // The two steps, with a code computed by this script (so the server's TOTP is checked against an independent implementation).
 await typePasswordStep(page, NEW_PASSWORD);
 await waitText('Two-step verification');
-check('the password alone leads to the second step, not into the application', page.url().includes('/login'));
+check(
+  'the password alone leads to the second step, not into the application',
+  page.url().includes('/login'),
+);
 await shot('13-two-step');
 await page.getByLabel('Authentication code').fill('000000');
 await button('Verify').click();
@@ -729,7 +1291,9 @@ check('the code computed independently signs in', true);
 // A recovery code works once.
 const first = await newBrowserAtLogin();
 await typePasswordStep(first.fresh, NEW_PASSWORD);
-await first.fresh.getByLabel('Authentication code').fill(recovery[0].toUpperCase());
+await first.fresh
+  .getByLabel('Authentication code')
+  .fill(recovery[0].toUpperCase());
 await first.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
 await first.fresh.waitForURL(`${base}/`, { timeout: 15000 });
 check('a recovery code signs in (case does not matter)', true);
@@ -738,35 +1302,66 @@ const second = await newBrowserAtLogin();
 await typePasswordStep(second.fresh, NEW_PASSWORD);
 await second.fresh.getByLabel('Authentication code').fill(recovery[0]);
 await second.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
-await second.fresh.getByText('That code is not valid').first().waitFor({ timeout: 10000 });
-check('the same recovery code does not work twice', second.fresh.url().includes('/login'));
+await second.fresh
+  .getByText('That code is not valid')
+  .first()
+  .waitFor({ timeout: 10000 });
+check(
+  'the same recovery code does not work twice',
+  second.fresh.url().includes('/login'),
+);
 await second.context.close();
 
 // New recovery codes replace the old ones.
 await page.goto(`${base}/settings`);
 await waitText('Two-factor authentication is');
 await page.getByLabel('Code from the app', { exact: true }).fill(recovery[1]);
-const inputMiddle = await box(page.locator('.mud-input-outlined').filter({ has: page.getByLabel('Code from the app', { exact: true }) }));
+const inputMiddle = await box(
+  page
+    .locator('.mud-input-outlined')
+    .filter({ has: page.getByLabel('Code from the app', { exact: true }) }),
+);
 const buttonBox = await box(button('Get new recovery codes'));
-check('the recovery codes button is centred on its code input', Math.abs((inputMiddle.y + inputMiddle.height / 2) - (buttonBox.y + buttonBox.height / 2)) <= 3, `${inputMiddle.y + inputMiddle.height / 2} vs ${buttonBox.y + buttonBox.height / 2}`);
+check(
+  'the recovery codes button is centred on its code input',
+  Math.abs(
+    inputMiddle.y +
+      inputMiddle.height / 2 -
+      (buttonBox.y + buttonBox.height / 2),
+  ) <= 3,
+  `${inputMiddle.y + inputMiddle.height / 2} vs ${buttonBox.y + buttonBox.height / 2}`,
+);
 await button('Get new recovery codes').click();
 await waitText('Save these recovery codes now');
-const regenerated = (await page.locator('pre.rg-recovery-codes').innerText()).trim().split(/\s+/);
-check('regenerating gives ten new codes, confirmed with a code', regenerated.length === 10 && !regenerated.includes(recovery[2]));
+const regenerated = (await page.locator('pre.rg-recovery-codes').innerText())
+  .trim()
+  .split(/\s+/);
+check(
+  'regenerating gives ten new codes, confirmed with a code',
+  regenerated.length === 10 && !regenerated.includes(recovery[2]),
+);
 await button('I have saved them').click();
 await waitText('10 recovery code(s) left');
-check('regenerating does not sign the user out', !page.url().includes('/login'));
+check(
+  'regenerating does not sign the user out',
+  !page.url().includes('/login'),
+);
 const third = await newBrowserAtLogin();
 await typePasswordStep(third.fresh, NEW_PASSWORD);
 await third.fresh.getByLabel('Authentication code').fill(recovery[2]);
 await third.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
-await third.fresh.getByText('That code is not valid').first().waitFor({ timeout: 10000 });
+await third.fresh
+  .getByText('That code is not valid')
+  .first()
+  .waitFor({ timeout: 10000 });
 check('an old recovery code no longer works', true);
 await third.context.close();
 
 // Turning it off needs the password and a code.
 await page.getByLabel('Password', { exact: true }).fill('wrong-password-123');
-await page.getByLabel('Code from the app (or a recovery code)').fill(regenerated[0]);
+await page
+  .getByLabel('Code from the app (or a recovery code)')
+  .fill(regenerated[0]);
 await button('Turn off two-factor authentication').click();
 await waitText('The password is not correct');
 check('turning it off with a wrong password is refused', true);
@@ -779,13 +1374,20 @@ check('with two-factor off the password alone signs in again', true);
 
 // The way out when the phone is lost: the console command.
 const enabledAgain = await enableTwoFactor();
-check('it can be turned on again with a new secret', enabledAgain.secret !== secret);
+check(
+  'it can be turned on again with a new secret',
+  enabledAgain.secret !== secret,
+);
 await button('I have saved them, sign in again').click();
 await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
 await typePasswordStep(page, NEW_PASSWORD);
 await waitText('Two-step verification');
 const consoleOutput = sh('roastgate disable-2fa 2>&1');
-check('the console command turns it off', consoleOutput.includes('is off'), consoleOutput);
+check(
+  'the console command turns it off',
+  consoleOutput.includes('is off'),
+  consoleOutput,
+);
 await page.goto(`${base}/login`);
 await typePasswordStep(page, NEW_PASSWORD);
 await page.waitForURL(`${base}/`, { timeout: 20000 });
@@ -795,22 +1397,55 @@ check('afterwards the password alone is enough', true);
 await page.goto(`${base}/audit-log`);
 await waitText('config.save');
 const audit = await body();
-check('the audit log records saves, refusals, enables and deletes', ['config.save', 'config.enable', 'config.disable', 'config.delete', 'nginx.reload', 'nginx.test', 'certbot.issue', 'certbot.renew', 'certbot.delete'].every((a) => audit.includes(a)));
+check(
+  'the audit log records saves, refusals, enables and deletes',
+  [
+    'config.save',
+    'config.enable',
+    'config.disable',
+    'config.delete',
+    'nginx.reload',
+    'nginx.test',
+    'certbot.issue',
+    'certbot.renew',
+    'certbot.delete',
+  ].every((a) => audit.includes(a)),
+);
 await shot('05-audit');
 
 // ---- the account survives a restart of the container ----
 execSync(`docker restart ${container}`, { stdio: 'ignore' });
 for (let i = 0; i < 60; i += 1) {
-  try { if ((await fetch(`${base}/login`)).ok) { break; } } catch { /* not up yet */ }
+  try {
+    if ((await fetch(`${base}/login`)).ok) {
+      break;
+    }
+  } catch {
+    /* not up yet */
+  }
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-const restartLogs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
-check('after a restart the existing database is reused', restartLogs.includes('Using the existing database'));
+const restartLogs = execSync(`docker logs ${container} 2>&1`, {
+  encoding: 'utf8',
+});
+check(
+  'after a restart the existing database is reused',
+  restartLogs.includes('Using the existing database'),
+);
 await page.goto(`${base}/`);
-check('after a restart the account and the session are still there (no setup)', !page.url().includes('/setup') && !page.url().includes('/login'), page.url());
+check(
+  'after a restart the account and the session are still there (no setup)',
+  !page.url().includes('/setup') && !page.url().includes('/login'),
+  page.url(),
+);
 
 await browser.close();
-console.log('\nbrowser problems:', problems.length ? '\n  ' + [...new Set(problems)].join('\n  ') : 'none');
+console.log(
+  '\nbrowser problems:',
+  problems.length ? '\n  ' + [...new Set(problems)].join('\n  ') : 'none',
+);
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+console.log(
+  `\n${results.length - failed.length}/${results.length} checks passed`,
+);
 process.exit(failed.length ? 1 : 0);
