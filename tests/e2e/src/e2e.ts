@@ -1,6 +1,6 @@
 /**
  * End to end scenario: the real setup wizard, then every config feature against a REAL nginx running in the test
- * container. See README.md in this folder. Needs Docker, Node 22.18+ (it runs this TypeScript file as is) and an
+ * container. See README.md in tests/e2e. Needs Docker, Node 22.18+ (it runs this TypeScript file as is) and an
  * installed browser (Edge by default, see E2E_CHANNEL).
  */
 

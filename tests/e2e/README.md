@@ -61,28 +61,32 @@ The container uses `ROASTGATE_HOST_EXEC=direct` with nginx installed in the same
 
 ```
 tests/e2e/
-  e2e.ts             entry point: launches the browser, runs the sections in order, prints the summary
-  lib/
-    config.ts        the E2E_* variables and the passwords used by the scenario
-    context.ts       what every section receives: the browser, the page, the page helpers, the setup token
-    page.ts          helpers bound to the page (waitText, button, box, shot, the Monaco editor...)
-    report.ts        check(), the browser problems and trace, the final summary
-    shell.ts         commands in the container (sh, httpGet, writeHostFile...) and the setup token
-    totp.ts          an authenticator app's TOTP, written independently of the server
-  sections/          one function per part of the scenario
-  globals.d.ts       the few parts of Monaco the scenario reaches through window.monaco
+  src/
+    e2e.ts             entry point: launches the browser, runs the sections in order, prints the summary
+    lib/
+      config.ts        the E2E_* variables and the passwords used by the scenario
+      context.ts       what every section receives: the browser, the page, the page helpers, the setup token
+      page.ts          helpers bound to the page (waitText, button, box, shot, the Monaco editor...)
+      report.ts        check(), the browser problems and trace, the final summary
+      shell.ts         commands in the container (sh, httpGet, writeHostFile...) and the setup token
+      totp.ts          an authenticator app's TOTP, written independently of the server
+    sections/          one function per part of the scenario
+    globals.d.ts       the few parts of Monaco the scenario reaches through window.monaco
+  Dockerfile           the test image: Roastgate with nginx, the fancyindex module and fake-certbot.sh
+  fake-certbot.sh      a stand-in for certbot that keeps its command line and file layout but never reaches Let's Encrypt
+  out/                 screenshots of the last run (not committed)
 ```
 
 It is **one scenario, not independent tests**: each section relies on what the previous ones left on the server
 (127.0.0.1 in the whitelist for the wizard's HTTPS, files to back up and restore, the password changed in the settings
-for two-factor...). Keep the order of the `sections` array in `e2e.ts`.
+for two-factor...). Keep the order of the `sections` array in `src/e2e.ts`.
 
 ### Adding a check or a section
 
 - A check is a `check('what is true', condition, detail)` call: its name is what the run prints, so write it as a
   sentence.
-- A section is an `async ({ helpers, page, ... }: Context): Promise<void>` function in `sections/`, added to the
-  `sections` array in `e2e.ts` where its place in the scenario is.
+- A section is an `async ({ helpers, page, ... }: Context): Promise<void>` function in `src/sections/`, added to
+  the `sections` array in `src/e2e.ts` where its place in the scenario is.
 - Take screenshots with `helpers.shot('name')`, without a number: `shot` numbers them itself.
 - Run `pnpm typecheck` and `pnpm format` before committing.
 
