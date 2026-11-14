@@ -1,3 +1,4 @@
 node_modules/
+obj/
+obj\\*
 out/
-package-lock.json
