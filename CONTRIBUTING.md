@@ -32,7 +32,7 @@ dotnet run --project src/Roastgate.Web          # http://localhost:5009
 ```
 
 The [Development](README.md#development) section of the README explains how to run Roastgate against a real nginx in a
-container, and [tests/e2e](tests/e2e/README.md) how to run the end-to-end suite.
+container, and [tests/Roastgate.E2E](tests/Roastgate.E2E/README.md) how to run the end-to-end suite.
 
 ## Code style
 
@@ -57,7 +57,7 @@ Beyond that, write code that looks like the code around it.
 
 - Add or update tests in `tests/Roastgate.Tests` for every behaviour change. These tests fake nginx and must pass with
   `dotnet test`.
-- If your change touches the UI or what is written to nginx, also run the [end-to-end suite](tests/e2e/README.md),
+- If your change touches the UI or what is written to nginx, also run the [end-to-end suite](tests/Roastgate.E2E/README.md),
   which drives the real UI against a real nginx.
 - A change to the database schema comes with its EF Core migration (the command is in the README).
 

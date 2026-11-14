@@ -234,7 +234,7 @@ with `scripts/check-razor-imports.sh src/Roastgate.Web`.
 
 The tests that fake nginx live in `tests/Roastgate.Tests`. A second suite drives the real UI against a real nginx in
 Docker, see
-[tests/e2e](tests/e2e/README.md).
+[tests/Roastgate.E2E](tests/Roastgate.E2E/README.md).
 
 ### Trying it against a real nginx
 
@@ -245,7 +245,7 @@ the end-to-end image: Roastgate built from your working copy, with nginx install
 
 ```bash
 docker build -t roastgate:test .                                  # from the repository root, rebuild after each change
-docker build -f tests/e2e/Dockerfile -t roastgate:e2e tests/e2e
+docker build -f tests/Roastgate.E2E/Dockerfile -t roastgate:e2e tests/Roastgate.E2E
 docker rm -f roastgate-dev
 docker run -d --name roastgate-dev \
   -p 127.0.0.1:8282:8181 \

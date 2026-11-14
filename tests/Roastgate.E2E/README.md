@@ -15,7 +15,7 @@ lost Blazor circuit), so run it before releasing.
 ## Run it
 
 ```bash
-cd tests/e2e
+cd tests/Roastgate.E2E
 pnpm install
 pnpm e2e:build          # builds the application image, then the test image; again after each change to the application
 pnpm test:fresh:chrome  # or test:fresh:edge
@@ -60,7 +60,7 @@ The container uses `ROASTGATE_HOST_EXEC=direct` with nginx installed in the same
 ## Layout
 
 ```
-tests/e2e/
+tests/Roastgate.E2E/
   src/
     e2e.ts             entry point: launches the browser, runs the sections in order, prints the summary
     lib/
