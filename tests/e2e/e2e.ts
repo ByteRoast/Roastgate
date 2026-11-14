@@ -1,179 +1,59 @@
 // End to end scenario: the real setup wizard, then every config feature against a REAL nginx running in the test container.
 // See README.md in this folder. Needs Docker, Node 22.18+ (it runs this TypeScript file as is) and an installed browser (Edge by default, see E2E_CHANNEL).
 import { chromium } from 'playwright-core';
-import type { Locator, Page } from 'playwright-core';
+import type { Page } from 'playwright-core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
 
-// RFC 6238 (HMAC-SHA1, 30 s steps, 6 digits), written here independently of the server, as an authenticator app would compute it.
-const base32Decode = (text: string) => {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const character of text.replace(/[\s=-]/g, '').toUpperCase())
-    bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
-  const bytes = [];
-  for (let index = 0; index + 8 <= bits.length; index += 8)
-    bytes.push(parseInt(bits.slice(index, index + 8), 2));
-  return Buffer.from(bytes);
-};
-const totp = (secret: string, stepOffset = 0) => {
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000) + stepOffset));
-  const hash = crypto
-    .createHmac('sha1', base32Decode(secret))
-    .update(counter)
-    .digest();
-  const offset = hash[hash.length - 1] & 0x0f;
-  const binary =
-    ((hash[offset] & 0x7f) << 24) |
-    (hash[offset + 1] << 16) |
-    (hash[offset + 2] << 8) |
-    hash[offset + 3];
-  return String(binary % 1000000).padStart(6, '0');
-};
+import { BASE, CHANNEL, CONTAINER, SHOTS } from './lib/config.ts';
+import { pageHelper } from './lib/page.ts';
+import { check, PROBLEMS, RESULTS, watchPage } from './lib/report.ts';
+import {
+  sh,
+  httpGet,
+  readSetupToken,
+  requestFromLocalhost,
+  writeHostFile,
+} from './lib/shell.ts';
+import { totp } from './lib/totp.ts';
 
-const out = process.env.E2E_OUT ?? './out';
-const shots = `${out}/screenshots`;
-fs.rmSync(shots, { recursive: true, force: true });
-fs.mkdirSync(shots, { recursive: true });
+fs.rmSync(SHOTS, { recursive: true, force: true });
+fs.mkdirSync(SHOTS, { recursive: true });
 
-const container = process.env.E2E_CONTAINER ?? 'roastgate-e2e';
-const base = process.env.E2E_BASE ?? 'http://127.0.0.1:8199';
-const sh = (command: string) => {
-  try {
-    return execSync(
-      `docker exec ${container} sh -c ${JSON.stringify(command)}`,
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    ).trim();
-  } catch (e) {
-    // execSync throws an Error carrying the exit status and the output of the command.
-    const failure = e as {
-      status?: number;
-      stderr?: Buffer | string;
-      stdout?: Buffer | string;
-    };
-    return `ERR ${failure.status}: ${(failure.stderr || failure.stdout || '').toString().trim()}`;
-  }
-};
-const logs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
-const token = /setup token: (\w+)/.exec(logs)?.[1];
+const token = readSetupToken();
 if (!token)
   throw new Error(
-    `No setup token in the logs of ${container}: the scenario needs a fresh container.`,
+    `No setup token in the logs of ${CONTAINER}: the scenario needs a fresh container.`,
   );
-
-const results: { name: string; ok: boolean }[] = [];
-const problems: string[] = [];
-const check = (name: string, ok: boolean, detail = '') => {
-  results.push({ name, ok });
-  console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${name}${!ok && detail ? '\n        ' + detail : ''}`,
-  );
-};
 
 const browser = await chromium.launch({
-  channel: process.env.E2E_CHANNEL ?? 'msedge',
+  channel: CHANNEL,
   headless: true,
 });
 const page = await browser.newPage({ viewport: { width: 1300, height: 950 } });
-page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-const trace: string[] = [];
-const t0 = Date.now();
-page.on('console', (m) => {
-  trace.push(
-    `+${Date.now() - t0}ms console.${m.type()}: ${m.text().slice(0, 200)}`,
-  );
-  if (m.type() === 'error') problems.push('console: ' + m.text());
-});
-page.on('websocket', (ws) => {
-  trace.push(`+${Date.now() - t0}ms websocket open ${ws.url()}`);
-  ws.on('close', () => trace.push(`+${Date.now() - t0}ms websocket CLOSED`));
-});
-page.on('framenavigated', (f) => {
-  if (f === page.mainFrame())
-    trace.push(`+${Date.now() - t0}ms navigated ${f.url()}`);
-});
-page.on('requestfailed', (r) =>
-  trace.push(
-    `+${Date.now() - t0}ms request failed ${r.url()} ${r.failure()?.errorText}`,
-  ),
-);
 
-const shot = (name: string) =>
-  page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
-const body = async () => page.locator('body').innerText();
-// After the text shows up, give the Blazor circuit a moment to attach, the way a person reading the page would.
-// (A click within ~50 ms of the WebSocket opening can leave Blazor's URL and page out of step: a framework race.)
-const waitText = async (t: string, timeout = 10000) => {
-  await page.getByText(t, { exact: false }).first().waitFor({ timeout });
-  await page.waitForTimeout(700);
-};
-const button = (name: string) =>
-  page.getByRole('button', { name, exact: true });
-// Where an element is on the page; fails with its locator when it is not visible, instead of reading from null.
-const box = async (locator: Locator) => {
-  const found = await locator.boundingBox();
-  if (!found) throw new Error(`Not visible, so it has no position: ${locator}`);
-  return found;
-};
-// What an action reports: a success is a toast (MudBlazor snackbar), a failure stays inline (MudAlert) with nginx's output.
-const toasts = async () =>
-  (await page.locator('.mud-snackbar').allInnerTexts()).join('\n');
-const alerts = async () =>
-  (await page.locator('.mud-alert').allInnerTexts()).join('\n');
+watchPage(page);
 
-const waitMonaco = async (label: string) => {
-  try {
-    await page.waitForFunction(
-      () => window.monaco && window.monaco.editor.getModels().length > 0,
-      null,
-      {
-        timeout: 40000,
-      },
-    );
-  } catch (error) {
-    const state = await page.evaluate(() => ({
-      url: location.href,
-      monaco: typeof window.monaco,
-      models: window.monaco?.editor
-        ? window.monaco.editor.getModels().length
-        : null,
-      editorDom: document.querySelectorAll('.monaco-editor').length,
-      containers: document.querySelectorAll('.rg-editor').length,
-      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 300),
-    }));
-    console.log(`MONACO FAILED at ${label}:`, JSON.stringify(state));
-    console.log('TRACE (last 25):\n' + trace.slice(-25).join('\n'));
-    console.log('browser problems so far:', [...new Set(problems)].join(' | '));
-    await page.screenshot({
-      path: `${shots}/failure-${label.replace(/[^a-z0-9]+/gi, '_')}.png`,
-      fullPage: true,
-    });
-    throw error;
-  }
-};
-
-const setEditor = async (text: string) => {
-  await waitMonaco('setEditor');
-  await page.evaluate(
-    (value) => window.monaco.editor.getModels()[0].setValue(value),
-    text,
-  );
-};
-const getEditor = async () =>
-  page.evaluate(() => window.monaco.editor.getModels()[0].getValue());
-const openEditor = async (url: string) => {
-  await page.goto(`${base}${url}`);
-  await waitMonaco('openEditor ' + url);
-  await page.waitForTimeout(800); // language and theme are applied once the editor has initialised
-};
+const {
+  alerts,
+  body,
+  box,
+  button,
+  centerY,
+  expectSaved,
+  getEditor,
+  openEditor,
+  setEditor,
+  shot,
+  tab,
+  toasts,
+  waitField,
+  waitMonaco,
+  waitText,
+} = pageHelper(page);
 
 // ---- setup, through the real wizard ----
-await page.goto(`${base}/setup`);
+await page.goto(`${BASE}/setup`);
 await waitText('Step 1 of 5');
 await page.waitForTimeout(1500);
 await page.getByLabel('Setup token').fill(token);
@@ -196,7 +76,7 @@ await shot('00-diagnostics');
 await button('Continue').click();
 await waitText('Step 5 of 5');
 await button('Finish setup').click();
-await page.waitForURL(`${base}/`, { timeout: 20000 });
+await page.waitForURL(`${BASE}/`, { timeout: 20000 });
 await waitText('Dashboard');
 check('setup finished and signed in', true);
 
@@ -211,7 +91,7 @@ check('dashboard: Reload nginx reloads the real nginx', true);
 await shot('01a-dashboard');
 
 // ---- sites: the existing default site (absolute symlink) ----
-await page.goto(`${base}/sites`);
+await page.goto(`${BASE}/sites`);
 await waitText('default');
 const defaultSwitch = page.getByLabel('Enable default');
 check(
@@ -221,7 +101,7 @@ check(
 await shot('01-sites-existing');
 
 // ---- reverse proxy: create ----
-await page.goto(`${base}/reverse-proxies`);
+await page.goto(`${BASE}/reverse-proxies`);
 await waitText('No reverse proxy yet');
 await page.getByRole('link', { name: 'New from raw text' }).click();
 await page.waitForURL(/\/reverse-proxies\/edit$/);
@@ -288,7 +168,7 @@ check(
 await shot('04-refused');
 
 // ---- reverse proxy: disable and enable ----
-await page.goto(`${base}/reverse-proxies`);
+await page.goto(`${BASE}/reverse-proxies`);
 await waitText('app.example.com.conf');
 await page.getByLabel('Enable app.example.com.conf').click();
 await page.waitForTimeout(1500);
@@ -315,7 +195,7 @@ check(
 );
 
 // ---- site: create, enable (symlink), serve, delete ----
-await page.goto(`${base}/sites/edit`);
+await page.goto(`${BASE}/sites/edit`);
 await page.waitForFunction(
   () => window.monaco && window.monaco.editor.getModels().length > 0,
   null,
@@ -355,7 +235,7 @@ check(
   served.includes('hello from roastgate'),
   served,
 );
-await page.goto(`${base}/sites`);
+await page.goto(`${BASE}/sites`);
 await waitText('example.com');
 await page.getByLabel('Delete example.com').click();
 await button('Delete').click();
@@ -376,7 +256,7 @@ check(
 );
 
 // Deleting from the editor leaves the page: the toast must still say what happened once the list is shown.
-await page.goto(`${base}/sites/edit`);
+await page.goto(`${BASE}/sites/edit`);
 await waitMonaco('throwaway-site');
 await page.waitForTimeout(800);
 await page.getByLabel('File name').fill('throwaway.example.com');
@@ -390,7 +270,7 @@ await page
   .locator('.mud-dialog')
   .getByRole('button', { name: 'Delete', exact: true })
   .click();
-await page.waitForURL(`${base}/sites`);
+await page.waitForURL(`${BASE}/sites`);
 await waitText('Deleted.');
 check(
   'deleting from the editor goes back to the list with a toast naming the file',
@@ -399,11 +279,8 @@ check(
 );
 
 // ---- whitelists: the list editor, then a real nginx enforcing it ----
-const requestFromLocalhost = (port: number) =>
-  sh(
-    `bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`,
-  );
-await page.goto(`${base}/whitelists/edit`);
+
+await page.goto(`${BASE}/whitelists/edit`);
 await waitText('Allowed addresses');
 await page.getByLabel('Name', { exact: true }).fill('alice');
 await page.getByLabel('Address', { exact: true }).first().fill('203.0.113.7');
@@ -462,7 +339,7 @@ check(
 );
 
 // A proxy that includes it. It serves a static file on purpose: nginx runs "return" before allow/deny, which would hide the whitelist.
-await page.goto(`${base}/reverse-proxies/edit`);
+await page.goto(`${BASE}/reverse-proxies/edit`);
 await waitMonaco('private-proxy');
 await page.getByLabel('File name').fill('private.example.com');
 await setEditor(
@@ -476,7 +353,7 @@ check(
   requestFromLocalhost(8082),
 );
 
-await page.goto(`${base}/whitelists`);
+await page.goto(`${BASE}/whitelists`);
 await waitText('alice.conf');
 const listText = await body();
 check(
@@ -486,7 +363,7 @@ check(
 );
 await shot('07-whitelist-list');
 
-await page.goto(`${base}/whitelists/edit?name=alice.conf`);
+await page.goto(`${BASE}/whitelists/edit?name=alice.conf`);
 await waitText('Used by');
 check(
   'the editor lists the including file and links to it',
@@ -503,7 +380,7 @@ check(
 );
 
 // deletion is blocked while the whitelist is in use
-await page.goto(`${base}/whitelists`);
+await page.goto(`${BASE}/whitelists`);
 await waitText('alice.conf');
 await page.getByLabel('Delete alice.conf').click();
 await button('Delete').click();
@@ -523,7 +400,7 @@ check(
 sh(
   `printf 'allow 198.51.100.1;\\ndeny 198.51.100.2;\\n' > /etc/nginx/whitelists/mixed.conf`,
 );
-await page.goto(`${base}/whitelists/edit?name=mixed.conf`);
+await page.goto(`${BASE}/whitelists/edit?name=mixed.conf`);
 await waitText('more than a list');
 check(
   'a whitelist with other directives shows a warning instead of the list editor',
@@ -533,7 +410,7 @@ check(
   'the file on disk is untouched',
   sh('cat /etc/nginx/whitelists/mixed.conf').includes('deny 198.51.100.2;'),
 );
-await page.goto(`${base}/whitelists/raw?name=mixed.conf`);
+await page.goto(`${BASE}/whitelists/raw?name=mixed.conf`);
 await waitMonaco('whitelist-raw');
 check(
   'the raw editor opens it',
@@ -541,7 +418,7 @@ check(
 );
 
 // an unused whitelist can be deleted from the list
-await page.goto(`${base}/whitelists`);
+await page.goto(`${BASE}/whitelists`);
 await waitText('mixed.conf');
 await page.getByLabel('Delete mixed.conf').click();
 await button('Delete').click();
@@ -552,41 +429,10 @@ check(
 );
 
 // ---- the wizard, against a real nginx ----
-const httpGet = (port: number, host: string, path = '/') =>
-  sh(
-    `bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`,
-  );
-// Writes a file in the container with its real newlines (printf through two shells would keep the backslashes).
-const writeHostFile = (path: string, content: string) =>
-  sh(
-    `bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`,
-  );
-const tab = (name: string) => page.getByRole('tab', { name, exact: true });
-// Waits for the "Saved." message, and when the save failed shows why instead of just timing out.
-const expectSaved = async () => {
-  try {
-    await page
-      .getByText('Saved.', { exact: false })
-      .first()
-      .waitFor({ timeout: 10000 });
-  } catch (error) {
-    const alert = await page.locator('.mud-alert').allInnerTexts();
-    throw new Error(
-      'The save did not succeed. Alerts on the page: ' + JSON.stringify(alert),
-    );
-  }
-  await page.waitForTimeout(500);
-};
-
-// Waits for a form field by its label (the text of an outlined field also exists in a hidden legend).
-const waitField = async (label: string) => {
-  await page.getByLabel(label, { exact: true }).waitFor({ timeout: 10000 });
-  await page.waitForTimeout(700);
-};
 
 sh("sh -c 'echo hello from the static site > /var/www/html/index.html'");
 // A static site.
-await page.goto(`${base}/sites/wizard`);
+await page.goto(`${BASE}/sites/wizard`);
 await waitField('Root directory');
 await page.getByLabel('Domain names').fill('static.example.com');
 await page.getByLabel('Root directory').fill('/var/www/html');
@@ -602,7 +448,7 @@ check(
     siteFile.includes('listen 8091;'),
   siteFile.slice(0, 300),
 );
-await page.goto(`${base}/sites`);
+await page.goto(`${BASE}/sites`);
 await waitText('static.example.com');
 check('the list marks wizard sites', /wizard/i.test(await body()));
 await page.getByLabel('Enable static.example.com').click();
@@ -617,7 +463,7 @@ check(
 sh(
   "sh -c 'mkdir -p /var/www/files && echo listed > /var/www/files/listed-file.txt'",
 );
-await page.goto(`${base}/sites/wizard`);
+await page.goto(`${BASE}/sites/wizard`);
 await waitField('Root directory');
 await page.getByLabel('Domain names').fill('files.example.com');
 await page.getByLabel('Root directory').fill('/var/www/files');
@@ -636,7 +482,7 @@ check(
     filesSite.includes('fancyindex_default_sort name;'),
   filesSite.slice(0, 400),
 );
-await page.goto(`${base}/sites`);
+await page.goto(`${BASE}/sites`);
 await waitText('files.example.com');
 await page.getByLabel('Enable files.example.com').click();
 await page.waitForTimeout(1500);
@@ -646,14 +492,14 @@ check(
   listing.includes('200 OK') && listing.includes('listed-file.txt'),
   listing.slice(0, 300),
 );
-await page.goto(`${base}/sites/wizard?name=files.example.com`);
+await page.goto(`${BASE}/sites/wizard?name=files.example.com`);
 await waitField('Root directory');
 check(
   'reopening the site keeps the fancyindex option on',
   await page.getByRole('combobox', { name: 'Default sort' }).isVisible(),
 );
 // The image's fancyindex is Ubuntu's 0.5.2 package, which has no fancyindex_case_sensitive: the wizard asked nginx and
-// hides the option. If the base image changes, this build may have it and the check below must be revisited.
+// hides the option. If the BASE image changes, this build may have it and the check below must be revisited.
 check(
   'the case-sensitive sort is not offered by a fancyindex build without it',
   (await page.getByLabel('Case-sensitive sort').count()) === 0,
@@ -667,7 +513,7 @@ check(
 );
 
 // A reverse proxy in front of it, with the preview tab.
-await page.goto(`${base}/reverse-proxies/wizard`);
+await page.goto(`${BASE}/reverse-proxies/wizard`);
 await waitField('Forward to');
 await page.getByLabel('Domain names').fill('proxied.example.com');
 await page.getByLabel('Forward to').fill('not a url;');
@@ -706,7 +552,7 @@ check(
 );
 
 // Reopening it fills the form from the file, and a change regenerates it.
-await page.goto(`${base}/reverse-proxies/wizard?name=proxied.example.com.conf`);
+await page.goto(`${BASE}/reverse-proxies/wizard?name=proxied.example.com.conf`);
 await waitField('Forward to');
 check(
   'reopening the wizard restores the settings',
@@ -718,10 +564,6 @@ check(
 );
 await page.getByLabel('Timeout (seconds)').fill('90');
 // Layout: the WebSockets switch lines up with the timeout input, and the switches start where the inputs start.
-const centerY = async (locator: Locator) => {
-  const position = await box(locator);
-  return position.y + position.height / 2;
-};
 const switchY = await centerY(
   page.locator('.rg-switch-row .mud-switch').first(),
 );
@@ -770,13 +612,13 @@ check(
 
 // A hand edit is noticed.
 sh(`printf '# my own note\\n' >> /etc/nginx/conf.d/proxied.example.com.conf`);
-await page.goto(`${base}/reverse-proxies/wizard?name=proxied.example.com.conf`);
+await page.goto(`${BASE}/reverse-proxies/wizard?name=proxied.example.com.conf`);
 await waitText('edited by hand');
 check(
   'a hand edit is detected and the user is warned before it would be replaced',
   (await body()).includes('replaces those edits'),
 );
-await page.goto(`${base}/reverse-proxies`);
+await page.goto(`${BASE}/reverse-proxies`);
 await waitText('proxied.example.com.conf');
 check(
   'the list still opens an edited wizard file in the wizard',
@@ -788,7 +630,7 @@ check(
 );
 
 // A file the wizard did not create is read into the form, and the user is told that saving regenerates it.
-await page.goto(`${base}/reverse-proxies/wizard?name=app.example.com.conf`);
+await page.goto(`${BASE}/reverse-proxies/wizard?name=app.example.com.conf`);
 await waitText('not created by the wizard');
 check(
   'a hand-made file is imported and the user is told saving regenerates it',
@@ -859,7 +701,7 @@ server {
 }
 `,
 );
-await page.goto(`${base}/reverse-proxies/wizard?name=blocked.example.com.conf`);
+await page.goto(`${BASE}/reverse-proxies/wizard?name=blocked.example.com.conf`);
 await waitText('cannot be imported without changing what it does');
 check(
   'a file with an upstream block is refused with the reason',
@@ -871,7 +713,7 @@ check(
 sh(
   'openssl req -x509 -nodes -newkey rsa:2048 -keyout /etc/ssl/private/rg-e2e.key -out /etc/ssl/certs/rg-e2e.crt -subj /CN=secure.example.com -days 2',
 );
-await page.goto(`${base}/reverse-proxies/wizard`);
+await page.goto(`${BASE}/reverse-proxies/wizard`);
 await waitField('Forward to');
 await page.getByLabel('Domain names').fill('secure.example.com');
 await page.getByLabel('Forward to').fill('http://127.0.0.1:8091');
@@ -913,7 +755,7 @@ check(
 );
 
 // ---- certificates (against a stand-in for certbot: it cannot reach Let's Encrypt) ----
-await page.goto(`${base}/certificates`);
+await page.goto(`${BASE}/certificates`);
 await waitText('No certificate yet');
 check(
   'the page says certificates are handled by the embedded certbot',
@@ -954,7 +796,7 @@ check(
 await shot('09-certificates');
 
 // The wizard picks it from a list and fills in the paths.
-await page.goto(`${base}/reverse-proxies/wizard`);
+await page.goto(`${BASE}/reverse-proxies/wizard`);
 await waitField('Forward to');
 await page.getByLabel('Domain names').fill('lets.example.com');
 await page.getByLabel('Forward to').fill('http://127.0.0.1:8091');
@@ -988,7 +830,7 @@ check(
 );
 
 // A certificate that a config uses cannot be deleted.
-await page.goto(`${base}/certificates`);
+await page.goto(`${BASE}/certificates`);
 await waitText('lets.example.com.conf');
 check(
   'the list shows which config uses the certificate',
@@ -1011,7 +853,7 @@ check(
 sh(
   `openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout /etc/letsencrypt/live/lets.example.com/privkey.pem -out /etc/letsencrypt/live/lets.example.com/fullchain.pem -subj /CN=lets.example.com -addext subjectAltName=DNS:lets.example.com -days 5`,
 );
-await page.goto(`${base}/certificates`);
+await page.goto(`${BASE}/certificates`);
 await waitText('in 4 days');
 check(
   'a certificate close to expiry is shown with its few remaining days',
@@ -1053,7 +895,7 @@ await setEditor((await getEditor()) + '\n# second version');
 await button('Save').click();
 await expectSaved();
 await page.goto(
-  `${base}/backups?area=ReverseProxies&name=app.example.com.conf`,
+  `${BASE}/backups?area=ReverseProxies&name=app.example.com.conf`,
 );
 await waitText('Taken before');
 const showBox = await box(button('Show'));
@@ -1098,7 +940,7 @@ check(
 );
 
 // A deleted site comes back (it was deleted earlier in the scenario).
-await page.goto(`${base}/backups?area=Sites&name=example.com`);
+await page.goto(`${BASE}/backups?area=Sites&name=example.com`);
 await waitText('a deletion');
 await button('Compare').first().click();
 await waitText('does not exist any more');
@@ -1115,7 +957,7 @@ check(
 );
 
 // ---- settings ----
-await page.goto(`${base}/settings`);
+await page.goto(`${BASE}/settings`);
 await waitField('nginx directory');
 await page.getByLabel('nginx directory').fill('relative/path');
 await button('Save settings').click();
@@ -1130,14 +972,14 @@ check(
   (await toasts()).includes('Settings saved.') &&
     !(await alerts()).includes('Settings saved.'),
 );
-await page.goto(`${base}/certificates`);
+await page.goto(`${BASE}/certificates`);
 await waitField('Domain names');
 check(
   'saved settings are used elsewhere (the e-mail is pre-filled when getting a certificate)',
   (await page.getByLabel('E-mail for expiry notices').inputValue()) ===
     'ops@example.com',
 );
-await page.goto(`${base}/settings`);
+await page.goto(`${BASE}/settings`);
 await waitField('nginx directory');
 await button('Check the host with these values').click();
 await waitText('host access');
@@ -1152,11 +994,11 @@ const context2 = await browser.newContext({
   viewport: { width: 1300, height: 900 },
 });
 const page2 = await context2.newPage();
-await page2.goto(`${base}/login`);
+await page2.goto(`${BASE}/login`);
 await page2.getByLabel('Username').fill('admin');
 await page2.getByLabel('Password').fill('Correct-Horse-9');
 await page2.getByRole('button', { name: 'Sign in', exact: true }).click();
-await page2.waitForURL(`${base}/`);
+await page2.waitForURL(`${BASE}/`);
 
 await page.getByLabel('Current password').fill('definitely-not-it-1!');
 await page
@@ -1174,7 +1016,7 @@ check(
   'changing the password sends the user to the sign-in page with an explanation',
   (await body()).includes('Your password was changed'),
 );
-await page2.goto(`${base}/`);
+await page2.goto(`${BASE}/`);
 check(
   'the other browser, still open, is signed out as well',
   page2.url().includes('/login'),
@@ -1189,7 +1031,7 @@ await waitText('Invalid username or password.');
 check('the old password no longer works', true);
 await page.getByLabel('Password').fill('A-brand-new-Passw0rd');
 await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-await page.waitForURL(`${base}/`, { timeout: 10000 });
+await page.waitForURL(`${BASE}/`, { timeout: 10000 });
 check('the new password works', true);
 
 // ---- two-factor authentication ----
@@ -1204,13 +1046,13 @@ const newBrowserAtLogin = async () => {
     viewport: { width: 1300, height: 900 },
   });
   const fresh = await context.newPage();
-  await fresh.goto(`${base}/login`);
+  await fresh.goto(`${BASE}/login`);
   await fresh.getByLabel('Username').waitFor();
   await fresh.waitForTimeout(700);
   return { context, fresh };
 };
 const enableTwoFactor = async () => {
-  await page.goto(`${base}/settings`);
+  await page.goto(`${BASE}/settings`);
   await waitText('Two-factor authentication');
   await button('Set up two-factor authentication').click();
   await page.locator('.rg-qr svg').waitFor();
@@ -1227,7 +1069,7 @@ const enableTwoFactor = async () => {
   return { secret, recovery };
 };
 
-await page.goto(`${base}/settings`);
+await page.goto(`${BASE}/settings`);
 await waitText('Two-factor authentication');
 await button('Set up two-factor authentication').click();
 await page.locator('.rg-qr svg').waitFor();
@@ -1285,7 +1127,7 @@ await waitText('That code is not valid');
 check('a wrong code is refused', page.url().includes('/login'));
 await page.getByLabel('Authentication code').fill(totp(secret, 1));
 await button('Verify').click();
-await page.waitForURL(`${base}/`, { timeout: 15000 });
+await page.waitForURL(`${BASE}/`, { timeout: 15000 });
 check('the code computed independently signs in', true);
 
 // A recovery code works once.
@@ -1295,7 +1137,7 @@ await first.fresh
   .getByLabel('Authentication code')
   .fill(recovery[0].toUpperCase());
 await first.fresh.getByRole('button', { name: 'Verify', exact: true }).click();
-await first.fresh.waitForURL(`${base}/`, { timeout: 15000 });
+await first.fresh.waitForURL(`${BASE}/`, { timeout: 15000 });
 check('a recovery code signs in (case does not matter)', true);
 await first.context.close();
 const second = await newBrowserAtLogin();
@@ -1313,7 +1155,7 @@ check(
 await second.context.close();
 
 // New recovery codes replace the old ones.
-await page.goto(`${base}/settings`);
+await page.goto(`${BASE}/settings`);
 await waitText('Two-factor authentication is');
 await page.getByLabel('Code from the app', { exact: true }).fill(recovery[1]);
 const inputMiddle = await box(
@@ -1369,7 +1211,7 @@ await page.getByLabel('Password', { exact: true }).fill(NEW_PASSWORD);
 await button('Turn off two-factor authentication').click();
 await page.waitForURL(/\/login\?notice=two-factor-changed/, { timeout: 15000 });
 await typePasswordStep(page, NEW_PASSWORD);
-await page.waitForURL(`${base}/`, { timeout: 15000 });
+await page.waitForURL(`${BASE}/`, { timeout: 15000 });
 check('with two-factor off the password alone signs in again', true);
 
 // The way out when the phone is lost: the console command.
@@ -1388,13 +1230,13 @@ check(
   consoleOutput.includes('is off'),
   consoleOutput,
 );
-await page.goto(`${base}/login`);
+await page.goto(`${BASE}/login`);
 await typePasswordStep(page, NEW_PASSWORD);
-await page.waitForURL(`${base}/`, { timeout: 20000 });
+await page.waitForURL(`${BASE}/`, { timeout: 20000 });
 check('afterwards the password alone is enough', true);
 
 // ---- audit ----
-await page.goto(`${base}/audit-log`);
+await page.goto(`${BASE}/audit-log`);
 await waitText('config.save');
 const audit = await body();
 check(
@@ -1414,10 +1256,10 @@ check(
 await shot('05-audit');
 
 // ---- the account survives a restart of the container ----
-execSync(`docker restart ${container}`, { stdio: 'ignore' });
+execSync(`docker restart ${CONTAINER}`, { stdio: 'ignore' });
 for (let i = 0; i < 60; i += 1) {
   try {
-    if ((await fetch(`${base}/login`)).ok) {
+    if ((await fetch(`${BASE}/login`)).ok) {
       break;
     }
   } catch {
@@ -1425,14 +1267,14 @@ for (let i = 0; i < 60; i += 1) {
   }
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-const restartLogs = execSync(`docker logs ${container} 2>&1`, {
+const restartLogs = execSync(`docker logs ${CONTAINER} 2>&1`, {
   encoding: 'utf8',
 });
 check(
   'after a restart the existing database is reused',
   restartLogs.includes('Using the existing database'),
 );
-await page.goto(`${base}/`);
+await page.goto(`${BASE}/`);
 check(
   'after a restart the account and the session are still there (no setup)',
   !page.url().includes('/setup') && !page.url().includes('/login'),
@@ -1442,10 +1284,10 @@ check(
 await browser.close();
 console.log(
   '\nbrowser problems:',
-  problems.length ? '\n  ' + [...new Set(problems)].join('\n  ') : 'none',
+  PROBLEMS.length ? '\n  ' + [...new Set(PROBLEMS)].join('\n  ') : 'none',
 );
-const failed = results.filter((r) => !r.ok);
+const failed = RESULTS.filter((r) => !r.ok);
 console.log(
-  `\n${results.length - failed.length}/${results.length} checks passed`,
+  `\n${RESULTS.length - failed.length}/${RESULTS.length} checks passed`,
 );
 process.exit(failed.length ? 1 : 0);
