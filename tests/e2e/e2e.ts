@@ -1,12 +1,13 @@
 // End to end scenario: the real setup wizard, then every config feature against a REAL nginx running in the test container.
-// See README.md in this folder. Needs Docker, Node 20+ and an installed browser (Edge by default, see E2E_CHANNEL).
+// See README.md in this folder. Needs Docker, Node 22.18+ (it runs this TypeScript file as is) and an installed browser (Edge by default, see E2E_CHANNEL).
 import { chromium } from 'playwright-core';
+import type { Locator, Page } from 'playwright-core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 // RFC 6238 (HMAC-SHA1, 30 s steps, 6 digits), written here independently of the server, as an authenticator app would compute it.
-const base32Decode = (text) => {
+const base32Decode = (text: string) => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits = '';
   for (const character of text.replace(/[\s=-]/g, '').toUpperCase()) bits += alphabet.indexOf(character).toString(2).padStart(5, '0');
@@ -14,7 +15,7 @@ const base32Decode = (text) => {
   for (let index = 0; index + 8 <= bits.length; index += 8) bytes.push(parseInt(bits.slice(index, index + 8), 2));
   return Buffer.from(bytes);
 };
-const totp = (secret, stepOffset = 0) => {
+const totp = (secret: string, stepOffset = 0) => {
   const counter = Buffer.alloc(8);
   counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000) + stepOffset));
   const hash = crypto.createHmac('sha1', base32Decode(secret)).update(counter).digest();
@@ -30,42 +31,53 @@ fs.mkdirSync(shots, { recursive: true });
 
 const container = process.env.E2E_CONTAINER ?? 'roastgate-e2e';
 const base = process.env.E2E_BASE ?? 'http://127.0.0.1:8199';
-const sh = (command) => {
+const sh = (command: string) => {
   try { return execSync(`docker exec ${container} sh -c ${JSON.stringify(command)}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
-  catch (e) { return `ERR ${e.status}: ${(e.stderr || e.stdout || '').toString().trim()}`; }
+  catch (e) {
+    // execSync throws an Error carrying the exit status and the output of the command.
+    const failure = e as { status?: number; stderr?: Buffer | string; stdout?: Buffer | string };
+    return `ERR ${failure.status}: ${(failure.stderr || failure.stdout || '').toString().trim()}`;
+  }
 };
 const logs = execSync(`docker logs ${container} 2>&1`, { encoding: 'utf8' });
 const token = /setup token: (\w+)/.exec(logs)?.[1];
+if (!token) throw new Error(`No setup token in the logs of ${container}: the scenario needs a fresh container.`);
 
-const results = [];
-const problems = [];
-const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${!ok && detail ? '\n        ' + detail : ''}`); };
+const results: { name: string; ok: boolean }[] = [];
+const problems: string[] = [];
+const check = (name: string, ok: boolean, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${!ok && detail ? '\n        ' + detail : ''}`); };
 
 const browser = await chromium.launch({ channel: process.env.E2E_CHANNEL ?? 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1300, height: 950 } });
 page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-const trace = [];
+const trace: string[] = [];
 const t0 = Date.now();
 page.on('console', (m) => { trace.push(`+${Date.now() - t0}ms console.${m.type()}: ${m.text().slice(0, 200)}`); if (m.type() === 'error') problems.push('console: ' + m.text()); });
 page.on('websocket', (ws) => { trace.push(`+${Date.now() - t0}ms websocket open ${ws.url()}`); ws.on('close', () => trace.push(`+${Date.now() - t0}ms websocket CLOSED`)); });
 page.on('framenavigated', (f) => { if (f === page.mainFrame()) trace.push(`+${Date.now() - t0}ms navigated ${f.url()}`); });
 page.on('requestfailed', (r) => trace.push(`+${Date.now() - t0}ms request failed ${r.url()} ${r.failure()?.errorText}`));
 
-const shot = (name) => page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
+const shot = (name: string) => page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
 const body = async () => page.locator('body').innerText();
 // After the text shows up, give the Blazor circuit a moment to attach, the way a person reading the page would.
 // (A click within ~50 ms of the WebSocket opening can leave Blazor's URL and page out of step: a framework race.)
-const waitText = async (t, timeout = 10000) => {
+const waitText = async (t: string, timeout = 10000) => {
   await page.getByText(t, { exact: false }).first().waitFor({ timeout });
   await page.waitForTimeout(700);
 };
-const button = (name) => page.getByRole('button', { name, exact: true });
+const button = (name: string) => page.getByRole('button', { name, exact: true });
+// Where an element is on the page; fails with its locator when it is not visible, instead of reading from null.
+const box = async (locator: Locator) => {
+  const found = await locator.boundingBox();
+  if (!found) throw new Error(`Not visible, so it has no position: ${locator}`);
+  return found;
+};
 // What an action reports: a success is a toast (MudBlazor snackbar), a failure stays inline (MudAlert) with nginx's output.
 const toasts = async () => (await page.locator('.mud-snackbar').allInnerTexts()).join('\n');
 const alerts = async () => (await page.locator('.mud-alert').allInnerTexts()).join('\n');
 
 
-const waitMonaco = async (label) => {
+const waitMonaco = async (label: string) => {
   try {
     await page.waitForFunction(() => window.monaco && window.monaco.editor.getModels().length > 0, null, { timeout: 40000 });
   } catch (error) {
@@ -82,12 +94,12 @@ const waitMonaco = async (label) => {
   }
 };
 
-const setEditor = async (text) => {
+const setEditor = async (text: string) => {
   await waitMonaco('setEditor');
   await page.evaluate((value) => window.monaco.editor.getModels()[0].setValue(value), text);
 };
 const getEditor = async () => page.evaluate(() => window.monaco.editor.getModels()[0].getValue());
-const openEditor = async (url) => {
+const openEditor = async (url: string) => {
   await page.goto(`${base}${url}`);
   await waitMonaco('openEditor ' + url);
   await page.waitForTimeout(800); // language and theme are applied once the editor has initialised
@@ -218,7 +230,7 @@ await waitText('Deleted.');
 check('deleting from the editor goes back to the list with a toast naming the file', (await toasts()).includes('throwaway.example.com: Deleted.') && !sh('ls /etc/nginx/sites-available').includes('throwaway'));
 
 // ---- whitelists: the list editor, then a real nginx enforcing it ----
-const requestFromLocalhost = (port) => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`);
+const requestFromLocalhost = (port: number) => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET / HTTP/1.0\\r\\n\\r\\n" >&3; head -1 <&3'`);
 await page.goto(`${base}/whitelists/edit`);
 await waitText('Allowed addresses');
 await page.getByLabel('Name', { exact: true }).fill('alice');
@@ -298,10 +310,10 @@ await page.waitForTimeout(1500);
 check('an unused whitelist is deleted', !sh('ls /etc/nginx/whitelists').includes('mixed.conf'));
 
 // ---- the wizard, against a real nginx ----
-const httpGet = (port, host, path = '/') => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`);
+const httpGet = (port: number, host: string, path = '/') => sh(`bash -c 'exec 3<>/dev/tcp/127.0.0.1/${port}; printf "GET ${path} HTTP/1.0\\r\\nHost: ${host}\\r\\n\\r\\n" >&3; cat <&3'`);
 // Writes a file in the container with its real newlines (printf through two shells would keep the backslashes).
-const writeHostFile = (path, content) => sh(`bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`);
-const tab = (name) => page.getByRole('tab', { name, exact: true });
+const writeHostFile = (path: string, content: string) => sh(`bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d > ${path}'`);
+const tab = (name: string) => page.getByRole('tab', { name, exact: true });
 // Waits for the "Saved." message, and when the save failed shows why instead of just timing out.
 const expectSaved = async () => {
   try {
@@ -314,7 +326,7 @@ const expectSaved = async () => {
 };
 
 // Waits for a form field by its label (the text of an outlined field also exists in a hidden legend).
-const waitField = async (label) => {
+const waitField = async (label: string) => {
   await page.getByLabel(label, { exact: true }).waitFor({ timeout: 10000 });
   await page.waitForTimeout(700);
 };
@@ -395,16 +407,16 @@ await waitField('Forward to');
 check('reopening the wizard restores the settings', (await page.getByLabel('Forward to').inputValue()) === 'http://127.0.0.1:8091' && (await page.getByLabel('Domain names').inputValue()).includes('proxied.example.com'));
 await page.getByLabel('Timeout (seconds)').fill('90');
 // Layout: the WebSockets switch lines up with the timeout input, and the switches start where the inputs start.
-const centerY = async (locator) => { const box = await locator.boundingBox(); return box.y + box.height / 2; };
+const centerY = async (locator: Locator) => { const position = await box(locator); return position.y + position.height / 2; };
 const switchY = await centerY(page.locator('.rg-switch-row .mud-switch').first());
 const timeoutY = await centerY(page.locator('.rg-switch-row .mud-input-outlined').first());
 check('the WebSockets switch is vertically centred on the timeout input', Math.abs(switchY - timeoutY) <= 3, `${switchY} vs ${timeoutY}`);
 await tab('Advanced').click();
-const trackX = (await page.locator('.rg-switch-grid .mud-switch-track').first().boundingBox()).x;
-const portX = (await page.getByLabel('HTTP port').boundingBox()).x;
+const trackX = (await box(page.locator('.rg-switch-grid .mud-switch-track').first())).x;
+const portX = (await box(page.getByLabel('HTTP port'))).x;
 check('in Advanced the switches start at the same edge as the port inputs', Math.abs(trackX - portX) <= 3, `${trackX} vs ${portX}`);
-const httpsX = (await page.getByLabel('HTTPS port').boundingBox()).x;
-const secondTrackX = (await page.locator('.rg-switch-grid .mud-switch-track').nth(1).boundingBox()).x;
+const httpsX = (await box(page.getByLabel('HTTPS port'))).x;
+const secondTrackX = (await box(page.locator('.rg-switch-grid .mud-switch-track').nth(1))).x;
 check('the second switch column lines up with the HTTPS port input', Math.abs(secondTrackX - httpsX) <= 3, `${secondTrackX} vs ${httpsX}`);
 await tab('Essentials').click();
 check('the Domain names text area can be resized by the user', (await page.getByLabel('Domain names').evaluate((element) => getComputedStyle(element).resize)) === 'vertical');
@@ -419,7 +431,7 @@ await waitText('edited by hand');
 check('a hand edit is detected and the user is warned before it would be replaced', (await body()).includes('replaces those edits'));
 await page.goto(`${base}/reverse-proxies`);
 await waitText('proxied.example.com.conf');
-check('the list still opens an edited wizard file in the wizard', (await page.getByLabel('Edit proxied.example.com.conf', { exact: true }).getAttribute('href')).includes('/wizard'));
+check('the list still opens an edited wizard file in the wizard', ((await page.getByLabel('Edit proxied.example.com.conf', { exact: true }).getAttribute('href')) ?? '').includes('/wizard'));
 
 // A file the wizard did not create is read into the form, and the user is told that saving regenerates it.
 await page.goto(`${base}/reverse-proxies/wizard?name=app.example.com.conf`);
@@ -567,8 +579,8 @@ await button('Save').click();
 await expectSaved();
 await page.goto(`${base}/backups?area=ReverseProxies&name=app.example.com.conf`);
 await waitText('Taken before');
-const showBox = await button('Show').boundingBox();
-const fileInput = await page.locator('.mud-input-outlined').filter({ has: page.getByLabel('File name') }).boundingBox();
+const showBox = await box(button('Show'));
+const fileInput = await box(page.locator('.mud-input-outlined').filter({ has: page.getByLabel('File name') }));
 check('the Show button is centred on the filter inputs', Math.abs((showBox.y + showBox.height / 2) - (fileInput.y + fileInput.height / 2)) <= 3, `${showBox.y + showBox.height / 2} vs ${fileInput.y + fileInput.height / 2}`);
 check('the backups of a file are listed', /a change/i.test(await body()));
 await button('Compare').first().click();
@@ -653,7 +665,7 @@ check('the new password works', true);
 
 // ---- two-factor authentication ----
 const NEW_PASSWORD = 'A-brand-new-Passw0rd';
-const typePasswordStep = async (p, password) => {
+const typePasswordStep = async (p: Page, password: string) => {
   await p.getByLabel('Username').fill('admin');
   await p.getByLabel('Password', { exact: true }).fill(password);
   await p.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -734,8 +746,8 @@ await second.context.close();
 await page.goto(`${base}/settings`);
 await waitText('Two-factor authentication is');
 await page.getByLabel('Code from the app', { exact: true }).fill(recovery[1]);
-const inputMiddle = (await page.locator('.mud-input-outlined').filter({ has: page.getByLabel('Code from the app', { exact: true }) }).boundingBox());
-const buttonBox = await button('Get new recovery codes').boundingBox();
+const inputMiddle = await box(page.locator('.mud-input-outlined').filter({ has: page.getByLabel('Code from the app', { exact: true }) }));
+const buttonBox = await box(button('Get new recovery codes'));
 check('the recovery codes button is centred on its code input', Math.abs((inputMiddle.y + inputMiddle.height / 2) - (buttonBox.y + buttonBox.height / 2)) <= 3, `${inputMiddle.y + inputMiddle.height / 2} vs ${buttonBox.y + buttonBox.height / 2}`);
 await button('Get new recovery codes').click();
 await waitText('Save these recovery codes now');
