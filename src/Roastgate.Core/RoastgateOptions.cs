@@ -8,16 +8,19 @@ public sealed class RoastgateOptions
     public const string SetupTokenVariable = "ROASTGATE_SETUP_TOKEN";
     public const string SecureCookiesVariable = "ROASTGATE_SECURE_COOKIES";
     public const string TrustForwardedHeadersVariable = "ROASTGATE_TRUST_FORWARDED_HEADERS";
+    private const string GeoIpAutoUpdateVariable = "ROASTGATE_GEOIP_AUTO_UPDATE";
 
     /// <summary>Directory holding <c>roastgate.db</c>.</summary>
     public string DataDirectory { get; set; } = OperatingSystem.IsWindows()
         ? Path.Combine(AppContext.BaseDirectory, "data")
         : "/data";
-    
+
     /// <summary>
     /// Path pointing to dbip-city-lite.mmdb
     /// </summary>
     public string GeoIpDatabasePath => Path.Combine(DataDirectory, "dbip-city-lite.mmdb");
+
+    public bool AutoUpdateEnabled { get; set; } = IsTrue(Environment.GetEnvironmentVariable(GeoIpAutoUpdateVariable));
 
     public HostExecMode HostExecMode { get; set; } = OperatingSystem.IsWindows()
         ? HostExecMode.Direct

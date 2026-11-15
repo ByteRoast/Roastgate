@@ -1,3 +1,4 @@
+using AxiosNet.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -63,7 +64,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICertificateService, CertificateService>();
         services.AddSingleton<ICertificateRenewalJob, CertificateRenewalJob>();
         services.AddSingleton<HostDiagnostics>();
+
+        services.AddAxios(_ => { });
         services.AddSingleton<GeoLocator>();
+        services.AddSingleton<GeoIpUpdater>();
 
         return services;
     }
