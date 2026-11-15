@@ -6,42 +6,77 @@ namespace Roastgate.Core.GeoIP;
 
 public sealed class GeoLocator : IDisposable
 {
-    public bool IsAvailable => _reader is not null;
-
-    private readonly DatabaseReader? _reader;
+    public bool IsAvailable
+    {
+        get
+        {
+            lock (_lock) { return _reader is not null; }
+        }
+    }
+    
+    public DateTime? BuildDate
+    {
+        get
+        {
+            lock (_lock) { return _reader?.Metadata.BuildDate; }
+        }
+    }
+    
+    private readonly Lock _lock = new();
+    private readonly string _path;
+    private DatabaseReader? _reader;
 
     public GeoLocator(RoastgateOptions options)
     {
-        string path = options.GeoIpDatabasePath;
+        _path = options.GeoIpDatabasePath;
 
-        if (File.Exists(path))
+        if (File.Exists(_path))
         {
-            _reader = new DatabaseReader(path);
+            _reader = new DatabaseReader(_path);
         }
     }
 
     public IpLocation? Locate(IPAddress ipAddress)
     {
-        if (_reader == null)
+        lock (_lock)
         {
-            return null;
-        }
+            if (_reader == null)
+            {
+                return null;
+            }
 
-        if (!_reader.TryCity(ipAddress, out CityResponse? response))
+            if (!_reader.TryCity(ipAddress, out CityResponse? response))
+            {
+                return null;
+            }
+
+            return new IpLocation(
+                response.City.Name,
+                response.Country.Name,
+                response.Location.Latitude,
+                response.Location.Longitude
+            );
+        }
+    }
+
+    public void Replace(string newFilePath)
+    {
+        lock (_lock)
         {
-            return null;
-        }
+            _reader?.Dispose();
+            _reader = null;
 
-        return new IpLocation(
-            response.City.Name,
-            response.Country.Name,
-            response.Location.Latitude,
-            response.Location.Longitude
-        );
+            File.Move(newFilePath, _path, overwrite: true);
+
+            _reader = new DatabaseReader(_path);
+        }
     }
 
     public void Dispose()
     {
-        _reader?.Dispose();
+        lock (_lock)
+        {
+            _reader?.Dispose();
+        }
     }
 }
