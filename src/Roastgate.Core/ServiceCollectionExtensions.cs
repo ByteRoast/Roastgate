@@ -5,6 +5,7 @@ using Roastgate.Core.Certificates;
 using Roastgate.Core.Data;
 using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Data.Stores;
+using Roastgate.Core.GeoIP;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
@@ -62,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICertificateService, CertificateService>();
         services.AddSingleton<ICertificateRenewalJob, CertificateRenewalJob>();
         services.AddSingleton<HostDiagnostics>();
+        services.AddSingleton<GeoLocator>();
 
         return services;
     }

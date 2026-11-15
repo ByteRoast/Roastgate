@@ -13,6 +13,11 @@ public sealed class RoastgateOptions
     public string DataDirectory { get; set; } = OperatingSystem.IsWindows()
         ? Path.Combine(AppContext.BaseDirectory, "data")
         : "/data";
+    
+    /// <summary>
+    /// Path pointing to dbip-city-lite.mmdb
+    /// </summary>
+    public string GeoIpDatabasePath => Path.Combine(DataDirectory, "dbip-city-lite.mmdb");
 
     public HostExecMode HostExecMode { get; set; } = OperatingSystem.IsWindows()
         ? HostExecMode.Direct
