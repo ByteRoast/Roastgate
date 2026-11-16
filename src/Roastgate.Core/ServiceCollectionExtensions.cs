@@ -2,6 +2,7 @@ using AxiosNet.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Roastgate.Core.AccessLogs;
 using Roastgate.Core.Certificates;
 using Roastgate.Core.Data;
 using Roastgate.Core.Data.Interfaces;
@@ -68,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddAxios(_ => { });
         services.AddSingleton<GeoLocator>();
         services.AddSingleton<GeoIpUpdater>();
+        services.AddSingleton<AccessLogReader>();
 
         return services;
     }

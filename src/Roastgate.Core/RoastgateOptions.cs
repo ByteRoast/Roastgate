@@ -9,11 +9,15 @@ public sealed class RoastgateOptions
     public const string SecureCookiesVariable = "ROASTGATE_SECURE_COOKIES";
     public const string TrustForwardedHeadersVariable = "ROASTGATE_TRUST_FORWARDED_HEADERS";
     private const string GeoIpAutoUpdateVariable = "ROASTGATE_GEOIP_AUTO_UPDATE";
+    private const string NginxLogDirVariable = "ROASTGATE_NGINX_LOG_DIR";
 
     /// <summary>Directory holding <c>roastgate.db</c>.</summary>
     public string DataDirectory { get; set; } = OperatingSystem.IsWindows()
         ? Path.Combine(AppContext.BaseDirectory, "data")
         : "/data";
+
+    /// <summary>Directory holding nginx log files.</summary>
+    public string NginxLogDirectory { get; set; } = "/var/log/nginx";
 
     /// <summary>
     /// Path pointing to dbip-city-lite.mmdb
@@ -50,6 +54,13 @@ public sealed class RoastgateOptions
         if (!string.IsNullOrWhiteSpace(dataDirectory))
         {
             options.DataDirectory = dataDirectory;
+        }
+        
+        string? nginxLogDirectory = Environment.GetEnvironmentVariable(NginxLogDirVariable);
+
+        if (!string.IsNullOrWhiteSpace(nginxLogDirectory))
+        {
+            options.NginxLogDirectory = nginxLogDirectory;
         }
 
         string? hostExec = Environment.GetEnvironmentVariable(HostExecVariable);
