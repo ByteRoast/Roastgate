@@ -8,6 +8,8 @@
       "applicationUrl": "http://localhost:5009",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
+        "ROASTGATE_DATA_DIR": "../../data",
+        "ROASTGATE_GEOIP_AUTO_UPDATE": "true",
         "ROASTGATE_HOST_EXEC": "direct"
       }
     }
