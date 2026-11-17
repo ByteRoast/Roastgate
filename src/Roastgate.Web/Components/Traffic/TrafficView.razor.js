@@ -9,6 +9,7 @@ export async function init(container, svgUrl) {
     const world = svg.append("g");
     world.node().append(...svg.selectAll(":scope > path").nodes());
 
+    const countries = world.selectAll(":scope > path");
     const pointsLayer = world.append("g");
 
     let points = pointsLayer.selectAll("circle");
@@ -29,10 +30,47 @@ export async function init(container, svgUrl) {
 
     return {
         update(data) {
+            // Requests per country, from the data-country attribute of each path of world.svg.
+            const byCountry = d3.rollup(
+                data.filter(point => point.countryCode),
+                rows => ({ name: rows[0].country, requests: d3.sum(rows, row => row.requests) }),
+                point => point.countryCode,
+            );
+
+            const maxRequests = d3.max(byCountry.values(), country => country.requests) ?? 1;
+
+            // Logarithmic: one country with thousands of requests must not wash out all the others.
+            const shade = d3.scaleLog()
+                .domain([1, Math.max(maxRequests, 2)])
+                .range([0.2, 1])
+                .clamp(true);
+
+            // A transition needs a real color, not var(--mud-palette-primary).
+            const primary = getComputedStyle(container).getPropertyValue("--mud-palette-primary").trim();
+
+            countries
+                .transition()
+                .duration(400)
+                .style("fill", function () {
+                    return byCountry.has(this.dataset.country) ? primary : null;
+                })
+                .style("fill-opacity", function () {
+                    const country = byCountry.get(this.dataset.country);
+                    return country ? shade(country.requests) : null;
+                });
+
+            countries.selectAll("title")
+                .data(function () {
+                    const country = byCountry.get(this.dataset.country);
+                    return country ? [country] : [];
+                })
+                .join("title")
+                .text(country => `${country.name}: ${country.requests.toLocaleString()} requests`);
+            
             const located = data.filter(point => projection([point.longitude, point.latitude]));
             const max = d3.max(located, point => point.requests) ?? 1;
 
-            radius = point => 2 + 12 * Math.sqrt(point.requests / max);
+            radius = point => 1.5 + 6 * Math.sqrt(point.requests / max);
 
             points = pointsLayer
                 .selectAll("circle")

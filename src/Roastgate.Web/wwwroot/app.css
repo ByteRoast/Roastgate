@@ -585,9 +585,14 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 }
 
 .traffic-point {
-    fill: var(--mud-palette-primary);
-    fill-opacity: 0.6;
-    stroke: var(--mud-palette-primary);
+    fill: var(--mud-palette-text-primary);
+    fill-opacity: 0.7;
+    stroke: var(--mud-palette-surface);
+}
+
+.traffic-point:hover {
+    fill: var(--mud-palette-primary-darken);
+    fill-opacity: 1;
 }
 
 .traffic-map-frame {
