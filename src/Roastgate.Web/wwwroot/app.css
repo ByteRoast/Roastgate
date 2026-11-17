@@ -668,3 +668,35 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
         var(--mud-palette-primary)
     );
 }
+
+.traffic-tooltip {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 12px));
+    padding: 6px 10px;
+    border-radius: var(--mud-default-borderradius);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    box-shadow: var(--mud-elevation-4);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.traffic-tooltip--visible {
+    opacity: 1;
+}
+
+.traffic-tooltip-title {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: var(--mud-palette-text-primary);
+}
+
+.traffic-map path:hover {
+    stroke: var(--mud-palette-text-primary);
+    stroke-width: 1;
+}
