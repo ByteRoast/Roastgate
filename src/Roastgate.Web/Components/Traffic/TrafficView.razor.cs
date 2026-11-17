@@ -15,11 +15,14 @@ public partial class TrafficView : IAsyncDisposable
     private IJSObjectReference? _module;
     private IJSObjectReference? _worldMap;
     private bool _mapStarted;
+    private TimeSpan? _preset = TimeSpan.FromDays(1);
+    private DateTime? _customDate;
+    private CancellationTokenSource? _loading;
+    private bool _isLoading;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        _snapshot = await TrafficMap.BuildAsync(DateTimeOffset.UtcNow.AddDays(-1));
-        _points = [.. _snapshot.Points.OrderByDescending(point => point.Requests)];
+        return LoadAsync(DateTimeOffset.UtcNow.AddDays(-1));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -35,6 +38,68 @@ public partial class TrafficView : IAsyncDisposable
         _worldMap = await _module.InvokeAsync<IJSObjectReference>("init", _mapContainer, "maps/world.svg");
 
         await _worldMap.InvokeVoidAsync("update", _points);
+    }
+
+    private async Task OnPresetChangedAsync(TimeSpan? preset)
+    {
+        _preset = preset;
+        _customDate = null;
+
+        if (preset is { } period)
+        {
+            await LoadAsync(DateTimeOffset.UtcNow - period);
+        }
+    }
+
+    private async Task OnDateChangedAsync(DateTime? date)
+    {
+        _customDate = date;
+        _preset = null;
+
+        if (date is { } day)
+        {
+            // Midnight, server time (TZ of the container).
+            await LoadAsync(new DateTimeOffset(day.Date));
+        }
+    }
+
+    private async Task LoadAsync(DateTimeOffset since)
+    {
+        // A newer period wins: the previous load stops reading the logs.
+        if (_loading is not null)
+        {
+            await _loading.CancelAsync();
+        }
+
+        CancellationTokenSource loading = _loading = new CancellationTokenSource();
+
+        _isLoading = true;
+
+        try
+        {
+            TrafficSnapshot snapshot = await TrafficMap.BuildAsync(since, loading.Token);
+
+            loading.Token.ThrowIfCancellationRequested();
+
+            _snapshot = snapshot;
+            _points = [.. _snapshot.Points.OrderByDescending(point => point.Requests)];
+
+            if (_worldMap is not null)
+            {
+                await _worldMap.InvokeVoidAsync("update", loading.Token, _points);
+            }
+        }
+        catch (OperationCanceledException) when (loading.IsCancellationRequested)
+        {
+            // Replaced by a newer load: its result no longer matters.
+        }
+        finally
+        {
+            if (_loading == loading)
+            {
+                _isLoading = false;
+            }
+        }
     }
 
     private async Task ZoomByAsync(double factor)
@@ -57,8 +122,20 @@ public partial class TrafficView : IAsyncDisposable
     {
         try
         {
-            if (_worldMap is not null) await _worldMap.DisposeAsync();
-            if (_module is not null) await _module.DisposeAsync();
+            if (_loading is not null)
+            {
+                await _loading.CancelAsync();
+            }
+
+            if (_worldMap is not null)
+            {
+                await _worldMap.DisposeAsync();
+            }
+
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
         }
         catch (JSDisconnectedException)
         {

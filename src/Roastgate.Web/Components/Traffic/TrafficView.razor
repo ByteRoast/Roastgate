@@ -4,6 +4,42 @@
 }
 else
 {
+    <MudStack Row="true"
+              AlignItems="AlignItems.Center"
+              Wrap="Wrap.Wrap"
+              Spacing="2"
+              Class="mb-2">
+        <MudToggleGroup T="TimeSpan?"
+                        Value="_preset"
+                        ValueChanged="OnPresetChangedAsync"
+                        Size="Size.Small"
+                        Outlined="true">
+            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromHours(1))"
+                           Text="1 h"/>
+
+            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(1))"
+                           Text="24 h"/>
+
+            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(7))"
+                           Text="7 days"/>
+
+            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(30))"
+                           Text="30 days"/>
+        </MudToggleGroup>
+
+        <MudDatePicker Label="Since"
+                       Date="_customDate"
+                       DateChanged="OnDateChangedAsync"
+                       MaxDate="DateTime.Today"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"/>
+    </MudStack>
+    
+    @if (_isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+
     <div class="traffic-map-frame">
         <div class="traffic-map" @ref="_mapContainer"></div>
 
@@ -48,7 +84,7 @@ else
         </RowTemplate>
 
         <NoRecordsContent>
-            No traffic in the last 24 hours
+            No traffic for this period
         </NoRecordsContent>
     </MudTable>
 
