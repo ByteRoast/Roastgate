@@ -612,3 +612,12 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .traffic-map svg:active {
     cursor: grabbing;
 }
+
+.traffic-periods .mud-toggle-item {
+    text-transform: none;
+    padding-inline: 12px;
+}
+
+.traffic-since {
+    width: 180px;
+}

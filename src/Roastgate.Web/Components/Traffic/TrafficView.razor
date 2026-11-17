@@ -4,40 +4,49 @@
 }
 else
 {
-    <MudStack Row="true"
-              AlignItems="AlignItems.Center"
-              Wrap="Wrap.Wrap"
-              Spacing="2"
-              Class="mb-2">
-        <MudToggleGroup T="TimeSpan?"
-                        Value="_preset"
-                        ValueChanged="OnPresetChangedAsync"
-                        Size="Size.Small"
-                        Outlined="true">
-            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromHours(1))"
-                           Text="1 h"/>
+    <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4">Traffic</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                Where the requests come from, read from the nginx access logs.
+            </MudText>
+        </div>
 
-            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(1))"
-                           Text="24 h"/>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudToggleGroup T="TimeSpan?"
+                            Value="_preset"
+                            ValueChanged="OnPresetChangedAsync"
+                            Size="Size.Small"
+                            Outlined="true"
+                            Class="traffic-periods">
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromHours(1))"
+                               Text="1 h"/>
 
-            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(7))"
-                           Text="7 days"/>
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(1))"
+                               Text="24 h"/>
 
-            <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(30))"
-                           Text="30 days"/>
-        </MudToggleGroup>
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(7))"
+                               Text="7 days"/>
 
-        <MudDatePicker Label="Since"
-                       Date="_customDate"
-                       DateChanged="OnDateChangedAsync"
-                       MaxDate="DateTime.Today"
-                       Variant="Variant.Outlined"
-                       Margin="Margin.Dense"/>
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(30))"
+                               Text="30 days"/>
+            </MudToggleGroup>
+
+            <div class="traffic-since">
+                <MudDatePicker Label="Since"
+                               Date="_customDate"
+                               DateChanged="OnDateChangedAsync"
+                               MaxDate="DateTime.Today"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               PickerVariant="PickerVariant.Dialog"/>
+            </div>
+        </MudStack>
     </MudStack>
-    
+
     @if (_isLoading)
     {
-        <MudProgressLinear Indeterminate="true" />
+        <MudProgressLinear Indeterminate="true"/>
     }
 
     <div class="traffic-map-frame">
