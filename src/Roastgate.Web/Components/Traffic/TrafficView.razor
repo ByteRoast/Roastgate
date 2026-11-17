@@ -49,6 +49,69 @@ else
         <MudProgressLinear Indeterminate="true"/>
     }
 
+    <MudGrid Spacing="2"
+             Class="mb-4">
+        <MudItem xs="6"
+                 md="3">
+            <MudPaper Outlined="true"
+                      Class="pa-4">
+                <MudText Typo="Typo.caption"
+                         Class="mud-text-secondary">
+                    Requests
+                </MudText>
+
+                <MudText Typo="Typo.h5">
+                    @TotalRequests.ToString("N0")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="6"
+                 md="3">
+            <MudPaper Outlined="true"
+                      Class="pa-4">
+                <MudText Typo="Typo.caption"
+                         Class="mud-text-secondary">
+                    Addresses
+                </MudText>
+
+                <MudText Typo="Typo.h5">
+                    @TotalAddresses.ToString("N0")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="6"
+                 md="3">
+            <MudPaper Outlined="true"
+                      Class="pa-4">
+                <MudText Typo="Typo.caption"
+                         Class="mud-text-secondary">
+                    Countries
+                </MudText>
+
+                <MudText Typo="Typo.h5">
+                    @CountryCount
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="6"
+                 md="3">
+            <MudPaper Outlined="true"
+                      Class="pa-4">
+                <MudText Typo="Typo.caption"
+                         Class="mud-text-secondary">
+                    Unlocated requests
+                </MudText>
+
+                <MudText Typo="Typo.h5">
+                    @_snapshot.UnlocatedRequests.ToString("N0")
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
     <div class="traffic-map-frame">
         <div class="traffic-map" @ref="_mapContainer"></div>
 
@@ -96,8 +159,4 @@ else
             No traffic for this period
         </NoRecordsContent>
     </MudTable>
-
-    <MudText>
-        @_snapshot.UnlocatedRequests unlocated requests
-    </MudText>
 }

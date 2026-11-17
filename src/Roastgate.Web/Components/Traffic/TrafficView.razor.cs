@@ -9,6 +9,15 @@ public partial class TrafficView : IAsyncDisposable
     [Inject] private TrafficMap TrafficMap { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
 
+    private int TotalRequests => _points.Sum(point => point.Requests) + (_snapshot?.UnlocatedRequests ?? 0);
+    private int TotalAddresses => _points.Sum(point => point.Addresses);
+
+    private int CountryCount => _points
+        .Select(point => point.Country)
+        .Where(country => country is not null)
+        .Distinct()
+        .Count();
+
     private TrafficSnapshot? _snapshot;
     private IReadOnlyList<TrafficPoint> _points = [];
     private ElementReference _mapContainer;
