@@ -638,3 +638,9 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .traffic-content--busy {
     opacity: 0.5;
 }
+
+.traffic-flag {
+    margin-right: 6px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--mud-palette-lines-default);
+}
