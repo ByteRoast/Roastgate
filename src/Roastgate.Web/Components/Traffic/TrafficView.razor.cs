@@ -17,6 +17,8 @@ public partial class TrafficView : IAsyncDisposable
         .Where(country => country is not null)
         .Distinct()
         .Count();
+    
+    private IEnumerable<TrafficPoint> TopPlaces => _points.Take(10);
 
     private TrafficSnapshot? _snapshot;
     private IReadOnlyList<TrafficPoint> _points = [];

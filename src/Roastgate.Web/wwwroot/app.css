@@ -621,3 +621,7 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .traffic-since {
     width: 180px;
 }
+
+.traffic-place + .traffic-place {
+    margin-top: 16px;
+}

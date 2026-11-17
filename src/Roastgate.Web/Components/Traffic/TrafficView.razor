@@ -4,15 +4,25 @@
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.End" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
+    <MudStack Row="true" 
+              AlignItems="AlignItems.End"
+              Justify="Justify.SpaceBetween"
+              Wrap="Wrap.Wrap"
+              Class="mb-4">
         <div>
-            <MudText Typo="Typo.h4">Traffic</MudText>
-            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            <MudText Typo="Typo.h4">
+                Traffic
+            </MudText>
+            
+            <MudText Typo="Typo.body2"
+                     Class="mud-text-secondary">
                 Where the requests come from, read from the nginx access logs.
             </MudText>
         </div>
 
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudStack Row="true"
+                  AlignItems="AlignItems.Center"
+                  Spacing="2">
             <MudToggleGroup T="TimeSpan?"
                             Value="_preset"
                             ValueChanged="OnPresetChangedAsync"
@@ -49,7 +59,7 @@ else
         <MudProgressLinear Indeterminate="true"/>
     }
 
-    <MudGrid Spacing="2"
+    <MudGrid Spacing="3"
              Class="mb-4">
         <MudItem xs="6"
                  md="3">
@@ -110,35 +120,87 @@ else
                 </MudText>
             </MudPaper>
         </MudItem>
+        <MudItem xs="12" 
+                 lg="8">
+            <MudPaper Outlined="true"
+                      Class="pa-2">
+                <div class="traffic-map-frame">
+                    <div class="traffic-map"
+                         @ref="_mapContainer"></div>
+
+                    <div class="traffic-map-zoom">
+                        <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                       Size="Size.Small"
+                                       OnClick="() => ZoomByAsync(1.5)"
+                                       aria-label="Zoom in"/>
+
+                        <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                       Size="Size.Small"
+                                       OnClick="() => ZoomByAsync(1 / 1.5)"
+                                       aria-label="Zoom out"/>
+
+                        <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
+                                       Size="Size.Small"
+                                       OnClick="ResetZoomAsync"
+                                       aria-label="Reset zoom"/>
+                    </div>
+                </div>
+
+                <MudText Typo="Typo.caption" 
+                         Class="px-2">
+                    <MudLink Href="https://db-ip.com" 
+                             Target="_blank">
+                        IP Geolocation by DB-IP
+                    </MudLink>
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" 
+                 lg="4">
+            <MudPaper Outlined="true" 
+                      Class="pa-4" 
+                      Style="height: 100%">
+                <MudText Typo="Typo.subtitle1"
+                         Class="mb-3">
+                    Top places
+                </MudText>
+
+                @if (_points.Count == 0)
+                {
+                    <MudText Typo="Typo.body2"
+                             Class="mud-text-secondary">
+                        No traffic for this period.
+                    </MudText>
+                }
+
+                @foreach (TrafficPoint place in TopPlaces)
+                {
+                    <div class="traffic-place">
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">
+                                @(place.City ?? "Unknown city")
+
+                                @if (place.Country is not null)
+                                {
+                                    <span class="mud-text-secondary"> · @place.Country</span>
+                                }
+                            </MudText>
+
+                            <MudText Typo="Typo.body2">
+                                <b>@place.Requests.ToString("N0")</b>
+                            </MudText>
+                        </div>
+
+                        <MudProgressLinear Value="@(100.0 * place.Requests / _points[0].Requests)"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Rounded="true"/>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
     </MudGrid>
-
-    <div class="traffic-map-frame">
-        <div class="traffic-map" @ref="_mapContainer"></div>
-
-        <div class="traffic-map-zoom">
-            <MudIconButton Icon="@Icons.Material.Filled.Add"
-                           Size="Size.Small"
-                           OnClick="() => ZoomByAsync(1.5)"
-                           aria-label="Zoom in"/>
-
-            <MudIconButton Icon="@Icons.Material.Filled.Remove"
-                           Size="Size.Small"
-                           OnClick="() => ZoomByAsync(1 / 1.5)"
-                           aria-label="Zoom out"/>
-
-            <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
-                           Size="Size.Small"
-                           OnClick="ResetZoomAsync"
-                           aria-label="Reset zoom"/>
-        </div>
-    </div>
-
-    <MudText Typo="Typo.caption">
-        <MudLink Href="https://db-ip.com"
-                 Target="_blank">
-            IP Geolocation by DB-IP
-        </MudLink>
-    </MudText>
 
     <MudTable Items="_points">
         <HeaderContent>
