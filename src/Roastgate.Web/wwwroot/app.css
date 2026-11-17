@@ -649,3 +649,22 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     border-radius: 2px;
     box-shadow: 0 0 0 1px var(--mud-palette-lines-default);
 }
+
+.traffic-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.traffic-legend-scale {
+    width: 96px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--mud-palette-primary) 20%, transparent),
+        var(--mud-palette-primary)
+    );
+}
