@@ -5,6 +5,7 @@ public sealed record TrafficPoint(
     double Longitude,
     string? City,
     string? Country,
+    string? CountryCode,
     int Requests,
     int Addresses
 );

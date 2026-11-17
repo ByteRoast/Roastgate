@@ -40,11 +40,12 @@ public sealed class TrafficMap(AccessLogReader reader, GeoLocator geoLocator)
                     Requests = point.Requests + requests,
                     Addresses = point.Addresses + 1
                 }
-                : new TrafficPoint(
+                :  new TrafficPoint(
                     latitude,
                     longitude,
                     location.City,
                     location.Country,
+                    location.CountryCode,
                     requests,
                     1
                 );

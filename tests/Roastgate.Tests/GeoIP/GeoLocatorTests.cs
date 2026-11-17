@@ -67,6 +67,21 @@ public sealed class GeoLocatorTests : IDisposable
     }
 
     [Fact]
+    public void Locate_returns_the_iso_code_of_the_country()
+    {
+        Directory.CreateDirectory(_directory);
+        File.Copy(Fixture, _options.GeoIpDatabasePath);
+
+        using GeoLocator locator = new(_options);
+
+        IpLocation? location = locator.Locate(LondonAddress);
+
+        Assert.NotNull(location);
+        Assert.Equal("United Kingdom", location.Country);
+        Assert.Equal("GB", location.CountryCode);
+    }
+
+    [Fact]
     public void Locate_returns_null_for_an_address_missing_from_the_database()
     {
         Directory.CreateDirectory(_directory);

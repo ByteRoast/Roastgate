@@ -10,18 +10,24 @@ public sealed class GeoLocator : IDisposable
     {
         get
         {
-            lock (_lock) { return _reader is not null; }
+            lock (_lock)
+            {
+                return _reader is not null;
+            }
         }
     }
-    
+
     public DateTime? BuildDate
     {
         get
         {
-            lock (_lock) { return _reader?.Metadata.BuildDate; }
+            lock (_lock)
+            {
+                return _reader?.Metadata.BuildDate;
+            }
         }
     }
-    
+
     private readonly Lock _lock = new();
     private readonly string _path;
     private DatabaseReader? _reader;
@@ -53,6 +59,7 @@ public sealed class GeoLocator : IDisposable
             return new IpLocation(
                 response.City.Name,
                 response.Country.Name,
+                response.Country.IsoCode,
                 response.Location.Latitude,
                 response.Location.Longitude
             );

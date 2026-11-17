@@ -77,11 +77,13 @@ public sealed class TrafficMapTests : IDisposable
         Assert.Equal(2, london.Addresses);
         Assert.Equal(51.5142, london.Latitude);
         Assert.Equal(-0.0931, london.Longitude);
+        Assert.Equal("GB", london.CountryCode);
 
         TrafficPoint milton = Assert.Single(snapshot.Points, point => point.City == "Milton");
 
         Assert.Equal(1, milton.Requests);
         Assert.Equal(1, milton.Addresses);
+        Assert.Equal("US", milton.CountryCode);
     }
 
     [Fact]
