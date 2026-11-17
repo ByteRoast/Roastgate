@@ -571,3 +571,20 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
         opacity: 1;
     }
 }
+
+.traffic-map svg {
+    width: 100%;
+    height: auto;
+}
+
+.traffic-map path {
+    fill: var(--mud-palette-lines-default);
+    stroke: var(--mud-palette-background);
+    stroke-width: 0.5;
+}
+
+.traffic-point {
+    fill: var(--mud-palette-primary);
+    fill-opacity: 0.6;
+    stroke: var(--mud-palette-primary);
+}

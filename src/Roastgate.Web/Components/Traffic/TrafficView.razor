@@ -1,0 +1,34 @@
+@if (_snapshot == null)
+{
+    <MudProgressLinear Indeterminate="true"/>
+}
+else
+{
+    <div class="traffic-map"
+         @ref="_map">
+    </div>
+    
+    <MudTable Items="_points">
+        <HeaderContent>
+            <MudTh>City</MudTh>
+            <MudTh>Country</MudTh>
+            <MudTh>Requests</MudTh>
+            <MudTh>Addresses</MudTh>
+        </HeaderContent>
+
+        <RowTemplate>
+            <MudTd>@context.City</MudTd>
+            <MudTd>@context.Country</MudTd>
+            <MudTd>@context.Requests</MudTd>
+            <MudTd>@context.Addresses</MudTd>
+        </RowTemplate>
+
+        <NoRecordsContent>
+            No traffic in the last 24 hours
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudText>
+        @_snapshot.UnlocatedRequests unlocated requests
+    </MudText>
+}
