@@ -625,3 +625,16 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
 .traffic-place + .traffic-place {
     margin-top: 16px;
 }
+
+.traffic-loading {
+    height: 4px;
+    margin-bottom: 8px;
+}
+
+.traffic-content {
+    transition: opacity 200ms ease;
+}
+
+.traffic-content--busy {
+    opacity: 0.5;
+}
