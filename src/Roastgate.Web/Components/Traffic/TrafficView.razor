@@ -202,23 +202,59 @@ else
         </MudItem>
     </MudGrid>
 
-    <MudTable Items="_points">
+    <MudTable T="TrafficPoint"
+              Items="_points"
+              Hover="true"
+              Dense="true"
+              Outlined="true"
+              Elevation="0"
+              Breakpoint="Breakpoint.Sm"
+              RowsPerPage="10">
+        <ToolBarContent>
+            <MudText Typo="Typo.subtitle1">
+                All places
+            </MudText>
+        </ToolBarContent>
+
         <HeaderContent>
             <MudTh>City</MudTh>
             <MudTh>Country</MudTh>
-            <MudTh>Requests</MudTh>
-            <MudTh>Addresses</MudTh>
+            
+            <MudTh Style="text-align: right">
+                Requests
+            </MudTh>
+            
+            <MudTh Style="text-align: right">
+                Addresses
+            </MudTh>
         </HeaderContent>
 
         <RowTemplate>
-            <MudTd>@context.City</MudTd>
-            <MudTd>@context.Country</MudTd>
-            <MudTd>@context.Requests</MudTd>
-            <MudTd>@context.Addresses</MudTd>
+            <MudTd DataLabel="City">
+                @(context.City ?? "Unknown city")
+            </MudTd>
+            
+            <MudTd DataLabel="Country">
+                @context.Country
+            </MudTd>
+            
+            <MudTd DataLabel="Requests"
+                   Style="text-align: right">
+                @context.Requests.ToString("N0")
+            </MudTd>
+            
+            <MudTd DataLabel="Addresses"
+                   Style="text-align: right">
+                @context.Addresses.ToString("N0")
+            </MudTd>
         </RowTemplate>
 
         <NoRecordsContent>
-            No traffic for this period
+            No traffic for this period.
         </NoRecordsContent>
+
+        <PagerContent>
+            <MudTablePager PageSizeOptions="[10, 25, 50, 100, int.MaxValue]"/>
+        </PagerContent>
     </MudTable>
 }
