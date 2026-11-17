@@ -581,10 +581,34 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     fill: var(--mud-palette-lines-default);
     stroke: var(--mud-palette-background);
     stroke-width: 0.5;
+    vector-effect: non-scaling-stroke;
 }
 
 .traffic-point {
     fill: var(--mud-palette-primary);
     fill-opacity: 0.6;
     stroke: var(--mud-palette-primary);
+}
+
+.traffic-map-frame {
+    position: relative;
+}
+
+.traffic-map-zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    background: var(--mud-palette-surface);
+    border-radius: var(--mud-default-borderradius);
+    box-shadow: var(--mud-elevation-1);
+}
+
+.traffic-map svg {
+    cursor: grab;
+}
+
+.traffic-map svg:active {
+    cursor: grabbing;
 }

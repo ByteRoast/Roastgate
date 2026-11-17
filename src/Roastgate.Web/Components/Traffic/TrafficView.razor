@@ -4,8 +4,25 @@
 }
 else
 {
-    <div class="traffic-map"
-         @ref="_map">
+    <div class="traffic-map-frame">
+        <div class="traffic-map" @ref="_mapContainer"></div>
+
+        <div class="traffic-map-zoom">
+            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                           Size="Size.Small"
+                           OnClick="() => ZoomByAsync(1.5)"
+                           aria-label="Zoom in"/>
+
+            <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                           Size="Size.Small"
+                           OnClick="() => ZoomByAsync(1 / 1.5)"
+                           aria-label="Zoom out"/>
+
+            <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
+                           Size="Size.Small"
+                           OnClick="ResetZoomAsync"
+                           aria-label="Reset zoom"/>
+        </div>
     </div>
 
     <MudText Typo="Typo.caption">

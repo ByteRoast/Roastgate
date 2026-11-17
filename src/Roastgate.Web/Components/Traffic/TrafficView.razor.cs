@@ -4,15 +4,17 @@ using Roastgate.Core.AccessLogs;
 
 namespace Roastgate.Web.Components.Traffic;
 
-public partial class TrafficView
+public partial class TrafficView : IAsyncDisposable
 {
     [Inject] private TrafficMap TrafficMap { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
 
     private TrafficSnapshot? _snapshot;
     private IReadOnlyList<TrafficPoint> _points = [];
-    private ElementReference _map;
-    private bool _mapDrawn;
+    private ElementReference _mapContainer;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _worldMap;
+    private bool _mapStarted;
 
     protected override async Task OnInitializedAsync()
     {
@@ -22,18 +24,45 @@ public partial class TrafficView
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_snapshot is null || _mapDrawn)
+        if (_snapshot is null || _mapStarted)
         {
             return;
         }
 
-        _mapDrawn = true;
+        _mapStarted = true;
 
-        await using IJSObjectReference module = await JS.InvokeAsync<IJSObjectReference>(
-            "import",
-            "./Components/Traffic/TrafficView.razor.js"
-        );
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/Traffic/TrafficView.razor.js");
+        _worldMap = await _module.InvokeAsync<IJSObjectReference>("init", _mapContainer, "maps/world.svg");
 
-        await module.InvokeVoidAsync("render", _map, "maps/world.svg", _points);
+        await _worldMap.InvokeVoidAsync("update", _points);
+    }
+
+    private async Task ZoomByAsync(double factor)
+    {
+        if (_worldMap is not null)
+        {
+            await _worldMap.InvokeVoidAsync("zoomBy", factor);
+        }
+    }
+
+    private async Task ResetZoomAsync()
+    {
+        if (_worldMap is not null)
+        {
+            await _worldMap.InvokeVoidAsync("reset");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_worldMap is not null) await _worldMap.DisposeAsync();
+            if (_module is not null) await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser is already gone: there is nothing left to free.
+        }
     }
 }
