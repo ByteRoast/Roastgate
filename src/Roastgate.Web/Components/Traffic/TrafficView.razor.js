@@ -75,12 +75,28 @@ export async function init(container, svgUrl) {
 
     svg.call(zoom);
 
+    // Wired here and not through Blazor: the browser only allows full screen right after a click,
+    // and the round trip to the server could arrive too late.
+    const frame = container.closest(".traffic-map-frame");
+
+    for (const button of frame.querySelectorAll(".traffic-fullscreen")) {
+        if (!document.fullscreenEnabled) {
+            // Safari on iPhone only allows videos in full screen.
+            button.style.display = "none";
+            continue;
+        }
+
+        button.addEventListener("click", () => document.fullscreenElement
+            ? document.exitFullscreen()
+            : frame.requestFullscreen());
+    }
+
     return {
         update(data) {
             // Requests per country, from the data-country attribute of each path of world.svg.
             byCountry = d3.rollup(
                 data.filter(point => point.countryCode),
-                rows => ({ name: rows[0].country, requests: d3.sum(rows, row => row.requests) }),
+                rows => ({name: rows[0].country, requests: d3.sum(rows, row => row.requests)}),
                 point => point.countryCode,
             );
 
@@ -105,7 +121,7 @@ export async function init(container, svgUrl) {
                     const country = byCountry.get(this.dataset.country);
                     return country ? shade(country.requests) : null;
                 });
-            
+
             const located = data.filter(point => projection([point.longitude, point.latitude]));
             const max = d3.max(located, point => point.requests) ?? 1;
 

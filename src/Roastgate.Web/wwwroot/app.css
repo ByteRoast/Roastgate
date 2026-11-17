@@ -700,3 +700,22 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     stroke: var(--mud-palette-text-primary);
     stroke-width: 1;
 }
+
+.traffic-map-frame:fullscreen {
+    display: flex;
+    align-items: center;
+    background: var(--mud-palette-surface);
+}
+
+.traffic-map-frame:fullscreen .traffic-map {
+    width: 100%;
+}
+
+.traffic-map-frame:fullscreen svg {
+    max-height: 100vh;
+}
+
+.traffic-map-frame:fullscreen .traffic-fullscreen-enter,
+.traffic-map-frame:not(:fullscreen) .traffic-fullscreen-exit {
+    display: none;
+}
