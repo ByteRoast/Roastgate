@@ -70,6 +70,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GeoLocator>();
         services.AddSingleton<GeoIpUpdater>();
         services.AddSingleton<AccessLogReader>();
+        services.AddSingleton<TrafficMap>();
 
         return services;
     }
