@@ -18,6 +18,9 @@
           href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
 
     <link rel="stylesheet"
+          href="@Assets["lib/flag-icons/css/flag-icons.min.css"]" />
+    
+    <link rel="stylesheet"
           href="@Assets["app.css"]" />
 
     <ImportMap />
@@ -30,10 +33,12 @@
 
     <ReconnectModal />
 
+    @* Before Monaco's loader.js: once its AMD `define` exists, the d3 UMD bundles register with it instead of creating
+       window.d3. *@
+    <script src="@Assets["lib/d3/d3.min.js"]"></script>
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
-    
     <script src="@Assets["js/nginx-language.js"]"></script>
     <script src="@Assets["js/roastgate.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>

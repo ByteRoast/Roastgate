@@ -1,10 +1,13 @@
+using AxiosNet.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Roastgate.Core.AccessLogs;
 using Roastgate.Core.Certificates;
 using Roastgate.Core.Data;
 using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Data.Stores;
+using Roastgate.Core.GeoIP;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
 using Roastgate.Core.Nginx.Generation;
@@ -62,6 +65,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICertificateService, CertificateService>();
         services.AddSingleton<ICertificateRenewalJob, CertificateRenewalJob>();
         services.AddSingleton<HostDiagnostics>();
+
+        services.AddAxios(_ => { });
+        services.AddSingleton<GeoLocator>();
+        services.AddSingleton<GeoIpUpdater>();
+        services.AddSingleton<AccessLogReader>();
+        services.AddSingleton<TrafficMap>();
 
         return services;
     }

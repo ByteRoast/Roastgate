@@ -1,0 +1,285 @@
+@if (_snapshot == null)
+{
+    <MudProgressLinear Indeterminate="true"/>
+}
+else
+{
+    <MudStack Row="true"
+              AlignItems="AlignItems.End"
+              Justify="Justify.SpaceBetween"
+              Wrap="Wrap.Wrap"
+              Class="mb-4">
+        <div>
+            <MudText Typo="Typo.h4">
+                Traffic
+            </MudText>
+
+            <MudText Typo="Typo.body2"
+                     Class="mud-text-secondary">
+                Where the requests come from, read from the nginx access logs.
+            </MudText>
+        </div>
+
+        <MudStack Row="true"
+                  AlignItems="AlignItems.Center"
+                  Spacing="2">
+            <MudToggleGroup T="TimeSpan?"
+                            Value="_preset"
+                            ValueChanged="OnPresetChangedAsync"
+                            Size="Size.Small"
+                            Outlined="true"
+                            Class="traffic-periods">
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromHours(1))"
+                               Text="1 h"/>
+
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(1))"
+                               Text="24 h"/>
+
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(7))"
+                               Text="7 days"/>
+
+                <MudToggleItem Value="@((TimeSpan?)TimeSpan.FromDays(30))"
+                               Text="30 days"/>
+            </MudToggleGroup>
+
+            <div class="traffic-since">
+                <MudDatePicker Label="Since"
+                               Date="_customDate"
+                               DateChanged="OnDateChangedAsync"
+                               MaxDate="DateTime.Today"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               PickerVariant="PickerVariant.Dialog"/>
+            </div>
+        </MudStack>
+    </MudStack>
+
+    <div class="traffic-loading">
+        @if (_isLoading)
+        {
+            <MudProgressLinear Indeterminate="true"/>
+        }
+    </div>
+
+    <div class="@(_isLoading ? "traffic-content traffic-content--busy" : "traffic-content")">
+        <MudGrid Spacing="3"
+                 Class="mb-4">
+            <MudItem xs="6"
+                     md="3">
+                <MudPaper Outlined="true"
+                          Class="pa-4">
+                    <MudText Typo="Typo.caption"
+                             Class="mud-text-secondary">
+                        Requests
+                    </MudText>
+
+                    <MudText Typo="Typo.h5">
+                        @TotalRequests.ToString("N0")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="6"
+                     md="3">
+                <MudPaper Outlined="true"
+                          Class="pa-4">
+                    <MudText Typo="Typo.caption"
+                             Class="mud-text-secondary">
+                        Addresses
+                    </MudText>
+
+                    <MudText Typo="Typo.h5">
+                        @TotalAddresses.ToString("N0")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="6"
+                     md="3">
+                <MudPaper Outlined="true"
+                          Class="pa-4">
+                    <MudText Typo="Typo.caption"
+                             Class="mud-text-secondary">
+                        Countries
+                    </MudText>
+
+                    <MudText Typo="Typo.h5">
+                        @CountryCount
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="6"
+                     md="3">
+                <MudPaper Outlined="true"
+                          Class="pa-4">
+                    <MudText Typo="Typo.caption"
+                             Class="mud-text-secondary">
+                        Unlocated requests
+                    </MudText>
+
+                    <MudText Typo="Typo.h5">
+                        @_snapshot.UnlocatedRequests.ToString("N0")
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12"
+                     lg="8">
+                <MudPaper Outlined="true"
+                          Class="pa-2">
+                    <div class="traffic-map-frame">
+                        <div class="traffic-map"
+                             @ref="_mapContainer"></div>
+
+                        <div class="traffic-map-zoom">
+                            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                           Size="Size.Small"
+                                           OnClick="() => ZoomByAsync(1.5)"
+                                           aria-label="Zoom in"/>
+
+                            <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                           Size="Size.Small"
+                                           OnClick="() => ZoomByAsync(1 / 1.5)"
+                                           aria-label="Zoom out"/>
+
+                            <MudIconButton Icon="@Icons.Material.Filled.CenterFocusStrong"
+                                           Size="Size.Small"
+                                           OnClick="ResetZoomAsync"
+                                           aria-label="Reset zoom"/>
+                            
+                            <MudIconButton Icon="@Icons.Material.Filled.Fullscreen"
+                                           Size="Size.Small"
+                                           Class="traffic-fullscreen traffic-fullscreen-enter"
+                                           aria-label="Full screen"/>
+
+                            <MudIconButton Icon="@Icons.Material.Filled.FullscreenExit"
+                                           Size="Size.Small"
+                                           Class="traffic-fullscreen traffic-fullscreen-exit"
+                                           aria-label="Exit full screen"/>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-space-between align-center px-2">
+                        <MudText Typo="Typo.caption">
+                            <MudLink Href="https://db-ip.com"
+                                     Target="_blank">
+                                IP Geolocation by DB-IP
+                            </MudLink>
+                        </MudText>
+
+                        <div class="traffic-legend">
+                            <span>Fewer</span>
+                            <span class="traffic-legend-scale"></span>
+                            <span>More requests</span>
+                        </div>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12"
+                     lg="4">
+                <MudPaper Outlined="true"
+                          Class="pa-4"
+                          Style="height: 100%">
+                    <MudText Typo="Typo.subtitle1"
+                             Class="mb-3">
+                        Top places
+                    </MudText>
+
+                    @if (_points.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2"
+                                 Class="mud-text-secondary">
+                            No traffic for this period.
+                        </MudText>
+                    }
+
+                    @foreach (TrafficPoint place in TopPlaces)
+                    {
+                        <div class="traffic-place">
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2">
+                                    <CountryFlag Code="@place.CountryCode"/>
+
+                                    @(place.City ?? "Unknown city")
+
+                                    @if (place.Country is not null)
+                                    {
+                                        <span class="mud-text-secondary"> · @place.Country</span>
+                                    }
+                                </MudText>
+
+                                <MudText Typo="Typo.body2">
+                                    <b>@place.Requests.ToString("N0")</b>
+                                </MudText>
+                            </div>
+
+                            <MudProgressLinear Value="@(100.0 * place.Requests / _points[0].Requests)"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               Rounded="true"/>
+                        </div>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudTable T="TrafficPoint"
+                  Items="_points"
+                  Hover="true"
+                  Dense="true"
+                  Outlined="true"
+                  Elevation="0"
+                  Breakpoint="Breakpoint.Sm"
+                  RowsPerPage="10">
+            <ToolBarContent>
+                <MudText Typo="Typo.subtitle1">
+                    All places
+                </MudText>
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTh>City</MudTh>
+                <MudTh>Country</MudTh>
+
+                <MudTh Style="text-align: right">
+                    Requests
+                </MudTh>
+
+                <MudTh Style="text-align: right">
+                    Addresses
+                </MudTh>
+            </HeaderContent>
+
+            <RowTemplate>
+                <MudTd DataLabel="City">
+                    @(context.City ?? "Unknown city")
+                </MudTd>
+
+                <MudTd DataLabel="Country">
+                    <CountryFlag Code="@context.CountryCode"/>
+
+                    @context.Country
+                </MudTd>
+
+                <MudTd DataLabel="Requests"
+                       Style="text-align: right">
+                    @context.Requests.ToString("N0")
+                </MudTd>
+
+                <MudTd DataLabel="Addresses"
+                       Style="text-align: right">
+                    @context.Addresses.ToString("N0")
+                </MudTd>
+            </RowTemplate>
+
+            <NoRecordsContent>
+                No traffic for this period.
+            </NoRecordsContent>
+
+            <PagerContent>
+                <MudTablePager PageSizeOptions="[10, 25, 50, 100, int.MaxValue]"/>
+            </PagerContent>
+        </MudTable>
+    </div>
+}

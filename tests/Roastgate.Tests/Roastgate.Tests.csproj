@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="GeoIP\Fixtures\*.mmdb" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Roastgate.Core\Roastgate.Core.csproj" />
     <ProjectReference Include="..\..\src\Roastgate.Web\Roastgate.Web.csproj" />
   </ItemGroup>
