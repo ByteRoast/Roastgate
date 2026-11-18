@@ -14,6 +14,7 @@ public partial class CertificatesView
     [Inject] private AppSettingsService SettingsService { get; set; } = null!;
     [Inject] private CurrentUser User { get; set; } = null!;
     [Inject] private IDialogService Dialogs { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     private CertificateListing? _listing;
     private RenewalStatus? _status;
@@ -71,7 +72,13 @@ public partial class CertificatesView
 
     private void Show(CertificateOperation operation)
     {
-        _outputFailed = !operation.Succeeded;
+        if (operation.Succeeded)
+        {
+            Snackbar.Add(operation.Message, Severity.Success);
+            return;
+        }
+
+        _outputFailed = true;
         _outputMessage = operation.Message;
         _output = operation.Output ?? string.Empty;
     }

@@ -571,3 +571,151 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
         opacity: 1;
     }
 }
+
+.traffic-map svg {
+    width: 100%;
+    height: auto;
+}
+
+.traffic-map path {
+    fill: var(--mud-palette-lines-default);
+    stroke: var(--mud-palette-background);
+    stroke-width: 0.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.traffic-point {
+    fill: var(--mud-palette-text-primary);
+    fill-opacity: 0.7;
+    stroke: var(--mud-palette-surface);
+}
+
+.traffic-point:hover {
+    fill: var(--mud-palette-primary-darken);
+    fill-opacity: 1;
+}
+
+.traffic-map-frame {
+    position: relative;
+}
+
+.traffic-map-zoom {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: column;
+    background: var(--mud-palette-surface);
+    border-radius: var(--mud-default-borderradius);
+    box-shadow: var(--mud-elevation-1);
+}
+
+.traffic-map svg {
+    cursor: grab;
+}
+
+.traffic-map svg:active {
+    cursor: grabbing;
+}
+
+.traffic-periods .mud-toggle-item {
+    text-transform: none;
+    padding-inline: 12px;
+}
+
+.traffic-since {
+    width: 180px;
+}
+
+.traffic-place + .traffic-place {
+    margin-top: 16px;
+}
+
+.traffic-loading {
+    height: 4px;
+    margin-bottom: 8px;
+}
+
+.traffic-content {
+    transition: opacity 200ms ease;
+}
+
+.traffic-content--busy {
+    opacity: 0.5;
+}
+
+.traffic-flag {
+    margin-right: 6px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px var(--mud-palette-lines-default);
+}
+
+.traffic-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--mud-palette-text-secondary);
+}
+
+.traffic-legend-scale {
+    width: 96px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        to right,
+        color-mix(in srgb, var(--mud-palette-primary) 20%, transparent),
+        var(--mud-palette-primary)
+    );
+}
+
+.traffic-tooltip {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 12px));
+    padding: 6px 10px;
+    border-radius: var(--mud-default-borderradius);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    box-shadow: var(--mud-elevation-4);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.traffic-tooltip--visible {
+    opacity: 1;
+}
+
+.traffic-tooltip-title {
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: var(--mud-palette-text-primary);
+}
+
+.traffic-map path:hover {
+    stroke: var(--mud-palette-text-primary);
+    stroke-width: 1;
+}
+
+.traffic-map-frame:fullscreen {
+    display: flex;
+    align-items: center;
+    background: var(--mud-palette-surface);
+}
+
+.traffic-map-frame:fullscreen .traffic-map {
+    width: 100%;
+}
+
+.traffic-map-frame:fullscreen svg {
+    max-height: 100vh;
+}
+
+.traffic-map-frame:fullscreen .traffic-fullscreen-enter,
+.traffic-map-frame:not(:fullscreen) .traffic-fullscreen-exit {
+    display: none;
+}

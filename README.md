@@ -183,6 +183,9 @@ are atomic (temporary file, then rename) and keep the original file permissions.
   and a dry run before issuing. [Read more](https://byteroast.fr/docs/roastgate/certificates)
 - **Backups and restore**: the 30 most recent versions of each file are kept, can be compared line by line and
   restored. [Read more](https://byteroast.fr/docs/roastgate/backups-and-audit-log)
+- **Traffic map**: where the requests of the last 24 hours come from, read from the nginx access logs (current,
+  rotated and gzipped) and placed on a world map with the free [DB-IP](https://db-ip.com) city database. Set
+  `ROASTGATE_GEOIP_AUTO_UPDATE=true` to download it and refresh it every month.
 - **Account security**: two-factor authentication (TOTP), passkeys, and rate-limited sign-in.
   [Read more](https://byteroast.fr/docs/roastgate/account-security)
 - **Settings**: the paths and options chosen at setup, and the password. [Read more](https://byteroast.fr/docs/roastgate/settings-and-configuration)
@@ -190,7 +193,7 @@ are atomic (temporary file, then rename) and keep the original file permissions.
 ## Configuration
 
 The container is configured with optional environment variables (`ROASTGATE_SETUP_TOKEN`, `ROASTGATE_SECURE_COOKIES`,
-`ROASTGATE_TRUST_FORWARDED_HEADERS`...). See the [full list](https://byteroast.fr/docs/roastgate/settings-and-configuration#environment-variables).
+`ROASTGATE_TRUST_FORWARDED_HEADERS`, `ROASTGATE_GEOIP_AUTO_UPDATE`...). See the [full list](https://byteroast.fr/docs/roastgate/settings-and-configuration#environment-variables).
 
 
 ## Security notes
@@ -234,7 +237,7 @@ with `scripts/check-razor-imports.sh src/Roastgate.Web`.
 
 The tests that fake nginx live in `tests/Roastgate.Tests`. A second suite drives the real UI against a real nginx in
 Docker, see
-[tests/e2e](tests/e2e/README.md).
+[tests/Roastgate.E2E](tests/Roastgate.E2E/README.md).
 
 ### Trying it against a real nginx
 
@@ -245,7 +248,7 @@ the end-to-end image: Roastgate built from your working copy, with nginx install
 
 ```bash
 docker build -t roastgate:test .                                  # from the repository root, rebuild after each change
-docker build -f tests/e2e/Dockerfile -t roastgate:e2e tests/e2e
+docker build -f tests/Roastgate.E2E/Dockerfile -t roastgate:e2e tests/Roastgate.E2E
 docker rm -f roastgate-dev
 docker run -d --name roastgate-dev \
   -p 127.0.0.1:8282:8181 \

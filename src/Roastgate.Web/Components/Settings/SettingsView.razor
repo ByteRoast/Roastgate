@@ -1,4 +1,3 @@
-
 <div class="rg-page-header">
     <div>
         <MudText Typo="Typo.h4">
@@ -23,8 +22,8 @@
     <MudText Typo="Typo.body2"
              Color="Color.Secondary"
              Class="mb-3">
-        These paths are the ones <em>Roastgate</em> sees: they must be mounted into its container, at the same location as on the host,
-        because nginx reads the files you write through the same paths.
+        These paths are the ones <em>Roastgate</em> sees: they must be mounted into its container, at the same location
+        as on the host, because nginx reads the files you write through the same paths.
     </MudText>
 
     @if (_saveErrors.Count > 0)
@@ -40,41 +39,33 @@
         </MudAlert>
     }
 
-    @if (_saved)
-    {
-        <MudAlert Severity="Severity.Success"
-                  Class="mb-3">
-            Settings saved.
-        </MudAlert>
-    }
-
     <div class="rg-field-row">
         <MudTextField T="string"
-                      @bind-Value="_nginxRoot"
                       Label="nginx directory"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_nginxRoot"/>
 
         <MudTextField T="string"
-                      @bind-Value="_whitelistsDirectory"
                       Label="Whitelists directory"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_whitelistsDirectory"/>
 
         <MudTextField T="string"
-                      @bind-Value="_acmeWebroot"
                       Label="ACME webroot"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_acmeWebroot"/>
 
         <MudTextField T="string"
-                      @bind-Value="_letsEncryptDirectory"
                       Label="Let's Encrypt directory"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_letsEncryptDirectory"/>
     </div>
 
     <div class="rg-field-row mt-3">
         <MudSelect T="CertbotMode"
-                   @bind-Value="_certbotMode"
                    Label="Certificate management"
-                   Variant="Variant.Outlined">
+                   Variant="Variant.Outlined"
+                   @bind-Value="_certbotMode">
             <MudSelectItem Value="CertbotMode.Embedded">
                 Embedded certbot (renewed by Roastgate)
             </MudSelectItem>
@@ -89,9 +80,9 @@
         </MudSelect>
 
         <MudTextField T="string"
-                      @bind-Value="_acmeEmail"
                       Label="Let's Encrypt e-mail"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_acmeEmail"/>
     </div>
 
     <div class="rg-editor-actions">
@@ -112,12 +103,12 @@
     {
         <MudProgressLinear Indeterminate="true"
                            Color="Color.Primary"
-                           Class="mt-3" />
+                           Class="mt-3"/>
     }
     else if (_checks.Count > 0)
     {
         <div class="mt-3">
-            <DiagnosticsTable Checks="_checks" />
+            <DiagnosticsTable Checks="_checks"/>
         </div>
     }
 </MudPaper>
@@ -151,23 +142,23 @@
 
     <div class="rg-field-row">
         <MudTextField T="string"
-                      @bind-Value="_currentPassword"
                       Label="Current password"
                       InputType="InputType.Password"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_currentPassword"/>
 
         <MudTextField T="string"
-                      @bind-Value="_newPassword"
                       Label="New password"
                       InputType="InputType.Password"
                       Variant="Variant.Outlined"
-                      Immediate="true" />
+                      Immediate="true"
+                      @bind-Value="_newPassword"/>
 
         <MudTextField T="string"
-                      @bind-Value="_confirmation"
                       Label="Repeat the new password"
                       InputType="InputType.Password"
-                      Variant="Variant.Outlined" />
+                      Variant="Variant.Outlined"
+                      @bind-Value="_confirmation"/>
     </div>
 
     @if (_newPassword.Length > 0)
@@ -192,9 +183,9 @@
     </div>
 </MudPaper>
 
-<TwoFactorSection />
+<TwoFactorSection/>
 
-<PasskeySection />
+<PasskeySection/>
 
 <MudPaper Outlined="true"
           Elevation="0"
@@ -207,29 +198,41 @@
     <MudSimpleTable Dense="true"
                     Elevation="0">
         <tbody>
-            <tr>
-                <td>Signed in as</td><td>@_username</td>
-            </tr>
+        <tr>
+            <td>Signed in as</td>
+            <td>@_username</td>
+        </tr>
 
-            <tr>
-                <td>Version</td><td>@_version</td>
-            </tr>
+        <tr>
+            <td>Version</td>
+            <td>@_version</td>
+        </tr>
 
-            <tr>
-                <td>Host commands</td><td>@(Options.HostExecMode == HostExecMode.Nsenter ? "run in the host namespaces (nsenter)" : "run inside this process (direct, development)")</td>
-            </tr>
+        <tr>
+            <td>Host commands</td>
+            <td>
+                @(
+                Options.HostExecMode == HostExecMode.Nsenter
+                    ? "run in the host namespaces (nsenter)"
+                    : "run inside this process (direct, development)"
+                )
+            </td>
+        </tr>
 
-            <tr>
-                <td>Data directory</td><td><code>@Options.DataDirectory</code></td>
-            </tr>
+        <tr>
+            <td>Data directory</td>
+            <td><code>@Options.DataDirectory</code></td>
+        </tr>
 
-            <tr>
-                <td>Forwarded headers</td><td>@(Options.TrustForwardedHeaders ? "trusted (X-Forwarded-For, X-Forwarded-Proto)" : "ignored")</td>
-            </tr>
+        <tr>
+            <td>Forwarded headers</td>
+            <td>@(Options.TrustForwardedHeaders ? "trusted (X-Forwarded-For, X-Forwarded-Proto)" : "ignored")</td>
+        </tr>
 
-            <tr>
-                <td>Secure cookies</td><td>@(Options.SecureCookies ? "yes" : "no (set ROASTGATE_SECURE_COOKIES=true behind HTTPS)")</td>
-            </tr>
+        <tr>
+            <td>Secure cookies</td>
+            <td>@(Options.SecureCookies ? "yes" : "no (set ROASTGATE_SECURE_COOKIES=true behind HTTPS)")</td>
+        </tr>
         </tbody>
     </MudSimpleTable>
 </MudPaper>

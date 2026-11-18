@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using MudBlazor;
 using Roastgate.Core.Certificates;
 using Roastgate.Core.Hosting;
 using Roastgate.Core.Nginx;
@@ -15,92 +16,9 @@ public partial class SiteWizardView
     [Inject] private ICertificateCatalog Catalog { get; set; } = null!;
     [Inject] private CurrentUser User { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
-
-    private sealed class WizardForm
-    {
-        public string Name { get; set; } = string.Empty;
-
-        public string ServerNames { get; set; } = string.Empty;
-
-        public int HttpPort { get; set; } = 80;
-
-        public bool Ipv6 { get; set; } = true;
-
-        public string Upstream { get; set; } = string.Empty;
-
-        public bool Websockets { get; set; } = true;
-
-        public int? ProxyTimeout { get; set; }
-
-        public string RootDirectory { get; set; } = string.Empty;
-
-        public bool SpaFallback { get; set; }
-
-        public bool CacheStaticAssets { get; set; } = true;
-
-        public bool EnableTls { get; set; }
-
-        public int HttpsPort { get; set; } = 443;
-
-        public string CertificatePath { get; set; } = string.Empty;
-
-        public string CertificateKeyPath { get; set; } = string.Empty;
-
-        public bool ForceHttps { get; set; } = true;
-
-        public bool Http2 { get; set; } = true;
-
-        public bool Hsts { get; set; }
-
-        public string MaxBodySize { get; set; } = string.Empty;
-
-        public DeniedBehavior DeniedBehavior { get; set; } = DeniedBehavior.Forbidden;
-
-        public string DeniedUrl { get; set; } = string.Empty;
-
-        public bool SecurityHeaders { get; set; } = true;
-
-        public bool BlockCommonExploits { get; set; } = true;
-
-        public bool ServeAcmeChallenge { get; set; }
-
-        public string ExtraServerDirectives { get; set; } = string.Empty;
-
-        public string ExtraLocationDirectives { get; set; } = string.Empty;
-
-        public bool FancyIndexEnabled { get; set; }
-
-        public FancyIndexSort FancyIndexSort { get; set; }
-
-        public bool FancyIndexCaseSensitive { get; set; } = true;
-
-        public bool FancyIndexDirectoriesFirst { get; set; } = true;
-
-        public bool FancyIndexExactSize { get; set; } = true;
-
-        public bool FancyIndexLocalTime { get; set; }
-
-        public bool FancyIndexShowPath { get; set; } = true;
-
-        public bool FancyIndexShowDotFiles { get; set; }
-
-        public bool FancyIndexHideSymlinks { get; set; }
-
-        public bool FancyIndexHideParentDir { get; set; }
-
-        public string FancyIndexTimeFormat { get; set; } = "%Y-%b-%d %H:%M";
-
-        public string FancyIndexHeader { get; set; } = string.Empty;
-
-        public string FancyIndexFooter { get; set; } = string.Empty;
-
-        public string FancyIndexCssHref { get; set; } = string.Empty;
-
-        public string FancyIndexIgnore { get; set; } = string.Empty;
-    }
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     [Parameter, EditorRequired] public ConfigArea Area { get; set; }
-
     [Parameter] public string? Name { get; set; }
 
     private readonly HashSet<string> _selectedWhitelists = new(StringComparer.Ordinal);
@@ -132,8 +50,8 @@ public partial class SiteWizardView
 
     private string? FirstDomain => ParseNames(_form.ServerNames).FirstOrDefault();
 
-    private CertificateInfo? SelectedCertificate => _certificates.FirstOrDefault((CertificateInfo certificate) =>
-        certificate.FullChainPath == _form.CertificatePath);
+    private CertificateInfo? SelectedCertificate => _certificates
+        .FirstOrDefault(certificate => certificate.FullChainPath == _form.CertificatePath);
 
     private bool FancyIndexModuleMissing => _modules.Known && !KnownModule.FancyIndex.IsLoaded(_modules);
 
@@ -155,8 +73,9 @@ public partial class SiteWizardView
         _form.CertificateKeyPath = certificate?.PrivateKeyPath ?? string.Empty;
     }
 
-    private string EffectiveName =>
-        string.IsNullOrWhiteSpace(_form.Name) ? FirstDomain ?? string.Empty : _form.Name.Trim();
+    private string EffectiveName => string.IsNullOrWhiteSpace(_form.Name)
+        ? FirstDomain ?? string.Empty
+        : _form.Name.Trim();
 
     private string PreviewFileName => ConfigNames.Normalize(Area, EffectiveName) ?? "(no name yet)";
 
@@ -176,9 +95,9 @@ public partial class SiteWizardView
 
         ConfigListing whitelists = await Store.ListAsync(ConfigArea.Whitelists);
 
-        _availableWhitelists = whitelists.Entries.Select((ConfigEntry entry) => entry.Name).ToList();
+        _availableWhitelists = whitelists.Entries.Select(entry => entry.Name).ToList();
         _certificates = (await Catalog.ListAsync()).Certificates
-            .Select((CertificateEntry entry) => entry.Certificate)
+            .Select(entry => entry.Certificate)
             .ToList();
 
         _modules = await Wizard.GetModulesAsync();
@@ -361,7 +280,7 @@ public partial class SiteWizardView
             return null;
         }
 
-        return Problems.FirstOrDefault((SpecProblem problem) => problem.Field == field)?.Message;
+        return Problems.FirstOrDefault(problem => problem.Field == field)?.Message;
     }
 
     private void ToggleWhitelist(string name, bool on)
@@ -412,7 +331,10 @@ public partial class SiteWizardView
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            _result = new ConfigResult(false, "Enter a domain name (it also names the file) or a file name.");
+            _result = new ConfigResult(
+                false,
+                "Enter a domain name (it also names the file) or a file name."
+            );
             return;
         }
 
@@ -424,7 +346,7 @@ public partial class SiteWizardView
 
             ConfigResult result = await Wizard.SaveAsync(Area, name, ToSpec(), _reload, actor);
 
-            _result = result;
+            _result = Snackbar.ToastSuccess(result, ConfigNames.Normalize(Area, name) ?? name);
 
             if (!result.Succeeded)
             {
@@ -452,5 +374,49 @@ public partial class SiteWizardView
         {
             _isBusy = false;
         }
+    }
+
+    private sealed class WizardForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ServerNames { get; set; } = string.Empty;
+        public int HttpPort { get; set; } = 80;
+        public bool Ipv6 { get; set; } = true;
+        public string Upstream { get; set; } = string.Empty;
+        public bool Websockets { get; set; } = true;
+        public int? ProxyTimeout { get; set; }
+        public string RootDirectory { get; set; } = string.Empty;
+        public bool SpaFallback { get; set; }
+        public bool CacheStaticAssets { get; set; } = true;
+        public bool EnableTls { get; set; }
+        public int HttpsPort { get; set; } = 443;
+        public string CertificatePath { get; set; } = string.Empty;
+        public string CertificateKeyPath { get; set; } = string.Empty;
+        public bool ForceHttps { get; set; } = true;
+        public bool Http2 { get; set; } = true;
+        public bool Hsts { get; set; }
+        public string MaxBodySize { get; set; } = string.Empty;
+        public DeniedBehavior DeniedBehavior { get; set; } = DeniedBehavior.Forbidden;
+        public string DeniedUrl { get; set; } = string.Empty;
+        public bool SecurityHeaders { get; set; } = true;
+        public bool BlockCommonExploits { get; set; } = true;
+        public bool ServeAcmeChallenge { get; set; }
+        public string ExtraServerDirectives { get; set; } = string.Empty;
+        public string ExtraLocationDirectives { get; set; } = string.Empty;
+        public bool FancyIndexEnabled { get; set; }
+        public FancyIndexSort FancyIndexSort { get; set; }
+        public bool FancyIndexCaseSensitive { get; set; } = true;
+        public bool FancyIndexDirectoriesFirst { get; set; } = true;
+        public bool FancyIndexExactSize { get; set; } = true;
+        public bool FancyIndexLocalTime { get; set; }
+        public bool FancyIndexShowPath { get; set; } = true;
+        public bool FancyIndexShowDotFiles { get; set; }
+        public bool FancyIndexHideSymlinks { get; set; }
+        public bool FancyIndexHideParentDir { get; set; }
+        public string FancyIndexTimeFormat { get; set; } = "%Y-%b-%d %H:%M";
+        public string FancyIndexHeader { get; set; } = string.Empty;
+        public string FancyIndexFooter { get; set; } = string.Empty;
+        public string FancyIndexCssHref { get; set; } = string.Empty;
+        public string FancyIndexIgnore { get; set; } = string.Empty;
     }
 }

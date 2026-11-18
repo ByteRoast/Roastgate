@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
+using MudBlazor;
 using Roastgate.Core;
 using Roastgate.Core.Data.Interfaces;
 using Roastgate.Core.Security;
@@ -20,6 +21,7 @@ public partial class SettingsView
     [Inject] private RoastgateOptions Options { get; set; } = null!;
     [Inject] private CurrentUser User { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
 
     private readonly List<string> _saveErrors = [];
     private readonly List<string> _passwordErrors = [];
@@ -36,7 +38,6 @@ public partial class SettingsView
     private string _confirmation = string.Empty;
     private string _username = string.Empty;
     private string _version = string.Empty;
-    private bool _saved;
     private bool _isChecking;
     private bool _isChangingPassword;
 
@@ -50,7 +51,9 @@ public partial class SettingsView
         _acmeEmail = _original.AcmeEmail;
         _certbotMode = _original.CertbotMode;
         _username = await User.GetNameAsync();
-        _version = typeof(SettingsView).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
+        _version = typeof(SettingsView).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0] ?? "unknown";
     }
 
     private AppSettings Current()
@@ -68,45 +71,92 @@ public partial class SettingsView
 
     private async Task SaveSettingsAsync()
     {
-        _saved = false;
         _saveErrors.Clear();
+
         AppSettings updated = Current();
+
         _saveErrors.AddRange(updated.Validate());
+
         if (_saveErrors.Count > 0)
         {
             return;
         }
 
         List<string> changed = ChangedSettings(_original, updated);
+
         await SettingsService.SaveAsync(updated);
-        await Audit.WriteAsync(await User.GetNameAsync(), "settings.update", null, true, changed.Count == 0 ? "no change" : string.Join(", ", changed));
+        await Audit.WriteAsync(
+            await User.GetNameAsync(),
+            "settings.update",
+            null,
+            true,
+            changed.Count == 0
+                ? "no change"
+                : string.Join(", ", changed)
+        );
+
         _original = updated;
-        _saved = true;
+
+        Snackbar.Add(
+            changed.Count == 0
+                ? "Settings saved. Nothing had changed."
+                : "Settings saved. Use \"Check the host\" to verify the new values.",
+            Severity.Success
+        );
     }
 
     private static List<string> ChangedSettings(AppSettings before, AppSettings after)
     {
         List<string> changed = [];
-        if (before.NginxRoot != after.NginxRoot) { changed.Add("nginx directory"); }
-        if (before.WhitelistsDirectory != after.WhitelistsDirectory) { changed.Add("whitelists directory"); }
-        if (before.AcmeWebroot != after.AcmeWebroot) { changed.Add("ACME webroot"); }
-        if (before.LetsEncryptDirectory != after.LetsEncryptDirectory) { changed.Add("Let's Encrypt directory"); }
-        if (before.CertbotMode != after.CertbotMode) { changed.Add("certificate management"); }
-        if (before.AcmeEmail != after.AcmeEmail) { changed.Add("Let's Encrypt e-mail"); }
+
+        if (before.NginxRoot != after.NginxRoot)
+        {
+            changed.Add("nginx directory");
+        }
+
+        if (before.WhitelistsDirectory != after.WhitelistsDirectory)
+        {
+            changed.Add("whitelists directory");
+        }
+
+        if (before.AcmeWebroot != after.AcmeWebroot)
+        {
+            changed.Add("ACME webroot");
+        }
+
+        if (before.LetsEncryptDirectory != after.LetsEncryptDirectory)
+        {
+            changed.Add("Let's Encrypt directory");
+        }
+
+        if (before.CertbotMode != after.CertbotMode)
+        {
+            changed.Add("certificate management");
+        }
+
+        if (before.AcmeEmail != after.AcmeEmail)
+        {
+            changed.Add("Let's Encrypt e-mail");
+        }
+
         return changed;
     }
 
     private async Task RunDiagnosticsAsync()
     {
         _saveErrors.Clear();
+
         AppSettings values = Current();
+
         _saveErrors.AddRange(values.Validate());
+
         if (_saveErrors.Count > 0)
         {
             return;
         }
 
         _isChecking = true;
+
         try
         {
             _checks = await Diagnostics.RunAsync(values);
@@ -120,10 +170,14 @@ public partial class SettingsView
     private async Task ChangePasswordAsync()
     {
         _passwordErrors.Clear();
+
         string throttleKey = "password-change:" + _username;
+
         if (Throttle.IsBlocked(throttleKey, out TimeSpan retryAfter))
         {
-            _passwordErrors.Add($"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalMinutes)} minute(s).");
+            _passwordErrors.Add(
+                $"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalMinutes)} minute(s)."
+            );
             return;
         }
 
@@ -134,15 +188,24 @@ public partial class SettingsView
         }
 
         _isChangingPassword = true;
+
         try
         {
             IReadOnlyList<string> problems = await Accounts.ChangePasswordAsync(_currentPassword, _newPassword);
+
             if (problems.Count > 0)
             {
-                if (problems.Any((string problem) => problem.Contains("current password", StringComparison.Ordinal)))
+                if (problems.Any(problem => problem.Contains("current password", StringComparison.Ordinal)))
                 {
                     Throttle.RecordFailure(throttleKey);
-                    await Audit.WriteAsync(_username, "auth.password-change", null, false, "wrong current password");
+
+                    await Audit.WriteAsync(
+                        _username,
+                        "auth.password-change",
+                        null,
+                        false,
+                        "wrong current password"
+                    );
                 }
 
                 _passwordErrors.AddRange(problems);
@@ -150,6 +213,7 @@ public partial class SettingsView
             }
 
             Throttle.Reset(throttleKey);
+
             await Audit.WriteAsync(_username, "auth.password-change", null, true);
 
             // The security stamp changed, so this session is over as well: the sign-in page explains why.

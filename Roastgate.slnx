@@ -4,6 +4,7 @@
     <Project Path="src/Roastgate.Web/Roastgate.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Roastgate.E2E/Roastgate.E2E.esproj" />
     <Project Path="tests/Roastgate.Tests/Roastgate.Tests.csproj" />
   </Folder>
 </Solution>

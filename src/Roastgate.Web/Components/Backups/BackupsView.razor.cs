@@ -13,14 +13,14 @@ public partial class BackupsView
     [Inject] private IConfigStore Store { get; set; } = null!;
     [Inject] private CurrentUser User { get; set; } = null!;
     [Inject] private IDialogService Dialogs { get; set; } = null!;
+    [Inject] private ISnackbar Snackbar { get; set; } = null!;
+
+    [Parameter] public string? Area { get; set; }
+    [Parameter] public string? Name { get; set; }
 
     private sealed record DiffRow(DiffLine? Line, int Skipped);
 
     private const int ContextLines = 3;
-
-    [Parameter] public string? Area { get; set; }
-
-    [Parameter] public string? Name { get; set; }
 
     private IReadOnlyList<ConfigBackup>? _items;
     private ConfigBackup? _selected;
@@ -93,18 +93,24 @@ public partial class BackupsView
             "Restore " + _selected.Name + "?",
             "The file is replaced by this version and nginx is reloaded. The content it replaces is backed up too.",
             yesText: "Restore",
-            cancelText: "Cancel");
+            cancelText: "Cancel"
+        );
 
         if (confirmed != true)
         {
             return;
         }
 
+        // Read before the awaits: the selection can change while nginx is tested and reloaded.
+        ConfigBackup backup = _selected;
+
         _isBusy = true;
 
         try
         {
-            _result = await Store.RestoreAsync(_selected.Id, reload: true, await User.GetNameAsync());
+            ConfigResult result = await Store.RestoreAsync(backup.Id, reload: true, await User.GetNameAsync());
+
+            _result = Snackbar.ToastSuccess(result, backup.Name);
 
             await LoadAsync();
         }
@@ -135,9 +141,11 @@ public partial class BackupsView
                 continue;
             }
 
-            for (int near = Math.Max(0, index - ContextLines);
-                 near <= Math.Min(lines.Count - 1, index + ContextLines);
-                 near++)
+            for (
+                int near = Math.Max(0, index - ContextLines);
+                near <= Math.Min(lines.Count - 1, index + ContextLines);
+                near++
+            )
             {
                 keep[near] = true;
             }
@@ -173,7 +181,9 @@ public partial class BackupsView
 
     private static string AreaTitle(string area)
     {
-        return Enum.TryParse(area, out ConfigArea parsed) && Enum.IsDefined(parsed) ? AreaInfo.For(parsed).Title : area;
+        return Enum.TryParse(area, out ConfigArea parsed) && Enum.IsDefined(parsed)
+            ? AreaInfo.For(parsed).Title
+            : area;
     }
 
     private static string Describe(string reason)

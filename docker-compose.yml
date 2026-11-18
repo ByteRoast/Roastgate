@@ -1,6 +1,7 @@
 # Roastgate drives the nginx installed on the host.
 #   privileged + pid: host  lets it run `nginx` and `certbot` in the host namespaces (nsenter).
-#   the volumes below      let it read and write the nginx configuration and the certificates.
+#   the volumes below      let it read and write the nginx configuration and the certificates,
+#                          and read the nginx access logs.
 # Read the security notes in README.md before exposing the port beyond 127.0.0.1.
 # The project and the volume have fixed names, so the account survives a rebuild whatever the folder you cloned into.
 # Update with `docker compose pull && docker compose up -d` (or `docker compose up -d --build` to build from source).
@@ -24,11 +25,14 @@ services:
       # ROASTGATE_SECURE_COOKIES: "true"
       # Set to "true" only behind your own reverse proxy, so the client IP is read from X-Forwarded-For.
       # ROASTGATE_TRUST_FORWARDED_HEADERS: "true"
+      # Set to "true" to download the DB-IP city database (about 60 MB, refreshed monthly) for the traffic map.
+      # ROASTGATE_GEOIP_AUTO_UPDATE: "true"
       TZ: Europe/Paris
     volumes:
       - /etc/nginx:/etc/nginx
       - /etc/letsencrypt:/etc/letsencrypt
       - /var/www/certbot:/var/www/certbot
+      - /var/log/nginx:/var/log/nginx:ro
       - roastgate-data:/data
 
 volumes:
