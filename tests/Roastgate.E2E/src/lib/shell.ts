@@ -41,6 +41,13 @@ export const sh = (command: string): string => {
   }
 };
 
+// Appends to a file in the container, the same way writeHostFile writes one.
+export const appendHostFile = (path: string, content: string): string => {
+  return sh(
+    `bash -c 'echo ${Buffer.from(content).toString('base64')} | base64 -d >> ${path}'`,
+  );
+};
+
 // Writes a file in the container with its real newlines (printf through two shells would keep the backslashes).
 export const writeHostFile = (path: string, content: string): string => {
   return sh(
