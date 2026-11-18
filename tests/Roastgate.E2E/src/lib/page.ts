@@ -90,11 +90,19 @@ export const pageHelper = (page: Page) => {
     );
   };
 
-  const shot = async (name: string): Promise<void> => {
-    await page.screenshot({
-      path: `${SHOTS}/${String(++taken).padStart(2, '0')}-${name}.png`,
-      fullPage: true,
-    });
+  /**
+   * The whole page, or only `target` when given (a full page capture resizes the page, which can end a hover).
+   */
+  const shot = async (name: string, target?: Locator): Promise<void> => {
+    const path: string = `${SHOTS}/${String(++taken).padStart(2, '0')}-${name}.png`;
+
+    if (target) {
+      await target.screenshot({ path });
+
+      return;
+    }
+
+    await page.screenshot({ path, fullPage: true });
   };
 
   const tab = (name: string): Locator => {
