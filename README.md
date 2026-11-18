@@ -46,12 +46,11 @@ docker logs roastgate        # prints the setup token
 
 The compose file pulls `ghcr.io/byteroast/roastgate:latest`. The image is published with these tags:
 
-| Tag                       | Follows                                                                                     |
-|---------------------------|---------------------------------------------------------------------------------------------|
-| `latest`                  | `main`: published when `dev` is merged into it                                              |
-| `0.1.0-alpha.1`, `0.1.0`… | a release: published when its `v*` git tag is pushed                                        |
-| `0.1`, `1.2`…             | the latest stable release of that minor version (pre-releases such as alphas don't move it) |
-| `dev`                     | every push to the `dev` branch (unstable)                                                   |
+| Tag                           | Follows                                                                                 |
+|-------------------------------|-----------------------------------------------------------------------------------------|
+| `latest`                      | the latest stable release: published when a `vX.Y.Z` git tag is pushed                  |
+| `0.1.0-alpha.1`, `0.1.0`, ... | a release: published when its `v*` git tag is pushed (pre-releases don't move `latest`) |
+| `dev`                         | every push to the `dev` branch (unstable)                                               |
 
 To stay on one version, replace `latest` with a release tag in `docker-compose.yml`.
 
@@ -81,11 +80,13 @@ To pick the setup token yourself, uncomment `ROASTGATE_SETUP_TOKEN` in the compo
 
 Open <http://127.0.0.1:8181> (from your own machine, `ssh -L 8181:127.0.0.1:8181 user@server` gives you that address).
 The first
-visit goes to `/setup`, where you enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`), create the **administrator**
+visit goes to `/setup`, where you enter the **setup token** from the logs (or the one you set in `ROASTGATE_SETUP_TOKEN`
+), create the **administrator**
 account, choose the **paths and options**, and review the **host diagnostics**. Each step is detailed in the
 [first start guide](https://byteroast.fr/docs/roastgate/first-start).
 
-To create your first reverse proxy or site, see the [documentation](https://byteroast.fr/docs/roastgate/reverse-proxies-and-sites).
+To create your first reverse proxy or site, see the
+[documentation](https://byteroast.fr/docs/roastgate/reverse-proxies-and-sites).
 
 ### Development image
 
@@ -143,7 +144,8 @@ docker compose down            # keeps the data volume
 docker compose down --volumes  # also deletes the account, settings and backup history
 ```
 
-Then delete the folder that holds `docker-compose.yml`, and the image with `docker image rm ghcr.io/byteroast/roastgate:latest` (or the tag you used).
+Then delete the folder that holds `docker-compose.yml`, and the image with
+`docker image rm ghcr.io/byteroast/roastgate:latest` (or the tag you used).
 Your nginx files stay where they are: Roastgate never moves them.
 
 ## What it manages
@@ -188,13 +190,14 @@ are atomic (temporary file, then rename) and keep the original file permissions.
   `ROASTGATE_GEOIP_AUTO_UPDATE=true` to download it and refresh it every month.
 - **Account security**: two-factor authentication (TOTP), passkeys, and rate-limited sign-in.
   [Read more](https://byteroast.fr/docs/roastgate/account-security)
-- **Settings**: the paths and options chosen at setup, and the password. [Read more](https://byteroast.fr/docs/roastgate/settings-and-configuration)
+- **Settings**: the paths and options chosen at setup, and the
+  password. [Read more](https://byteroast.fr/docs/roastgate/settings-and-configuration)
 
 ## Configuration
 
 The container is configured with optional environment variables (`ROASTGATE_SETUP_TOKEN`, `ROASTGATE_SECURE_COOKIES`,
-`ROASTGATE_TRUST_FORWARDED_HEADERS`, `ROASTGATE_GEOIP_AUTO_UPDATE`...). See the [full list](https://byteroast.fr/docs/roastgate/settings-and-configuration#environment-variables).
-
+`ROASTGATE_TRUST_FORWARDED_HEADERS`, `ROASTGATE_GEOIP_AUTO_UPDATE`...). See
+the [full list](https://byteroast.fr/docs/roastgate/settings-and-configuration#environment-variables).
 
 ## Security notes
 
@@ -212,8 +215,8 @@ in practice, root on the host. Treat it accordingly:
 - Every sign-in, failure and config change is written to the audit log.
 - The `/data` volume holds the database **and the keys that encrypt session cookies**. On Linux those keys are stored
   unencrypted, so keep `/data` readable by root only.
-- Turn on [two-factor authentication and passkeys](https://byteroast.fr/docs/roastgate/account-security) in the settings.
-
+- Turn on [two-factor authentication and passkeys](https://byteroast.fr/docs/roastgate/account-security) in the
+  settings.
 
 ## Development
 
