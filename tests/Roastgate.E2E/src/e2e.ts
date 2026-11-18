@@ -20,6 +20,7 @@ import { reverseProxies } from './sections/reverse-proxies.ts';
 import { settings } from './sections/settings.ts';
 import { setup } from './sections/setup.ts';
 import { defaultSite, sites } from './sections/sites.ts';
+import { traffic } from './sections/traffic.ts';
 import { twoFactor } from './sections/two-factor.ts';
 import { whitelists } from './sections/whitelists.ts';
 import { wizard } from './sections/wizard.ts';
@@ -69,6 +70,7 @@ const sections: ((context: Context) => Promise<void>)[] = [
   settings,
   twoFactor,
   audit,
+  traffic,
   restart,
 ];
 

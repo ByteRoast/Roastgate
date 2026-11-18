@@ -57,6 +57,10 @@ The `e2e:*` scripts use the default container name and port. `test:fresh:chrome`
 The container uses `ROASTGATE_HOST_EXEC=direct` with nginx installed in the same container, so `nginx -t` and
 `nginx -s reload` are the real commands without needing the host namespaces.
 
+Its GeoIP database is MaxMind's public test database (`tests/Roastgate.Tests/GeoIP/Fixtures`), which `e2e:build`
+passes as the `geoip` build context: the traffic section seeds the access logs with addresses it knows, and nothing is
+downloaded from DB-IP.
+
 ## Layout
 
 ```
@@ -72,7 +76,8 @@ tests/Roastgate.E2E/
       totp.ts          an authenticator app's TOTP, written independently of the server
     sections/          one function per part of the scenario
     globals.d.ts       the few parts of Monaco the scenario reaches through window.monaco
-  Dockerfile           the test image: Roastgate with nginx, the fancyindex module and fake-certbot.sh
+  Dockerfile           the test image: Roastgate with nginx, the fancyindex module, fake-certbot.sh and a test GeoIP
+                       database
   scripts/
     fake-certbot.sh    a stand-in for certbot that keeps its command line and file layout but never reaches Let's Encrypt
   out/                 screenshots of the last run (not committed)

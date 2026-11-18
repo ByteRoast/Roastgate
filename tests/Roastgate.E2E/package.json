@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Browser tests that drive the real application against a real nginx in Docker",
   "scripts": {
-    "e2e:build": "docker build -t roastgate:test ../.. && docker build -t roastgate:e2e .",
+    "e2e:build": "docker build -t roastgate:test ../.. && docker build --build-context geoip=../Roastgate.Tests/GeoIP/Fixtures -t roastgate:e2e .",
     "e2e:up": "docker rm -f roastgate-e2e && docker run -d --name roastgate-e2e -p 127.0.0.1:8199:8181 roastgate:e2e",
     "e2e:wait": "timeout 60 sh -c 'until docker logs roastgate-e2e 2>&1 | grep -q \"setup token:\"; do sleep 1; done'",
     "format": "prettier --write .",

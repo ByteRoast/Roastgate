@@ -248,12 +248,16 @@ the end-to-end image: Roastgate built from your working copy, with nginx install
 
 ```bash
 docker build -t roastgate:test .                                  # from the repository root, rebuild after each change
-docker build -f tests/Roastgate.E2E/Dockerfile -t roastgate:e2e tests/Roastgate.E2E
+docker build -f tests/Roastgate.E2E/Dockerfile \
+  --build-context geoip=tests/Roastgate.Tests/GeoIP/Fixtures \
+  -t roastgate:e2e tests/Roastgate.E2E
+
 docker rm -f roastgate-dev
 docker run -d --name roastgate-dev \
   -p 127.0.0.1:8282:8181 \
   -p 127.0.0.1:8280:80 \
   roastgate:e2e
+
 docker logs roastgate-dev                                         # prints the setup token
 ```
 
