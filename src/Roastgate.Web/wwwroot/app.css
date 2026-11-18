@@ -404,7 +404,7 @@ a:not(.mud-button-root):not(.mud-nav-link):not(.mud-link) {
     margin-top: 0;
 }
 
-/* Connection lost dialog (Components/Layout/ReconnectModal.razor). This lives here because scoped component CSS is not linked in App.razor. */
+/* Connection lost dialog (Components/Common/ReconnectModal.razor). This lives here because scoped component CSS is not linked in App.razor. */
 /* Each element below is shown only in the connection states it belongs to (the script sets the components-reconnect-* class on the dialog). */
 .components-reconnect-first-attempt-visible,
 .components-reconnect-repeated-attempt-visible,
